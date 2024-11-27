@@ -13,6 +13,16 @@ updater.repo = {
     branch = "Github-updating-test"
 }
 
+-- Protected files that cannot be deleted
+updater.protected_files = {
+    "scios/Sci_sentinel.lua",
+    "scios/Gui.lua",
+    "scios/Commands.lua",
+    "scios/Updater.lua",
+    "startup.lua",
+    "scios/versions.db"
+}
+
 -- Module version information and file hashes
 updater.modules = {
     ["core"] = {
@@ -55,49 +65,55 @@ updater.settings = {
     auto_install = false -- Require confirmation by default
 }
 
+-- Load saved versions from file
+function updater.loadVersions()
+    if fs.exists("scios/versions.db") then
+        local file = fs.open("scios/versions.db", "r")
+        if file then
+            local content = file.readAll()
+            file.close()
+            
+            for name, version in string.gmatch(content, "(%w+):([%d%.]+)") do
+                if updater.modules[name] then
+                    updater.modules[name].version = version
+                end
+            end
+        end
+    end
+end
+
+-- Save current versions to file
+function updater.saveVersions()
+    local file = fs.open("scios/versions.db", "w")
+    if file then
+        for name, info in pairs(updater.modules) do
+            file.write(string.format("%s:%s\n", name, info.version))
+        end
+        file.close()
+    end
+end
+
+-- Protect system files from deletion
+function updater.protectFiles()
+    -- Override fs.delete for protected files
+    local original_delete = fs.delete
+    fs.delete = function(path)
+        path = fs.combine("", path) -- Normalize path
+        for _, protected in ipairs(updater.protected_files) do
+            if path == protected then
+                return false -- Prevent deletion of protected files
+            end
+        end
+        return original_delete(path)
+    end
+end
+
 function updater.calculateHash(content)
-    -- Simple hash function for file validation
     local hash = 0
     for i = 1, #content do
         hash = (hash * 31 + string.byte(content, i)) % 2^32
     end
     return string.format("%08x", hash)
-end
-
-function updater.validateFile(path, expected_hash)
-    if not fs.exists(path) then
-        return false, "File does not exist"
-    end
-
-    local file = fs.open(path, "r")
-    if not file then
-        return false, "Cannot open file"
-    end
-
-    local content = file.readAll()
-    file.close()
-
-    local actual_hash = updater.calculateHash(content)
-    return actual_hash == expected_hash, actual_hash
-end
-
-function updater.validateAllFiles()
-    local all_valid = true
-    gui.drawSuccess("Validating system files...")
-    
-    for name, info in pairs(updater.modules) do
-        local path = "scios/" .. info.path
-        local valid, result = updater.validateFile(path, info.hash)
-        
-        if valid then
-            gui.drawSuccess(string.format("%s: Valid", name))
-        else
-            all_valid = false
-            gui.drawError(string.format("%s: Invalid (%s)", name, result))
-        end
-    end
-    
-    return all_valid
 end
 
 function updater.getGitHubRawURL(filepath)
@@ -147,6 +163,7 @@ end
 
 function updater.checkForUpdates(auto_mode)
     local updates_available = false
+    local updates_installed = false
     
     -- Update last check time
     updater.settings.last_check = os.epoch("utc")
@@ -171,6 +188,7 @@ function updater.checkForUpdates(auto_mode)
                     -- Update local version and hash
                     info.version = remote_version
                     info.hash = new_hash
+                    updates_installed = true
                 else
                     gui.drawError(string.format("Failed to update %s", name))
                 end
@@ -180,49 +198,21 @@ function updater.checkForUpdates(auto_mode)
         end
     end
     
+    -- Save updated versions
+    if updates_installed then
+        updater.saveVersions()
+        if not auto_mode then
+            gui.drawSuccess("Updates installed. Rebooting in 3 seconds...")
+            os.sleep(3)
+            os.reboot()
+        end
+    end
+    
     return updates_available
 end
 
--- Function to run periodic update checks
-function updater.autoUpdateCheck()
-    local current_time = os.epoch("utc")
-    if updater.settings.auto_check and 
-       (current_time - updater.settings.last_check) >= (updater.settings.check_interval * 1000) then
-        if updater.checkForUpdates(true) then
-            gui.drawSuccess("Updates were found and " .. 
-                          (updater.settings.auto_install and "installed" or "are available"))
-        end
-    end
-end
-
--- Initial installation function
-function updater.initialInstall()
-    gui.drawSuccess("Performing initial installation...")
-    local allSuccess = true
-    
-    -- Create scios directory if it doesn't exist
-    if not fs.exists("scios") then
-        fs.makeDir("scios")
-    end
-    
-    -- Download startup file first
-    if not updater.downloadFile(updater.getGitHubRawURL("Startup.lua"), "Startup.lua") then
-        gui.drawError("Failed to install startup file")
-        return false
-    end
-    
-    -- Download all modules
-    for moduleName, info in pairs(updater.modules) do
-        local destination = "scios/" .. info.path
-        gui.drawSuccess("Installing " .. moduleName .. " module...")
-        
-        if not updater.downloadFile(updater.getGitHubRawURL(info.path), destination) then
-            gui.drawError("Failed to install " .. moduleName)
-            allSuccess = false
-        end
-    end
-    
-    return allSuccess
-end
+-- Initialize
+updater.loadVersions() -- Load saved versions
+updater.protectFiles() -- Enable file protection
 
 return updater
