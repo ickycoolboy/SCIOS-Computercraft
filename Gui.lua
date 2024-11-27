@@ -21,6 +21,8 @@ function gui.mirrorCurrentDisplay()
     if displayManager then
         pcall(function()
             if displayManager.isMirroringEnabled() then
+                -- Allow a small delay for terminal updates
+                os.sleep(0.05)
                 displayManager.mirrorContent()
             end
         end)
@@ -28,6 +30,7 @@ function gui.mirrorCurrentDisplay()
 end
 
 function gui.drawScreen()
+    local currentTerm = term.current()
     term.clear()
     term.setCursorPos(1,1)
     term.setTextColor(colors.yellow)

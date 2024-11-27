@@ -9,6 +9,8 @@ local config = {
 
 -- Store monitor references
 local secondaryMonitor = nil
+local originalTerm = term.current()
+local redirectedTerm = nil
 
 -- Debug function
 local function debug(msg)
@@ -27,26 +29,17 @@ function displayManager.detectMonitors()
             secondaryMonitor = peripheral.wrap(side)
             if secondaryMonitor then
                 debug("Successfully wrapped monitor")
-                -- Match the main terminal's text scale
-                local w, h = term.getSize()
                 secondaryMonitor.setTextScale(0.5)
-                while true do
-                    local mw, mh = secondaryMonitor.getSize()
-                    if mw >= w and mh >= h then
-                        break
-                    end
-                    local scale = secondaryMonitor.getTextScale()
-                    if scale >= 5 then
-                        break
-                    end
-                    secondaryMonitor.setTextScale(scale + 0.5)
-                end
-                
                 secondaryMonitor.clear()
                 secondaryMonitor.setCursorPos(1,1)
                 secondaryMonitor.setBackgroundColor(colors.black)
                 secondaryMonitor.setTextColor(colors.white)
-                debug("Monitor initialized with scale: " .. secondaryMonitor.getTextScale())
+                
+                -- Create redirected terminal
+                redirectedTerm = term.redirect(secondaryMonitor)
+                term.redirect(originalTerm)
+                
+                debug("Monitor initialized")
                 return true
             end
         end
@@ -61,6 +54,11 @@ function displayManager.enableMirroring()
     if displayManager.detectMonitors() then
         config.mirrorEnabled = true
         debug("Mirroring enabled")
+        -- Set up terminal redirection
+        if secondaryMonitor then
+            redirectedTerm = term.redirect(secondaryMonitor)
+            term.redirect(originalTerm)
+        end
         return true
     end
     debug("Failed to enable mirroring")
@@ -99,39 +97,30 @@ function displayManager.mirrorContent()
     end
 
     local status, err = pcall(function()
-        -- Get terminal size
-        local width, height = term.getSize()
+        -- Save current terminal
+        local currentTerm = term.current()
         
-        -- Save current terminal state
-        local curX, curY = term.getCursorPos()
-        local curFg = term.getTextColor()
-        local curBg = term.getBackgroundColor()
+        -- Redirect to secondary monitor
+        term.redirect(secondaryMonitor)
         
-        -- Clear secondary monitor
-        secondaryMonitor.clear()
+        -- Copy from original terminal
+        local width, height = originalTerm.getSize()
         
-        -- Copy terminal content
+        -- Clear the monitor
+        term.clear()
+        term.setCursorPos(1,1)
+        
+        -- Copy content from original terminal
         for y = 1, height do
-            for x = 1, width do
-                -- Get character at position
-                term.setCursorPos(x, y)
-                local fg = term.getTextColor()
-                local bg = term.getBackgroundColor()
-                
-                -- Set position and colors on secondary monitor
-                secondaryMonitor.setCursorPos(x, y)
-                secondaryMonitor.setTextColor(fg)
-                secondaryMonitor.setBackgroundColor(bg)
-                
-                -- Write the character
-                secondaryMonitor.write(" ")
+            term.setCursorPos(1, y)
+            local line = originalTerm.getLine(y)
+            if line then
+                term.write(line)
             end
         end
         
-        -- Restore cursor and colors
-        term.setCursorPos(curX, curY)
-        term.setTextColor(curFg)
-        term.setBackgroundColor(curBg)
+        -- Restore original terminal
+        term.redirect(currentTerm)
     end)
 
     if not status then
@@ -143,6 +132,7 @@ end
 -- Initialize display manager
 function displayManager.init()
     debug("Initializing display manager")
+    originalTerm = term.current() -- Store original terminal
     displayManager.detectMonitors()
 end
 
