@@ -815,7 +815,7 @@ function commands.handleCommand(input)
                 }
                 
                 -- Handle button click
-                local choice = gui.handleButtons(buttons)
+                local choice = gui.handleMouseEvents(buttons)
                 if choice ~= "Yes" then
                     gui.drawCenteredText(3, "Cancelled", colors.lime)
                     os.sleep(1)
@@ -839,7 +839,7 @@ function commands.handleCommand(input)
                 }
                 
                 -- Handle button click
-                local choice = gui.handleButtons(buttons)
+                local choice = gui.handleMouseEvents(buttons)
                 if choice ~= "Yes" then
                     gui.drawCenteredText(7, "Uninstall cancelled", colors.lime)
                     os.sleep(1)
@@ -867,7 +867,7 @@ function commands.handleCommand(input)
                 }
                 
                 -- Handle button click
-                local choice = gui.handleButtons(buttons)
+                local choice = gui.handleMouseEvents(buttons)
                 if choice ~= "Yes" then
                     gui.drawCenteredText(3, "Cancelled", colors.lime)
                     os.sleep(1)
@@ -890,7 +890,7 @@ function commands.handleCommand(input)
                 }
                 
                 -- Handle button click
-                local choice = gui.handleButtons(buttons)
+                local choice = gui.handleMouseEvents(buttons)
                 if choice ~= "Yes" then
                     gui.drawCenteredText(7, "Uninstall cancelled", colors.lime)
                     os.sleep(1)
@@ -1077,7 +1077,7 @@ end
                 }
                 
                 -- Handle button click
-                local choice = gui.handleButtons(buttons)
+                local choice = gui.handleMouseEvents(buttons)
                 if choice == "Yes" then
                     gui.drawCenteredText(3, "Rebooting...", colors.lime)
                     os.sleep(1)
@@ -1103,7 +1103,7 @@ end
                 }
                 
                 -- Handle button click
-                local choice = gui.handleButtons(buttons)
+                local choice = gui.handleMouseEvents(buttons)
                 if choice == "Yes" then
                     gui.drawCenteredText(7, "Rebooting to complete uninstallation...", colors.lime)
                     os.sleep(1)
