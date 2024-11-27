@@ -134,6 +134,7 @@ function updater.getGitHubRawURL(filepath)
 end
 
 function updater.downloadFile(url, path)
+    gui.drawInfo("Downloading: " .. path)
     local response = http.get(url)
     if response then
         local content = response.readAll()
@@ -145,6 +146,23 @@ function updater.downloadFile(url, path)
             fs.makeDir(dir)
         end
         
+        -- Check if file is protected
+        local isProtected = false
+        for _, pfile in ipairs(updater.protected_files) do
+            if pfile == path then
+                isProtected = true
+                break
+            end
+        end
+        
+        -- Handle protected files
+        if isProtected and fs.exists(path) then
+            if not gui.confirm("Warning: " .. path .. " is a protected system file.\nAre you sure you want to modify it?", colors.red) then
+                gui.drawError("Update cancelled for " .. path)
+                return false
+            end
+        end
+        
         -- Delete existing file if it exists
         if fs.exists(path) then
             fs.delete(path)
@@ -154,13 +172,16 @@ function updater.downloadFile(url, path)
         if file then
             file.write(content)
             file.close()
+            gui.drawSuccess("Downloaded: " .. path)
             return true, updater.calculateHash(content)
         end
     end
+    gui.drawError("Failed to download: " .. path)
     return false
 end
 
 function updater.getRemoteVersion(filepath)
+    gui.drawInfo("Checking version for: " .. filepath)
     local url = updater.getGitHubRawURL(filepath)
     local response = http.get(url)
     if response then
@@ -173,6 +194,7 @@ function updater.getRemoteVersion(filepath)
             return version, updater.calculateHash(content)
         end
     end
+    gui.drawError("Failed to get version for: " .. filepath)
     return nil
 end
 
@@ -198,6 +220,10 @@ function updater.checkForUpdates(auto_mode)
     local updates_available = false
     local updates_installed = false
     
+    if not auto_mode then
+        gui.drawInfo("Checking for updates...")
+    end
+    
     -- Update last check time
     updater.settings.last_check = os.epoch("utc")
     
@@ -205,7 +231,9 @@ function updater.checkForUpdates(auto_mode)
     updater.loadVersions()
     
     for name, info in pairs(updater.modules) do
-        gui.drawInfo(string.format("Checking %s for updates...", name))
+        if not auto_mode then
+            gui.drawInfo(string.format("Checking %s...", name))
+        end
         
         -- Get remote version and hash
         local remote_version, remote_hash = updater.getRemoteVersion(info.path)
@@ -230,22 +258,15 @@ function updater.checkForUpdates(auto_mode)
                     local url = updater.getGitHubRawURL(info.path)
                     local success, new_hash = updater.downloadFile(url, info.target)
                     if success then
-                        if not auto_mode then
-                            gui.drawSuccess(string.format("Successfully updated %s", name))
-                        end
                         -- Update local version and hash
                         info.version = remote_version
                         info.hash = new_hash
                         updates_installed = true
-                    else
-                        gui.drawError(string.format("Failed to update %s", name))
                     end
                 end
             elseif not auto_mode then
                 gui.drawSuccess(string.format("%s is up to date", name))
             end
-        else
-            gui.drawError(string.format("Failed to check %s for updates", name))
         end
     end
     
@@ -255,7 +276,7 @@ function updater.checkForUpdates(auto_mode)
         if not auto_mode then
             gui.drawSuccess("Updates installed. Rebooting in 3 seconds...")
             os.sleep(3)
-            shell.run("reboot")  -- Use shell.run instead of os.reboot()
+            shell.run("reboot")
         end
     elseif not auto_mode then
         gui.drawSuccess("No updates available.")

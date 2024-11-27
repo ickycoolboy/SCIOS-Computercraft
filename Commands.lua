@@ -152,9 +152,9 @@ function commands.executeCommand(command, gui)
         gui.drawSuccess("  uninstall     - Uninstall SCI Sentinel")
     elseif cmd == "uninstall" then
         if gui.confirm("Are you sure you want to uninstall SCI Sentinel? This will remove all system files except the installer.") then
-            -- Remove system files first
+            -- System files to remove
             local system_files = {
-                "startup.lua",  
+                "startup.lua",
                 "scios/Sci_sentinel.lua",
                 "scios/Gui.lua",
                 "scios/Commands.lua",
@@ -163,10 +163,34 @@ function commands.executeCommand(command, gui)
             }
             
             local removed = 0
+            local skipped = 0
+            
+            -- Try to remove each file
             for _, file in ipairs(system_files) do
                 if fs.exists(file) then
-                    fs.delete(file)
-                    removed = removed + 1
+                    -- Check if file is protected
+                    local isProtected = false
+                    for _, pfile in ipairs({"scios/Sci_sentinel.lua", "scios/Gui.lua", "startup.lua"}) do
+                        if pfile == file then
+                            isProtected = true
+                            break
+                        end
+                    end
+                    
+                    if isProtected then
+                        gui.drawWarning(string.format("Warning: %s is a protected system file", file))
+                        if gui.confirm("Are you sure you want to delete this protected file?", colors.red) then
+                            fs.delete(file)
+                            removed = removed + 1
+                            gui.drawSuccess(string.format("Removed protected file: %s", file))
+                        else
+                            skipped = skipped + 1
+                            gui.drawInfo(string.format("Skipped protected file: %s", file))
+                        end
+                    else
+                        fs.delete(file)
+                        removed = removed + 1
+                    end
                 end
             end
             
@@ -179,13 +203,21 @@ function commands.executeCommand(command, gui)
                 end
             end
             
-            gui.drawSuccess(string.format("Uninstalled SCI Sentinel (%d files removed)", removed))
-            gui.drawSuccess("System will reboot in 3 seconds...")
-            os.sleep(3)
-            shell.run("reboot")  
+            gui.drawSuccess(string.format("Uninstalled SCI Sentinel (%d files removed, %d protected files skipped)", 
+                removed, skipped))
+            
+            if removed > 0 then
+                gui.drawSuccess("System will reboot in 3 seconds...")
+                os.sleep(3)
+                shell.run("reboot")
+            end
         else
             gui.drawSuccess("Uninstall cancelled")
         end
+    elseif cmd == "update" then
+        -- Update command
+        gui.drawSuccess("Checking for updates...")
+        shell.run("wget", "run", "https://raw.githubusercontent.com/ickycoolboy/SCIOS-Computercraft/Github-updating-test/Updater.lua")
     else
         -- Try to run as CraftOS command if not recognized
         if shell.resolveProgram(cmd) then
