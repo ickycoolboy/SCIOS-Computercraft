@@ -185,11 +185,18 @@ end
 -- Main loop with error recovery
 local function mainLoop(gui, updater, commands)
     local running = true
+    local lastUpdateCheck = os.epoch("utc")
+    
     while running do
-        -- Auto-update check
-        protected_call(function()
-            updater.autoUpdateCheck()
-        end)
+        local currentTime = os.epoch("utc")
+        
+        -- Only check for updates every hour (3600000 milliseconds)
+        if currentTime - lastUpdateCheck >= 3600000 then
+            protected_call(function()
+                updater.autoUpdateCheck()
+            end)
+            lastUpdateCheck = currentTime
+        end
 
         -- Command processing
         gui.printPrompt()
