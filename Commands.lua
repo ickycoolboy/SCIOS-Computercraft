@@ -262,26 +262,8 @@ local function net(args)
         -- Initialize network if needed
         network.init()
         
-        -- Show modem information
-        local modems = network.getModems()
-        if #modems == 0 then
-            gui.drawError("No modems found")
-            return false
-        end
-        
-        -- Display network status
-        gui.drawInfo("=== Network Status ===")
-        gui.drawInfo("Computer ID: " .. os.getComputerID())
-        gui.drawInfo("Label: " .. (os.getComputerLabel() or "None"))
-        gui.drawInfo("")
-        gui.drawInfo("Connected Modems:")
-        for _, modem in ipairs(modems) do
-            local status = modem.isOpen and "OPEN" or "CLOSED"
-            local type = modem.isWireless and "Wireless" or "Wired"
-            local side = modem.side and (" (" .. modem.side .. ")") or ""
-            gui.drawInfo(string.format("  %s Modem%s: %s", type, side, status))
-        end
-        gui.drawInfo("===================")
+        -- Show network status
+        print(network.getStatus())
         return true
         
     elseif cmd == "scan" then

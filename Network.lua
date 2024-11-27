@@ -16,7 +16,7 @@ local protocols = {
 -- Debug function
 local function debug(msg)
     if _G.DEBUG then
-        gui.drawInfo("[DEBUG] " .. msg)
+        print("[DEBUG] " .. msg)
     end
 end
 
@@ -67,6 +67,7 @@ end
 -- Open rednet on all modems
 function network.openRednet()
     if not network.init() then
+        print("Error: No modems found")
         return false
     end
     
@@ -80,8 +81,10 @@ function network.openRednet()
             if success then
                 opened = true
                 debug("Successfully opened rednet on " .. name)
+                print("Opened rednet on " .. name)
             else
                 debug("Failed to open rednet on " .. name .. ": " .. tostring(err))
+                print("Error opening rednet on " .. name)
             end
         else
             debug(name .. " was already open")
@@ -100,6 +103,7 @@ function network.closeRednet()
         if rednet.isOpen(name) then
             rednet.close(name)
             debug("Closed rednet on " .. name)
+            print("Closed rednet on " .. name)
             closed = true
         else
             debug(name .. " was already closed")
@@ -213,8 +217,10 @@ function network.getModems()
         local isOpen = rednet.isOpen(name)
         local isWireless = modem.isWireless and modem.isWireless() or false
         
-        debug(string.format("Modem %s: wireless=%s, open=%s", 
-            name, tostring(isWireless), tostring(isOpen)))
+        debug(string.format("Found %s modem on %s (open: %s)", 
+            isWireless and "wireless" or "wired",
+            name,
+            isOpen and "yes" or "no"))
             
         table.insert(modemList, {
             name = name,
@@ -224,8 +230,32 @@ function network.getModems()
         })
     end
     
-    debug("Found " .. #modemList .. " modems")
     return modemList
+end
+
+-- Get network status string
+function network.getStatus()
+    local status = {}
+    table.insert(status, "=== Network Status ===")
+    table.insert(status, string.format("Computer ID: %d", os.getComputerID()))
+    table.insert(status, string.format("Label: %s", os.getComputerLabel() or "None"))
+    table.insert(status, "")
+    table.insert(status, "Connected Modems:")
+    
+    local modems = network.getModems()
+    if #modems == 0 then
+        table.insert(status, "  No modems found")
+    else
+        for _, modem in ipairs(modems) do
+            local statusStr = modem.isOpen and "OPEN" or "CLOSED"
+            local typeStr = modem.isWireless and "Wireless" or "Wired"
+            table.insert(status, string.format("  %s modem on %s: %s", 
+                typeStr, modem.side, statusStr))
+        end
+    end
+    table.insert(status, "===================")
+    
+    return table.concat(status, "\n")
 end
 
 return network
