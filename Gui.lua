@@ -83,6 +83,9 @@ function gui.drawProgressBar(x, y, width, text, progress, showPercent)
     term.setTextColor(colors.lime)
     
     local barWidth = width - #text - 3
+    if showPercent then
+        barWidth = barWidth - 5  -- Account for percentage display
+    end
     local filled = math.floor(barWidth * progress)
     write(string.rep("=", filled))
     term.setTextColor(colors.gray)
@@ -93,7 +96,6 @@ function gui.drawProgressBar(x, y, width, text, progress, showPercent)
     -- Add percentage display if requested
     if showPercent then
         local percent = math.floor(progress * 100)
-        term.setCursorPos(x + width + 1, y)
         write(string.format(" %3d%%", percent))
     end
 end
@@ -104,11 +106,9 @@ function gui.updateProgress(x, y, width, text, progress, status)
     if status then
         term.setCursorPos(x, y + 1)
         term.setTextColor(colors.white)
-        -- Ensure there's a space after the percentage
-        local percent = math.floor(progress * 100)
-        write(string.format("%3d%% %s", percent, status))
+        write(status)
         -- Clear the rest of the line
-        local remaining = width - #status - 5  -- 5 for the percentage and space
+        local remaining = width - #status
         if remaining > 0 then
             write(string.rep(" ", remaining))
         end

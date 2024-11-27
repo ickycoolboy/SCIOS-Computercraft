@@ -422,7 +422,6 @@ function commands.handleCommand(input)
             
             -- Clean up SCIOS directory
             updateProgress("Cleaning up SCIOS directory...", 0.8)
-            local success = true
             
             -- Simple cleanup without complex error checking
             if fs.exists("scios") and not debugMode then
@@ -431,14 +430,13 @@ function commands.handleCommand(input)
                 for i, file in ipairs(files) do
                     local path = fs.combine("scios", file)
                     updateProgress(string.format("Removing: %s", path), 0.8 + (0.1 * (i/#files)))
-                    fs.delete(path)
+                    pcall(function() fs.delete(path) end)  -- Use pcall to prevent errors from stopping the process
                     os.sleep(0.1) -- Small delay to prevent freezing
                 end
                 
                 -- Finally remove the directory itself
                 updateProgress("Removing SCIOS directory...", 0.95)
-                fs.delete("scios")
-                os.sleep(0.2)
+                pcall(function() fs.delete("scios") end)
             elseif debugMode then
                 -- In debug mode, just simulate the delay
                 os.sleep(0.5)
