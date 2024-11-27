@@ -749,25 +749,34 @@ function commands.handleCommand(input)
             return true
         end,
         uninstall = function(args)
-            -- Ensure GUI module is loaded
-            if not gui then
-                print("Error: GUI module not loaded")
-                return false
-            end
+            -- Save current terminal state
+            local oldTerm = term.current()
+            local oldBg = term.getBackgroundColor()
+            local oldFg = term.getTextColor()
 
+            -- Ensure we're using the native terminal
+            term.redirect(term.native())
+            
+            -- Clear any previous state
+            term.setBackgroundColor(colors.black)
+            term.setTextColor(colors.white)
+            term.clear()
+            term.setCursorPos(1,1)
+
+            -- Check for debug mode
+            local debugMode = false
+            if args[1] == "-debug" then
+                debugMode = true
+                print("Running in DEBUG mode - No files will be modified")
+                os.sleep(1)
+            end
+            
             -- Get screen dimensions
             local w, h = term.getSize()
             local isPocketPC = h <= 13
             local minWidth = isPocketPC and 26 or 51
             local minHeight = isPocketPC and 8 or 16
 
-            -- Check for debug mode
-            local debugMode = false
-            if args[1] == "-debug" then
-                debugMode = true
-                gui.drawInfo("Running in DEBUG mode - No files will be modified")
-            end
-            
             -- Clear screen and draw main interface
             term.clear()
             term.setCursorPos(1,1)
@@ -795,6 +804,12 @@ function commands.handleCommand(input)
                     term.clear()
                     term.setCursorPos(1,1)
                     gui.drawSuccess("Cancelled")
+                    -- Before returning, restore terminal state
+                    term.redirect(oldTerm)
+                    term.setBackgroundColor(oldBg)
+                    term.setTextColor(oldFg)
+                    term.clear()
+                    term.setCursorPos(1,1)
                     return true
                 end
             else
@@ -821,6 +836,12 @@ function commands.handleCommand(input)
                     term.clear()
                     term.setCursorPos(1,1)
                     gui.drawSuccess("Uninstall cancelled")
+                    -- Before returning, restore terminal state
+                    term.redirect(oldTerm)
+                    term.setBackgroundColor(oldBg)
+                    term.setTextColor(oldFg)
+                    term.clear()
+                    term.setCursorPos(1,1)
                     return true
                 end
             end
@@ -987,6 +1008,12 @@ function commands.handleCommand(input)
                 term.setCursorPos(1,1)
             end
             
+            -- Before returning, restore terminal state
+            term.redirect(oldTerm)
+            term.setBackgroundColor(oldBg)
+            term.setTextColor(oldFg)
+            term.clear()
+            term.setCursorPos(1,1)
             return true
         end,
         mirror = function(args)
