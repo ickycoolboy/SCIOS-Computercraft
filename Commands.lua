@@ -749,6 +749,35 @@ function commands.handleCommand(input)
             return true
         end,
         uninstall = function(args)
+            -- Ensure GUI module is loaded
+            if not gui then
+                print("Error: GUI module not loaded")
+                return false
+            end
+
+            -- Get screen dimensions and validate
+            local w, h = term.getSize()
+            if w < 51 or h < 16 then
+                gui.drawError("Screen too small. Minimum size: 51x16")
+                return false
+            end
+
+            -- Check for debug mode
+            local debugMode = false
+            if args[1] == "-debug" then
+                debugMode = true
+                gui.drawInfo("Running in DEBUG mode - No files will be modified")
+            end
+            
+            -- Clear screen and draw main interface
+            pcall(function()
+                term.clear()
+                term.setCursorPos(1,1)
+                
+                -- Draw main box
+                gui.drawBox(1, 1, 51, 16, "[ SCI Sentinel Uninstaller ]")
+            end)
+            
             -- Check for debug mode
             local debugMode = false
             if args[1] == "-debug" then
