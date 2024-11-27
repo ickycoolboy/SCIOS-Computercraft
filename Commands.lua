@@ -78,7 +78,7 @@ function commands.executeCommand(command, gui)
         local response = read()
         if response == "confirm" then
             gui.drawSuccess("Starting reinstallation...")
-            shell.run("wget", "run", "https://raw.githubusercontent.com/ickycoolboy/SCIOS-Computercraft/Github-updating-test/Installer.lua")
+            shell.run("wget", "run", "https://raw.githubusercontent.com/ickycoolboy/SCIOS-Computercraft/Github-updating-test/installer.lua")
         else
             gui.drawSuccess("Reinstallation cancelled.")
         end
