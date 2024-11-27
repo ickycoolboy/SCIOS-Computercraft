@@ -22,21 +22,21 @@ function login.showLoginScreen()
     for y = startY, startY + boxHeight do
         dualTerm.setCursorPos(startX, y)
         if y == startY or y == startY + boxHeight then
-            displayManager.write("+" .. string.rep("-", boxWidth-2) .. "+")
+            dualTerm.write("+" .. string.rep("-", boxWidth-2) .. "+")
         else
-            displayManager.write("|" .. string.rep(" ", boxWidth-2) .. "|")
+            dualTerm.write("|" .. string.rep(" ", boxWidth-2) .. "|")
         end
     end
     
     -- Draw title
     dualTerm.setCursorPos(startX + 2, startY + 1)
     dualTerm.setTextColor(colors.yellow)
-    displayManager.write("SCI Sentinel OS Login")
+    dualTerm.write("SCI Sentinel OS Login")
     dualTerm.setTextColor(colors.white)
     
     -- Username input
     dualTerm.setCursorPos(startX + 2, startY + 3)
-    displayManager.write("Username: ")
+    dualTerm.write("Username: ")
     dualTerm.setCursorPos(startX + 11, startY + 3)
     
     -- Temporarily disable mirroring for input
@@ -58,7 +58,7 @@ function login.showLoginScreen()
             return true  -- Login successful
         else
             dualTerm.setCursorPos(startX + 2, startY + 4)
-            displayManager.write("Password: ")
+            dualTerm.write("Password: ")
             dualTerm.setCursorPos(startX + 11, startY + 4)
             
             -- Temporarily disable mirroring for password input

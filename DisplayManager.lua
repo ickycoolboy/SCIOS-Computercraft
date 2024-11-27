@@ -175,4 +175,9 @@ function displayManager.isMirroringEnabled()
     return config.mirrorEnabled
 end
 
+-- Get the dual terminal object
+function displayManager.getDualTerm()
+    return dualTerm or term.current()
+end
+
 return displayManager

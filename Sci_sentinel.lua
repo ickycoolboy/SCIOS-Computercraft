@@ -19,9 +19,9 @@ local GITHUB_REPO = {
 -- Module file mappings
 local MODULE_FILES = {
     updater = "Updater.lua",
-    gui = "GUI.lua",
+    gui = "Gui.lua",
     commands = "Commands.lua",
-    core = "sci_sentinel.lua"
+    core = "Sci_sentinel.lua"
 }
 
 local function getGitHubRawURL(filepath)
@@ -151,7 +151,7 @@ local function initSystem()
     package.path = "scios/?.lua;" .. package.path
 
     -- Load required modules with error handling
-    local gui = loadModule("GUI", true)
+    local gui = loadModule("Gui", true)
     if not gui then return false end
 
     local updater = loadModule("Updater", true)
