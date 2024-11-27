@@ -12,13 +12,36 @@ function gui.getBackground()
     return background
 end
 
+-- Screen size utilities
+function gui.getScreenDimensions()
+    local w, h = term.getSize()
+    local isPocketPC = h <= 13  -- Standard pocket computer height is 13 or less
+    return {
+        width = w,
+        height = h,
+        isPocketPC = isPocketPC,
+        headerHeight = isPocketPC and 2 or 3,
+        footerHeight = 1,
+        contentHeight = h - (isPocketPC and 3 or 4)  -- Adjust content area based on device
+    }
+end
+
 function gui.drawScreen()
+    local screen = gui.getScreenDimensions()
     term.clear()
     term.setCursorPos(1,1)
     term.setTextColor(colors.yellow)
-    print("#######################################")
-    print("#       Welcome to SCI Sentinel       #")
-    print("#######################################")
+    
+    if screen.isPocketPC then
+        -- Compact header for pocket PC
+        print(string.rep("#", screen.width))
+        print("#" .. string.rep(" ", math.floor((screen.width - 19) / 2)) .. "SCI Sentinel" .. string.rep(" ", screen.width - 19 - math.floor((screen.width - 19) / 2)) .. "#")
+    else
+        -- Full header for normal PC
+        print(string.rep("#", screen.width))
+        print("#" .. string.rep(" ", math.floor((screen.width - 23) / 2)) .. "Welcome to SCI Sentinel" .. string.rep(" ", screen.width - 23 - math.floor((screen.width - 23) / 2)) .. "#")
+        print(string.rep("#", screen.width))
+    end
     term.setTextColor(colors.white)
 end
 
@@ -118,51 +141,89 @@ end
 function gui.messageBox(title, message)
     local oldBg = term.getBackgroundColor()
     local oldFg = term.getTextColor()
-    local w, h = term.getSize()
+    local screen = gui.getScreenDimensions()
+    
+    -- Calculate box dimensions based on screen size
+    local boxWidth = math.min(screen.width - 4, math.max(#title, #message) + 6)
+    local startX = math.floor((screen.width - boxWidth) / 2)
+    local startY = math.floor((screen.height - 7) / 2)
     
     -- Draw box
     term.setBackgroundColor(colors.gray)
     term.clear()
-    term.setCursorPos(1, 1)
-    term.setTextColor(colors.white)
-    print(string.rep("-", w))
-    print(string.format("| %-" .. (w-4) .. "s |", title))
-    print(string.rep("-", w))
-    print(string.format("| %-" .. (w-4) .. "s |", message))
-    print(string.rep("-", w))
-    print("| Press any key to continue" .. string.rep(" ", w-26) .. "|")
-    print(string.rep("-", w))
+    
+    -- Draw borders and content
+    for y = startY, startY + 6 do
+        term.setCursorPos(startX, y)
+        if y == startY or y == startY + 6 then
+            write("+" .. string.rep("-", boxWidth-2) .. "+")
+        elseif y == startY + 1 then
+            write("|" .. gui.centerText(title, boxWidth-2) .. "|")
+        elseif y == startY + 2 then
+            write("|" .. string.rep("-", boxWidth-2) .. "|")
+        elseif y == startY + 3 then
+            write("|" .. gui.centerText(message, boxWidth-2) .. "|")
+        elseif y == startY + 4 then
+            write("|" .. string.rep("-", boxWidth-2) .. "|")
+        else
+            write("|" .. gui.centerText("Press any key", boxWidth-2) .. "|")
+        end
+    end
     
     -- Wait for keypress
     os.pullEvent("key")
     
-    -- Restore colors
+    -- Restore colors and screen
     term.setBackgroundColor(oldBg)
     term.setTextColor(oldFg)
     gui.drawScreen()
 end
 
+-- Utility function for centering text
+function gui.centerText(text, width)
+    local padding = width - #text
+    local leftPad = math.floor(padding / 2)
+    local rightPad = padding - leftPad
+    return string.rep(" ", leftPad) .. text .. string.rep(" ", rightPad)
+end
+
 -- Draw a box with borders
 function gui.drawBox(x, y, width, height, title)
+    local screen = gui.getScreenDimensions()
+    
+    -- Adjust dimensions if they exceed screen size
+    width = math.min(width, screen.width - x + 1)
+    height = math.min(height, screen.height - y + 1)
+    
     -- Draw top border
     term.setCursorPos(x, y)
     write("+" .. string.rep("-", width-2) .. "+")
     
+    -- Draw title if provided
+    if title then
+        term.setCursorPos(x + 2, y)
+        write(" " .. title .. " ")
+    end
+    
     -- Draw sides
     for i = 1, height-2 do
-        term.setCursorPos(x, y+i)
-        write("|" .. string.rep(" ", width-2) .. "|")
+        term.setCursorPos(x, y + i)
+        write("|")
+        term.setCursorPos(x + width-1, y + i)
+        write("|")
     end
     
     -- Draw bottom border
-    term.setCursorPos(x, y+height-1)
+    term.setCursorPos(x, y + height-1)
     write("+" .. string.rep("-", width-2) .. "+")
     
-    -- Draw title if provided
-    if title then
-        term.setCursorPos(x + math.floor((width - #title) / 2), y)
-        write(title)
-    end
+    -- Return the content area dimensions for convenience
+    return {
+        contentX = x + 1,
+        contentY = y + 1,
+        contentWidth = width - 2,
+        contentHeight = height - 2
+    }
 end
 
 -- Draw a button
