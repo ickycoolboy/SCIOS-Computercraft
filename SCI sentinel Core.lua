@@ -17,7 +17,6 @@ local pastebinURLs = {
     updater = "CHU2eqLh",
     sci_sentinel = "FYqUHbiR",
     startup = "Xhc3PP8J"
-    test
 }
 
 local function ensureDirectoryExists(dir)
