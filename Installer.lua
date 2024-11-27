@@ -1,6 +1,22 @@
 -- SCI Sentinel OS Installer
 local version = "1.2.0"
-local gui = require("GUI")
+
+-- First, ensure we have the GUI module
+if not fs.exists("Gui.lua") then
+    print("Downloading GUI module...")
+    local response = http.get("https://raw.githubusercontent.com/ickycoolboy/SCIOS-Computercraft/Github-updating-test/Gui.lua")
+    if response then
+        local content = response.readAll()
+        response.close()
+        local file = fs.open("Gui.lua", "w")
+        file.write(content)
+        file.close()
+    else
+        error("Failed to download GUI module. Please check your internet connection.")
+    end
+end
+
+local gui = require("Gui")
 
 -- Fun loading messages
 local loading_messages = {
