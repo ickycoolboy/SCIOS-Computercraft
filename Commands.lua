@@ -423,70 +423,64 @@ function commands.handleCommand(input)
             -- Clean up SCIOS directory
             updateProgress("Cleaning up SCIOS directory...", 0.8)
             local success = true
-            if fs.exists("scios") or debugMode then
-                success = performOperation(function()
-                    -- First try to delete any remaining files
-                    if fs.exists("scios") then
-                        for _, file in ipairs(fs.list("scios")) do
-                            local path = fs.combine("scios", file)
-                            fs.delete(path)
-                        end
-                        -- Then try to remove the directory
-                        fs.delete("scios")
-                    end
-                    return true
-                end, debugMode)
+            
+            -- Simple cleanup without complex error checking
+            if fs.exists("scios") and not debugMode then
+                -- Try to delete each file individually
+                local files = fs.list("scios")
+                for i, file in ipairs(files) do
+                    local path = fs.combine("scios", file)
+                    updateProgress(string.format("Removing: %s", path), 0.8 + (0.1 * (i/#files)))
+                    fs.delete(path)
+                    os.sleep(0.1) -- Small delay to prevent freezing
+                end
+                
+                -- Finally remove the directory itself
+                updateProgress("Removing SCIOS directory...", 0.95)
+                fs.delete("scios")
+                os.sleep(0.2)
+            elseif debugMode then
+                -- In debug mode, just simulate the delay
+                os.sleep(0.5)
             end
             
-            -- Show completion
-            if allFilesRemoved and success then
-                updateProgress("Uninstall Complete!", 1.0)
-                os.sleep(1)
-                
-                -- Show completion screen
-                term.clear()
-                term.setCursorPos(1,1)
-                gui.drawBox(1, 1, 51, 16, "[ Uninstall Complete ]")
-                
-                if debugMode then
-                    gui.drawCenteredText(4, "Debug Mode: Uninstall Simulation Complete", colors.lime)
-                    gui.drawCenteredText(6, "No files were modified", colors.white)
-                    gui.drawCenteredText(7, "Run without -debug to perform actual uninstall", colors.white)
-                else
-                    gui.drawCenteredText(4, "SCI Sentinel has been uninstalled!", colors.lime)
-                    gui.drawCenteredText(6, "The startup file will be removed", colors.white)
-                    gui.drawCenteredText(7, "when you reboot the computer.", colors.white)
-                end
-                
-                gui.drawCenteredText(9, "Would you like to reboot now?", colors.yellow)
-                
-                -- Draw reboot buttons
-                local buttons = {
-                    gui.drawButton(15, 12, "Reboot", colors.lime),
-                    gui.drawButton(30, 12, "Later", colors.red)
-                }
-                
-                -- Handle reboot choice
-                local choice = gui.handleButtons(buttons)
-                if choice == "Reboot" and not debugMode then
-                    term.clear()
-                    term.setCursorPos(1,1)
-                    gui.drawCenteredText(8, "Rebooting...", colors.yellow)
-                    os.sleep(1)
-                    os.reboot()
-                else
-                    -- Clear screen before exiting
-                    term.clear()
-                    term.setCursorPos(1,1)
-                end
+            -- Final completion
+            updateProgress("Uninstall Complete!", 1.0)
+            os.sleep(1)
+            
+            -- Show completion screen
+            term.clear()
+            term.setCursorPos(1,1)
+            gui.drawBox(1, 1, 51, 16, "[ Uninstall Complete ]")
+            
+            if debugMode then
+                gui.drawCenteredText(4, "Debug Mode: Uninstall Simulation Complete", colors.lime)
+                gui.drawCenteredText(6, "No files were modified", colors.white)
+                gui.drawCenteredText(7, "Run without -debug to perform actual uninstall", colors.white)
             else
-                -- If there was an error during uninstall
+                gui.drawCenteredText(4, "SCI Sentinel has been uninstalled!", colors.lime)
+                gui.drawCenteredText(6, "The startup file will be removed", colors.white)
+                gui.drawCenteredText(7, "when you reboot the computer.", colors.white)
+            end
+            
+            gui.drawCenteredText(9, "Would you like to reboot now?", colors.yellow)
+            
+            -- Draw reboot buttons
+            local buttons = {
+                gui.drawButton(15, 12, "Reboot", colors.lime),
+                gui.drawButton(30, 12, "Later", colors.red)
+            }
+            
+            -- Handle reboot choice
+            local choice = gui.handleButtons(buttons)
+            if choice == "Reboot" and not debugMode then
                 term.clear()
                 term.setCursorPos(1,1)
-                gui.drawBox(1, 1, 51, 16, "[ Uninstall Error ]")
-                gui.drawCenteredText(4, "An error occurred during uninstall", colors.red)
-                gui.drawCenteredText(6, "Press any key to continue", colors.white)
-                os.pullEvent("key")
+                gui.drawCenteredText(8, "Rebooting...", colors.yellow)
+                os.sleep(1)
+                os.reboot()
+            else
+                -- Clear screen before exiting
                 term.clear()
                 term.setCursorPos(1,1)
             end

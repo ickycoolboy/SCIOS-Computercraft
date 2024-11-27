@@ -104,9 +104,14 @@ function gui.updateProgress(x, y, width, text, progress, status)
     if status then
         term.setCursorPos(x, y + 1)
         term.setTextColor(colors.white)
-        write(status)
+        -- Ensure there's a space after the percentage
+        local percent = math.floor(progress * 100)
+        write(string.format("%3d%% %s", percent, status))
         -- Clear the rest of the line
-        write(string.rep(" ", width - #status))
+        local remaining = width - #status - 5  -- 5 for the percentage and space
+        if remaining > 0 then
+            write(string.rep(" ", remaining))
+        end
     end
 end
 
