@@ -195,11 +195,7 @@ function commands.executeCommand(command, gui)
                     "scios/*.bak",
                     "scios/*.log"
                 },
-                protected_files = {
-                    "startup.lua",
-                    "scios/Sci_sentinel.lua",
-                    "scios/Gui.lua"
-                }
+                protected_files = {}  -- No protected files during uninstall
             }
         end
 
@@ -210,113 +206,54 @@ function commands.executeCommand(command, gui)
             return true
         end
 
-        -- Ask about force deletion
-        local force_delete = gui.confirm("Do you want to force delete protected files?", colors.red)
-        
-        local function isProtected(file)
-            for _, protected in ipairs(filetracker.protected_files) do
-                if file == protected then
-                    return true
-                end
-            end
-            return false
-        end
-
-        local function deleteFile(file)
-            if fs.exists(file) then
-                local protected = isProtected(file)
-                if protected and not force_delete then
-                    gui.drawWarning(string.format("Skipping protected file: %s", file))
-                    return false
-                end
-                
-                local success = pcall(function()
-                    fs.delete(file)
-                end)
-                
-                if success then
-                    gui.drawSuccess(string.format("Removed: %s", file))
-                    return true
-                else
-                    gui.drawError(string.format("Failed to remove: %s", file))
-                    return false
-                end
-            end
-            return true -- File doesn't exist, consider it "removed"
-        end
-
         -- Delete system files
         local removed = 0
         local failed = 0
         
-        -- First delete non-protected files
-        for _, file in ipairs(filetracker.system_files) do
-            if not isProtected(file) then
-                if deleteFile(file) then
-                    removed = removed + 1
-                else
-                    failed = failed + 1
-                end
+        -- First, try to delete startup.lua specifically
+        if fs.exists("startup.lua") then
+            if fs.delete("startup.lua") then
+                removed = removed + 1
+                gui.drawSuccess("Removed: startup.lua")
+            else
+                failed = failed + 1
+                gui.drawError("Failed to remove: startup.lua")
             end
         end
         
-        -- Then delete protected files if force delete is enabled
-        if force_delete then
-            for _, file in ipairs(filetracker.protected_files) do
-                if deleteFile(file) then
+        -- Then delete other system files
+        for _, file in ipairs(filetracker.system_files) do
+            if file ~= "startup.lua" and fs.exists(file) then  -- Skip startup.lua as it's already handled
+                if fs.delete(file) then
                     removed = removed + 1
+                    gui.drawSuccess("Removed: " .. file)
                 else
                     failed = failed + 1
+                    gui.drawError("Failed to remove: " .. file)
                 end
             end
         end
 
-        -- Clean up temporary files
-        local function cleanTempFiles(pattern)
-            local dir = fs.getDir(pattern)
-            local ext = string.match(pattern, ".*%*(%..+)$")
-            if dir and ext then
-                if fs.exists(dir) then
-                    for _, file in ipairs(fs.list(dir)) do
-                        if string.match(file, ".*" .. ext .. "$") then
-                            local full_path = fs.combine(dir, file)
-                            if deleteFile(full_path) then
-                                removed = removed + 1
-                            else
-                                failed = failed + 1
-                            end
-                        end
-                    end
-                end
-            end
-        end
-
-        -- Clean up temp files
-        for _, pattern in ipairs(filetracker.temp_files) do
-            cleanTempFiles(pattern)
-        end
-
-        -- Try to remove scios directory if empty
+        -- Try to remove the scios directory itself
         if fs.exists("scios") then
-            local files = fs.list("scios")
-            if #files == 0 then
-                fs.delete("scios")
-                gui.drawSuccess("Removed empty scios directory")
+            if fs.delete("scios") then
+                removed = removed + 1
+                gui.drawSuccess("Removed: scios directory")
             else
-                gui.drawWarning("scios directory not empty, some files remain")
+                failed = failed + 1
+                gui.drawError("Failed to remove: scios directory")
             end
         end
-
+        
         -- Final status
-        gui.drawSuccess(string.format("Uninstallation complete: Removed %d files, %d failed", removed, failed))
+        gui.drawSuccess(string.format("Uninstallation complete: Removed %d files/directories, %d failed", removed, failed))
         
         if failed > 0 then
             gui.drawWarning("Some files could not be removed. You may need to delete them manually.")
-        end
-        
-        if force_delete then
-            gui.drawSuccess("System will reboot in 3 seconds...")
-            sleep(3)
+        else
+            gui.drawSuccess("SCI Sentinel has been completely uninstalled.")
+            gui.drawSuccess("The computer will reboot in 3 seconds...")
+            os.sleep(3)
             os.reboot()
         end
         

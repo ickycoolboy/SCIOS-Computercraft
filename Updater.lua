@@ -166,8 +166,14 @@ function updater.getRemoteVersion(filepath)
     if response then
         local content = response.readAll()
         response.close()
-        local version = string.match(content, "version%s*=%s*[\"']([%d%.]+)[\"']")
-        return version
+        
+        -- Try to find version string, ignoring comments
+        for line in content:gmatch("[^\r\n]+") do
+            local version = line:match("version%s*=%s*[\"']([%d%.]+)[\"']")
+            if version then
+                return version
+            end
+        end
     end
     return nil
 end
@@ -200,6 +206,8 @@ function updater.checkForUpdates()
     local updates_installed = false
     updater.gui.drawInfo("Checking for updates...")
     
+    -- First check all versions before updating any files
+    local to_update = {}
     for name, info in pairs(updater.modules) do
         updater.gui.drawInfo("Checking " .. name .. "...")
         local remote_version = updater.getRemoteVersion(info.path)
@@ -209,20 +217,24 @@ function updater.checkForUpdates()
                 updater.gui.drawSuccess(string.format("Update available for %s: %s -> %s", 
                     name, info.version, remote_version))
                 updates_available = true
-                
-                if updater.gui.confirm("Install update for " .. name .. "?") then
-                    local url = updater.getGitHubRawURL(info.path)
-                    if updater.downloadFile(url, info.target) then
-                        info.version = remote_version
-                        updates_installed = true
-                        updater.gui.drawSuccess("Successfully updated " .. name)
-                    end
-                end
+                table.insert(to_update, {name = name, info = info, new_version = remote_version})
             else
                 updater.gui.drawSuccess(name .. " is up to date")
             end
         else
             updater.gui.drawError("Failed to check " .. name .. " for updates")
+        end
+    end
+    
+    -- If updates are available, ask to install all at once
+    if #to_update > 0 and updater.gui.confirm("Install all available updates?") then
+        for _, update in ipairs(to_update) do
+            local url = updater.getGitHubRawURL(update.info.path)
+            if updater.downloadFile(url, update.info.target) then
+                update.info.version = update.new_version
+                updates_installed = true
+                updater.gui.drawSuccess("Successfully updated " .. update.name)
+            end
         end
     end
     
