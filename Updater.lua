@@ -121,6 +121,23 @@ function updater.getGitHubRawURL(filepath)
         os.epoch("utc"))
 end
 
+function updater.downloadFile(path, target)
+    local url = updater.getGitHubRawURL(path)
+    local response = http.get(url)
+    if response then
+        local content = response.readAll()
+        response.close()
+        
+        local file = fs.open(target, "w")
+        if file then
+            file.write(content)
+            file.close()
+            return true, content
+        end
+    end
+    return false
+end
+
 function updater.getRemoteContent(filepath)
     local url = updater.getGitHubRawURL(filepath)
     local response = http.get(url)
