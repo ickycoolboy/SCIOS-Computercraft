@@ -1,5 +1,5 @@
 -- SCI Sentinel OS Startup
-local version = "1.0.0"
+local version = "1.0.1" -- Version bump for case sensitivity fix
 
 -- System file protection
 local protected_files = {

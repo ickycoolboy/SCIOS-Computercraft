@@ -1,5 +1,5 @@
 -- SCI Sentinel OS Updater Module
-local version = "1.0.1"
+local version = "1.0.2" -- Minor version bump for improved file handling
 
 -- Load required modules
 local gui = require("Gui")
@@ -26,33 +26,33 @@ updater.protected_files = {
 -- Module version information and file hashes
 updater.modules = {
     ["core"] = {
-        version = "1.0.1",
+        version = "1.0.2",  -- Updated for startup handling improvements
         path = "Sci_sentinel.lua",
         hash = nil
     },
     ["gui"] = {
-        version = "1.0.1",
+        version = "1.0.1",  -- No changes
         path = "Gui.lua",
         hash = nil
     },
     ["commands"] = {
-        version = "1.0.1",
+        version = "1.0.1",  -- No changes
         path = "Commands.lua",
         hash = nil
     },
     ["updater"] = {
-        version = "1.0.1",
+        version = "1.0.2",  -- This file's version
         path = "Updater.lua",
         hash = nil
     },
     ["installer"] = {
-        version = "1.0.1",
+        version = "1.1.0",  -- Major version bump for installer
         path = "Installer.lua",
         hash = nil
     },
     ["startup"] = {
-        version = "1.0.1",
-        path = "startup.lua",
+        version = "1.0.1",  -- Properly cased version
+        path = "Startup.lua",
         hash = nil,
         root = true
     }
@@ -280,7 +280,3 @@ end
 updater.loadVersions() -- Load saved versions
 
 return updater
-
-
-
-

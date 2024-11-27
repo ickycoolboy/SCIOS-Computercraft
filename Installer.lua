@@ -1,5 +1,5 @@
 -- SCI Sentinel OS Installer
-local version = "1.0.1"
+local version = "1.1.0" -- Major version bump due to significant changes in file handling and startup management
 
 -- Fun loading messages
 local loading_messages = {
