@@ -4,6 +4,7 @@ local version = "1.0.1"
 -- Load required modules
 local gui = require("Gui")
 local updater = require("Updater")
+local help = require("Help")
 
 local commands = {}
 local sentinel_state = {}
@@ -231,26 +232,39 @@ local function ver()
     return true
 end
 
-local function help()
-    gui.drawSuccess("SCI Sentinel Command Line Help")
-    gui.drawSuccess("The following commands are available:")
-    gui.drawSuccess("")
-    gui.drawSuccess("  CD [path]      - Change directory")
-    gui.drawSuccess("  CLS            - Clear screen")
-    gui.drawSuccess("  COPY           - Copy files")
-    gui.drawSuccess("  DEL            - Delete files")
-    gui.drawSuccess("  DIR            - List directory contents")
-    gui.drawSuccess("  HELP           - Show this help message")
-    gui.drawSuccess("  MD             - Create directory")
-    gui.drawSuccess("  RD             - Remove directory")
-    gui.drawSuccess("  TYPE           - Display file contents")
-    gui.drawSuccess("  VER            - Show version information")
-    gui.drawSuccess("")
-    gui.drawSuccess("SCI Sentinel Commands:")
-    gui.drawSuccess("  UPDATE         - Check for updates")
-    gui.drawSuccess("  REINSTALL      - Reinstall SCI Sentinel")
-    gui.drawSuccess("  UNINSTALL      - Uninstall SCI Sentinel")
-    gui.drawSuccess("  MIRROR         - Toggle display mirroring")
+local function displayHelp(args)
+    if #args == 0 then
+        -- Display list of all commands
+        gui.drawInfo("SCI Sentinel OS Help System")
+        gui.drawInfo("The following commands are available:")
+        gui.drawInfo("")
+        
+        local cmdList = help.listCommands()
+        for _, cmd in ipairs(cmdList) do
+            gui.drawInfo(string.format("%-10s - %s", cmd.name, cmd.desc))
+        end
+        
+        gui.drawInfo("")
+        gui.drawInfo("For more information on a specific command, type HELP command-name")
+    else
+        -- Display help for specific command
+        local cmdHelp = help.getCommandHelp(args[1])
+        if cmdHelp then
+            gui.drawInfo("Help for " .. args[1]:upper())
+            gui.drawInfo("")
+            gui.drawInfo("Syntax:")
+            gui.drawInfo("  " .. cmdHelp.syntax)
+            gui.drawInfo("")
+            gui.drawInfo(cmdHelp.description)
+            gui.drawInfo("")
+            for _, line in ipairs(cmdHelp.details) do
+                gui.drawInfo(line)
+            end
+        else
+            gui.drawError("No help available for '" .. args[1] .. "'")
+            return false
+        end
+    end
     return true
 end
 
@@ -412,8 +426,8 @@ function commands.handleCommand(input)
         md = md,
         rd = rd,
         ver = ver,
-        help = help,
-        ["?"] = help,  -- Allow ? as alias for help
+        help = displayHelp,
+        ["?"] = displayHelp,  -- Allow ? as alias for help
         
         -- SCI Sentinel specific commands
         update = function(args)

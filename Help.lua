@@ -1,0 +1,272 @@
+-- SCI Sentinel OS Help Module
+local help = {}
+
+-- Command documentation structure
+local commands = {
+    CD = {
+        syntax = "CD [drive:][path]",
+        description = "Changes the current directory.",
+        details = {
+            "Changes the current directory or displays the current directory.",
+            "",
+            "CD ..         Changes to the parent directory",
+            "CD \\         Changes to the root directory",
+            "CD            Display current directory path",
+            "",
+            "Type CD without parameters to display the current path."
+        }
+    },
+    DIR = {
+        syntax = "DIR [drive:][path][filename]",
+        description = "Displays a list of files and subdirectories in a directory.",
+        details = {
+            "Lists all files and directories in the specified path.",
+            "",
+            "DIR          Lists all files in current directory",
+            "DIR path     Lists all files in specified path",
+            "",
+            "The output shows:",
+            " - File/directory name",
+            " - Size in bytes for files",
+            " - <DIR> marker for directories",
+            " - Total files listed",
+            " - Total bytes used"
+        }
+    },
+    COPY = {
+        syntax = "COPY <source> <destination>",
+        description = "Copies one or more files to another location.",
+        details = {
+            "Copies files from one location to another.",
+            "",
+            "COPY file1.txt file2.txt    Copy file1 to file2",
+            "COPY file.txt dir\\          Copy file to directory",
+            "",
+            "The file will be overwritten if it already exists."
+        }
+    },
+    DEL = {
+        syntax = "DEL <filename>",
+        description = "Deletes one or more files.",
+        details = {
+            "Deletes specified files permanently.",
+            "",
+            "DEL file.txt    Delete a single file",
+            "",
+            "Warning: Files cannot be recovered once deleted."
+        }
+    },
+    TYPE = {
+        syntax = "TYPE <filename>",
+        description = "Displays the contents of a text file.",
+        details = {
+            "Shows the content of specified text file.",
+            "",
+            "TYPE file.txt    Display file contents",
+            "",
+            "Use this command to view text files."
+        }
+    },
+    MD = {
+        syntax = "MD <directory>",
+        description = "Creates a directory.",
+        details = {
+            "Creates a new directory at specified path.",
+            "",
+            "MD dirname       Create new directory",
+            "MD dir\\subdir   Create nested directory",
+            "",
+            "Parent directory must exist for nested directories."
+        }
+    },
+    RD = {
+        syntax = "RD <directory>",
+        description = "Removes a directory.",
+        details = {
+            "Removes (deletes) a directory.",
+            "",
+            "RD dirname      Remove empty directory",
+            "",
+            "Directory must be empty to be removed."
+        }
+    },
+    CLS = {
+        syntax = "CLS",
+        description = "Clears the screen.",
+        details = {
+            "Clears the terminal screen and moves cursor to top.",
+            "",
+            "Use this command to clean up the display."
+        }
+    },
+    VER = {
+        syntax = "VER",
+        description = "Displays SCI Sentinel version.",
+        details = {
+            "Shows the version information for SCI Sentinel OS.",
+            "",
+            "Use this to check your current version."
+        }
+    },
+    UPDATE = {
+        syntax = "UPDATE",
+        description = "Checks for and installs system updates.",
+        details = {
+            "Checks GitHub repository for newer versions.",
+            "",
+            "The update process:",
+            " - Checks version numbers",
+            " - Downloads new files if available",
+            " - Updates system files",
+            "",
+            "System will restart after updating."
+        }
+    },
+    REINSTALL = {
+        syntax = "REINSTALL",
+        description = "Reinstalls SCI Sentinel OS.",
+        details = {
+            "Completely reinstalls the operating system.",
+            "",
+            "Warning: This will:",
+            " - Download fresh copies of all system files",
+            " - Replace existing system files",
+            " - Require confirmation before proceeding",
+            "",
+            "Your data files will not be affected."
+        }
+    },
+    UNINSTALL = {
+        syntax = "UNINSTALL [-debug]",
+        description = "Removes SCI Sentinel OS from the computer.",
+        details = {
+            "Completely removes the operating system.",
+            "",
+            "Options:",
+            " -debug    Run in debug mode (no files deleted)",
+            "",
+            "Warning: This will:",
+            " - Remove all system files",
+            " - Cannot be undone",
+            " - Requires confirmation"
+        }
+    },
+    MIRROR = {
+        syntax = "MIRROR",
+        description = "Toggles display mirroring for secondary monitors.",
+        details = {
+            "Controls monitor output mirroring.",
+            "",
+            "Effects:",
+            " - Toggles between single and mirrored display",
+            " - Affects all connected monitors",
+            "",
+            "Use this to manage multi-monitor setups."
+        }
+    },
+    MEM = {
+        syntax = "MEM",
+        description = "Displays memory usage information.",
+        details = {
+            "Shows detailed memory usage statistics for the system.",
+            "",
+            "Information displayed:",
+            " - Total Memory: Total available system memory in KB",
+            " - Used Memory:  Currently used memory in KB",
+            " - Free Memory:  Available memory in KB"
+        }
+    },
+    PS = {
+        syntax = "PS",
+        description = "Displays information about active processes.",
+        details = {
+            "Lists all currently running processes and their status.",
+            "",
+            "Information displayed:",
+            " - Process ID (PID)",
+            " - Process Status (running, suspended, dead)",
+            "",
+            "Use this command to monitor system activity."
+        }
+    },
+    FIND = {
+        syntax = "FIND <pattern>",
+        description = "Searches for files matching the specified pattern.",
+        details = {
+            "Recursively searches for files matching the given pattern.",
+            "",
+            "FIND *.lua   Finds all Lua files",
+            "FIND test    Finds files containing 'test'",
+            "",
+            "The search:",
+            " - Is case-sensitive",
+            " - Starts from current directory",
+            " - Includes subdirectories",
+            " - Shows full path of matches"
+        }
+    },
+    TAIL = {
+        syntax = "TAIL <file> [lines]",
+        description = "Displays the last part of a file.",
+        details = {
+            "Shows the last lines of the specified file.",
+            "",
+            "TAIL file.txt      Shows last 10 lines",
+            "TAIL file.txt 20   Shows last 20 lines",
+            "",
+            "Parameters:",
+            " file   - Required. The file to display",
+            " lines  - Optional. Number of lines (default: 10)"
+        }
+    },
+    HISTORY = {
+        syntax = "HISTORY",
+        description = "Displays the command history.",
+        details = {
+            "Shows a numbered list of previously executed commands.",
+            "",
+            "Information shown:",
+            " - Command number",
+            " - Command text",
+            "",
+            "Use this to recall previous commands."
+        }
+    },
+    HELP = {
+        syntax = "HELP [command]",
+        description = "Provides help information for SCI Sentinel commands.",
+        details = {
+            "Shows help for commands. Without parameters, lists all commands.",
+            "",
+            "HELP         Lists all available commands",
+            "HELP CMD     Shows detailed help for CMD",
+            "",
+            "For more information on a specific command, type HELP command-name"
+        }
+    }
+}
+
+-- Function to get command help
+function help.getCommandHelp(command)
+    if command then
+        command = command:upper()
+        return commands[command]
+    end
+    return nil
+end
+
+-- Function to list all commands
+function help.listCommands()
+    local cmdList = {}
+    for cmd, info in pairs(commands) do
+        table.insert(cmdList, {
+            name = cmd,
+            desc = info.description
+        })
+    end
+    table.sort(cmdList, function(a, b) return a.name < b.name end)
+    return cmdList
+end
+
+-- Return the module
+return help

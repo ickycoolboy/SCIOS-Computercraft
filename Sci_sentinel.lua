@@ -21,7 +21,10 @@ local MODULE_FILES = {
     updater = "Updater.lua",
     gui = "Gui.lua",
     commands = "Commands.lua",
-    core = "Sci_sentinel.lua"
+    core = "Sci_sentinel.lua",
+    help = "Help.lua",
+    displayManager = "DisplayManager.lua",
+    login = "Login.lua"
 }
 
 local function getGitHubRawURL(filepath)
@@ -97,6 +100,27 @@ local function initialSetup()
         return false
     end
     
+    -- Download Help module
+    print("Downloading Help module...")
+    if not downloadFromGitHub(MODULE_FILES.help, "scios/" .. MODULE_FILES.help) then
+        print("Failed to download Help module")
+        return false
+    end
+    
+    -- Download DisplayManager module
+    print("Downloading DisplayManager module...")
+    if not downloadFromGitHub(MODULE_FILES.displayManager, "scios/" .. MODULE_FILES.displayManager) then
+        print("Failed to download DisplayManager module")
+        return false
+    end
+    
+    -- Download Login module
+    print("Downloading Login module...")
+    if not downloadFromGitHub(MODULE_FILES.login, "scios/" .. MODULE_FILES.login) then
+        print("Failed to download Login module")
+        return false
+    end
+    
     print("Initial setup complete!")
     return true
 end
@@ -105,7 +129,10 @@ end
 if not fs.exists("scios/" .. MODULE_FILES.updater) or 
    not fs.exists("scios/" .. MODULE_FILES.gui) or
    not fs.exists("scios/" .. MODULE_FILES.commands) or
-   not fs.exists("scios/" .. MODULE_FILES.core) then
+   not fs.exists("scios/" .. MODULE_FILES.core) or
+   not fs.exists("scios/" .. MODULE_FILES.help) or
+   not fs.exists("scios/" .. MODULE_FILES.displayManager) or
+   not fs.exists("scios/" .. MODULE_FILES.login) then
     if not initialSetup() then
         print("Initial setup failed!")
         return
@@ -167,11 +194,26 @@ local function initSystem()
     local commands = loadModule("Commands", true)
     if not commands then return false end
 
-    return gui, updater, commands
+    local help = loadModule("Help", false)
+    if not help then 
+        gui.drawError("Failed to load Help module")
+    end
+
+    local displayManager = loadModule("DisplayManager", false)
+    if not displayManager then 
+        gui.drawError("Failed to load DisplayManager module")
+    end
+
+    local login = loadModule("Login", false)
+    if not login then 
+        gui.drawError("Failed to load Login module")
+    end
+
+    return gui, updater, commands, help, displayManager, login
 end
 
 -- Command execution wrapper
-local function executeCommand(command, gui, updater, commands)
+local function executeCommand(command, gui, updater, commands, help, displayManager, login)
     if command == "exit" then
         return false
     else
@@ -183,7 +225,7 @@ local function executeCommand(command, gui, updater, commands)
 end
 
 -- Main loop with error recovery
-local function mainLoop(gui, updater, commands)
+local function mainLoop(gui, updater, commands, help, displayManager, login)
     local running = true
     local lastUpdateCheck = os.epoch("utc")
     
@@ -202,7 +244,7 @@ local function mainLoop(gui, updater, commands)
         gui.printPrompt()
         local input = read()
         if input then
-            running = executeCommand(input, gui, updater, commands)
+            running = executeCommand(input, gui, updater, commands, help, displayManager, login)
         end
 
         -- Error recovery
@@ -217,7 +259,7 @@ end
 -- Main entry point with error handling
 local function main()
     -- Initialize modules
-    local gui, updater, commands = initSystem()
+    local gui, updater, commands, help, displayManager, login = initSystem()
     if not gui then
         print("Failed to initialize SCI Sentinel. Check error.log for details.")
         return
@@ -228,7 +270,7 @@ local function main()
 
     -- Enter main loop
     protected_call(function()
-        mainLoop(gui, updater, commands)
+        mainLoop(gui, updater, commands, help, displayManager, login)
     end)
 
     -- Clean shutdown
