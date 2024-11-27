@@ -33,7 +33,7 @@ local config = {
         {name = "Commands", file = "Commands.lua"}
     },
     root_files = {
-        {name = "Startup", file = "startup.lua", required = true}  -- Mark as required
+        {name = "Startup", file = "Startup.lua", target = "startup.lua", required = true}  
     }
 }
 
@@ -51,12 +51,11 @@ local function getGitHubRawURL(filepath)
         config.repo_name,
         config.branch,
         filepath,
-        os.epoch("utc")) -- Add timestamp to bust cache
+        os.epoch("utc")) 
 end
 
 -- Safe file write function for ComputerCraft
 local function safeWrite(path, content)
-    -- First try to delete the file if it exists
     if fs.exists(path) then
         local tries = 0
         while tries < 3 do
@@ -64,11 +63,10 @@ local function safeWrite(path, content)
                 break
             end
             tries = tries + 1
-            os.sleep(0.5)  -- Give the system time to release file handles
+            os.sleep(0.5)  
         end
     end
     
-    -- Now try to write the new file
     local tries = 0
     while tries < 3 do
         local file = fs.open(path, "w")
@@ -78,7 +76,7 @@ local function safeWrite(path, content)
             return true
         end
         tries = tries + 1
-        os.sleep(0.5)  -- Wait before retrying
+        os.sleep(0.5)  
     end
     return false
 end
@@ -91,7 +89,6 @@ local function downloadFile(url, path)
         local content = response.readAll()
         response.close()
         
-        -- Ensure parent directory exists if not a root file
         if not fs.getName(path) == path then
             local dir = fs.getDir(path)
             if dir and dir ~= "" and not fs.exists(dir) then
@@ -99,7 +96,6 @@ local function downloadFile(url, path)
             end
         end
         
-        -- Use safe write function
         if safeWrite(path, content) then
             return true, content
         end
@@ -115,7 +111,6 @@ local function checkInstallerUpdate()
     local success, content = downloadFile(url, tempPath)
     
     if success then
-        -- Check if content is different
         local currentFile = fs.open(installerPath, "r")
         local currentContent = currentFile.readAll()
         currentFile.close()
@@ -125,7 +120,6 @@ local function checkInstallerUpdate()
             print("The installer will be updated on next run.")
             print("Please run the installer again after this installation completes.")
             
-            -- Create a marker file that will trigger the update on next run
             local markerFile = fs.open("installer_update_pending", "w")
             markerFile.write("pending")
             markerFile.close()
@@ -145,7 +139,6 @@ local function handlePendingUpdate()
         local installerPath = shell.getRunningProgram()
         print("Applying pending installer update...")
         
-        -- Delete the old installer and move the new one in place
         fs.delete(installerPath)
         fs.move("installer_update.tmp", installerPath)
         fs.delete("installer_update_pending")
@@ -177,14 +170,11 @@ end
 print("SCI Sentinel OS Installer v" .. version)
 print("Your friendly neighborhood OS installer")
 
--- Handle any pending updates first
 handlePendingUpdate()
 
--- Check for installer updates
 print("\nChecking for installer updates...")
 local updateAvailable = checkInstallerUpdate()
 
--- Ask for confirmation
 listFilesToInstall()
 write("\nDo you want to install SCI Sentinel OS? (y/n): ")
 local input = read():lower()
@@ -195,12 +185,10 @@ end
 
 print("\nPerforming installation...")
 
--- Create install directory if it doesn't exist
 if not fs.exists(config.install_dir) then
     fs.makeDir(config.install_dir)
 end
 
--- Download and install core modules
 for _, module in ipairs(config.modules) do
     showLoadingMessage()
     print(string.format("Downloading %s module...", module.name))
@@ -215,41 +203,35 @@ for _, module in ipairs(config.modules) do
     end
 end
 
--- Download and install root files
 local startup_installed = false
 for _, file in ipairs(config.root_files) do
     showLoadingMessage()
     print(string.format("Downloading %s file...", file.name))
     
-    -- Special handling for startup.lua
-    if file.file == "startup.lua" then
-        -- First try to download from GitHub
+    if file.target == "startup.lua" then
         local success = downloadFile(getGitHubRawURL(file.file), "temp_startup.lua")
         
         if success then
-            -- Try to safely move the temp file to startup.lua
-            if fs.exists("startup.lua") then
+            if fs.exists(file.target) then
                 print("Removing old startup file...")
-                fs.delete("startup.lua")
-                os.sleep(0.5)  -- Give the system time
+                fs.delete(file.target)
+                os.sleep(0.5)  
             end
             
             print("Installing new startup file...")
-            if pcall(fs.move, "temp_startup.lua", "startup.lua") then
+            if pcall(fs.move, "temp_startup.lua", file.target) then
                 startup_installed = true
             else
                 print("Failed to move startup file, trying direct write...")
-                -- If move fails, try direct write
                 local content = "-- SCI Sentinel OS Startup File\nshell.run(\"scios/sci_sentinel.lua\")"
-                if safeWrite("startup.lua", content) then
+                if safeWrite(file.target, content) then
                     startup_installed = true
                 end
             end
         else
             print("Failed to download startup.lua, creating locally...")
-            -- Create a basic startup file locally
             local content = "-- SCI Sentinel OS Startup File\nshell.run(\"scios/sci_sentinel.lua\")"
-            if safeWrite("startup.lua", content) then
+            if safeWrite(file.target, content) then
                 startup_installed = true
             end
         end
@@ -261,8 +243,8 @@ for _, file in ipairs(config.root_files) do
             end
         end
     else
-        -- Handle other root files normally
-        local success = downloadFile(getGitHubRawURL(file.file), file.file)
+        local target = file.target or file.file  
+        local success = downloadFile(getGitHubRawURL(file.file), target)
         if not success and file.required then
             print(string.format("Failed to download required file: %s", file.name))
             print("Initial setup failed! (Error 404: Success not found)")
