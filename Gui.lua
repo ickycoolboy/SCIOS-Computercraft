@@ -21,7 +21,7 @@ end
 local gui = {}
 local background = {}
 -- Add display manager
-local displayManager = loadModule("DisplayManager")
+local displayManager = require("scios/DisplayManager")
 
 -- Initialize display manager
 displayManager.init()
