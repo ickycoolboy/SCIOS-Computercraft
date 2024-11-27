@@ -54,6 +54,11 @@ updater.modules = {
         path = "Help.lua",
         target = "scios/Help.lua",
         hash = nil
+    },
+    ["network"] = {
+        path = "Network.lua",
+        target = "scios/Network.lua",
+        hash = nil
     }
 }
 

@@ -32,7 +32,9 @@ local config = {
         {name = "Commands", file = "Commands.lua", target = "scios/Commands.lua", required = true},
         {name = "Updater", file = "Updater.lua", target = "scios/Updater.lua", required = true},
         {name = "Login", file = "Login.lua", target = "scios/Login.lua", required = true},
-        {name = "DisplayManager", file = "DisplayManager.lua", target = "scios/DisplayManager.lua", required = true}
+        {name = "DisplayManager", file = "DisplayManager.lua", target = "scios/DisplayManager.lua", required = true},
+        {name = "Network", file = "Network.lua", target = "scios/Network.lua", required = true},
+        {name = "Help", file = "Help.lua", target = "scios/Help.lua", required = true}
     },
     root_files = {
         {name = "Startup", file = "Startup.lua", target = "startup.lua", required = true},
