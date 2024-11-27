@@ -755,12 +755,11 @@ function commands.handleCommand(input)
                 return false
             end
 
-            -- Get screen dimensions and validate
+            -- Get screen dimensions
             local w, h = term.getSize()
-            if w < 51 or h < 16 then
-                gui.drawError("Screen too small. Minimum size: 51x16")
-                return false
-            end
+            local isPocketPC = h <= 13
+            local minWidth = isPocketPC and 26 or 51
+            local minHeight = isPocketPC and 8 or 16
 
             -- Check for debug mode
             local debugMode = false
@@ -770,56 +769,71 @@ function commands.handleCommand(input)
             end
             
             -- Clear screen and draw main interface
-            pcall(function()
-                term.clear()
-                term.setCursorPos(1,1)
-                
-                -- Draw main box
-                gui.drawBox(1, 1, 51, 16, "[ SCI Sentinel Uninstaller ]")
-            end)
-            
-            -- Check for debug mode
-            local debugMode = false
-            if args[1] == "-debug" then
-                debugMode = true
-                gui.drawInfo("Running in DEBUG mode - No files will be modified")
-            end
-            
-            -- Clear screen and draw main interface
             term.clear()
             term.setCursorPos(1,1)
             
-            -- Draw main box
-            gui.drawBox(1, 1, 51, 16, "[ SCI Sentinel Uninstaller ]")
-            
-            -- Draw warning
-            gui.drawCenteredText(4, "WARNING!", colors.red)
-            gui.drawCenteredText(6, "This will completely remove", colors.orange)
-            gui.drawCenteredText(7, "SCI Sentinel from your computer.", colors.orange)
-            if debugMode then
-                gui.drawCenteredText(8, "(Debug Mode - No files will be modified)", colors.lime)
-            end
-            gui.drawCenteredText(9, "Are you sure you want to proceed?", colors.white)
-            
-            -- Draw buttons
-            local buttons = {
-                gui.drawButton(15, 12, "Uninstall", colors.red),
-                gui.drawButton(30, 12, "Cancel", colors.lime)
-            }
-            
-            -- Handle button click
-            local choice = gui.handleButtons(buttons)
-            if choice ~= "Uninstall" then
-                term.clear()
-                term.setCursorPos(1,1)
-                gui.drawSuccess("Uninstall cancelled")
-                return true
+            -- Draw main box with appropriate size
+            if isPocketPC then
+                gui.drawBox(1, 1, minWidth, minHeight, "[ Uninstaller ]")
+                
+                -- Draw compact warning
+                gui.drawCenteredText(2, "WARNING!", colors.red)
+                gui.drawCenteredText(3, "Remove SCIOS?", colors.orange)
+                if debugMode then
+                    gui.drawCenteredText(4, "(Debug Mode)", colors.lime)
+                end
+                
+                -- Draw buttons
+                local buttons = {
+                    gui.drawButton(3, 6, "Yes", colors.red),
+                    gui.drawButton(minWidth-6, 6, "No", colors.lime)
+                }
+                
+                -- Handle button click
+                local choice = gui.handleButtons(buttons)
+                if choice ~= "Yes" then
+                    term.clear()
+                    term.setCursorPos(1,1)
+                    gui.drawSuccess("Cancelled")
+                    return true
+                end
+            else
+                gui.drawBox(1, 1, minWidth, minHeight, "[ SCI Sentinel Uninstaller ]")
+                
+                -- Draw warning
+                gui.drawCenteredText(4, "WARNING!", colors.red)
+                gui.drawCenteredText(6, "This will completely remove", colors.orange)
+                gui.drawCenteredText(7, "SCI Sentinel from your computer.", colors.orange)
+                if debugMode then
+                    gui.drawCenteredText(8, "(Debug Mode - No files will be modified)", colors.lime)
+                end
+                gui.drawCenteredText(9, "Are you sure you want to proceed?", colors.white)
+                
+                -- Draw buttons
+                local buttons = {
+                    gui.drawButton(15, 12, "Uninstall", colors.red),
+                    gui.drawButton(30, 12, "Cancel", colors.lime)
+                }
+                
+                -- Handle button click
+                local choice = gui.handleButtons(buttons)
+                if choice ~= "Uninstall" then
+                    term.clear()
+                    term.setCursorPos(1,1)
+                    gui.drawSuccess("Uninstall cancelled")
+                    return true
+                end
             end
             
             -- Draw uninstall progress interface
             term.clear()
             term.setCursorPos(1,1)
-            gui.drawBox(1, 1, 51, 16, "[ Uninstalling SCI Sentinel ]")
+            
+            if isPocketPC then
+                gui.drawBox(1, 1, minWidth, minHeight, "[ Uninstalling ]")
+            else
+                gui.drawBox(1, 1, minWidth, minHeight, "[ Uninstalling SCI Sentinel ]")
+            end
             
             -- Initialize progress tracking
             local currentProgress = 0
@@ -924,19 +938,34 @@ function commands.handleCommand(input)
             -- Show completion screen
             term.clear()
             term.setCursorPos(1,1)
-            gui.drawBox(1, 1, 51, 16, "[ Uninstall Complete ]")
             
-            if debugMode then
-                gui.drawCenteredText(4, "Debug Mode: Uninstall Simulation Complete", colors.lime)
-                gui.drawCenteredText(6, "No files were modified", colors.white)
-                gui.drawCenteredText(7, "Run without -debug to perform actual uninstall", colors.white)
+            if isPocketPC then
+                gui.drawBox(1, 1, minWidth, minHeight, "[ Complete ]")
+                
+                if debugMode then
+                    gui.drawCenteredText(2, "Debug Complete", colors.lime)
+                    gui.drawCenteredText(3, "No changes made", colors.white)
+                else
+                    gui.drawCenteredText(2, "Uninstalled!", colors.lime)
+                    gui.drawCenteredText(3, "Reboot needed", colors.white)
+                end
+                
+                gui.drawCenteredText(5, "Reboot now?", colors.yellow)
             else
-                gui.drawCenteredText(4, "SCI Sentinel has been uninstalled!", colors.lime)
-                gui.drawCenteredText(6, "The startup file will be removed", colors.white)
-                gui.drawCenteredText(7, "when you reboot the computer.", colors.white)
+                gui.drawBox(1, 1, minWidth, minHeight, "[ Uninstall Complete ]")
+                
+                if debugMode then
+                    gui.drawCenteredText(4, "Debug Mode: Uninstall Simulation Complete", colors.lime)
+                    gui.drawCenteredText(6, "No files were modified", colors.white)
+                    gui.drawCenteredText(7, "Run without -debug to perform actual uninstall", colors.white)
+                else
+                    gui.drawCenteredText(4, "SCI Sentinel has been uninstalled!", colors.lime)
+                    gui.drawCenteredText(6, "The startup file will be removed", colors.white)
+                    gui.drawCenteredText(7, "when you reboot the computer.", colors.white)
+                end
+                
+                gui.drawCenteredText(9, "Would you like to reboot now?", colors.yellow)
             end
-            
-            gui.drawCenteredText(9, "Would you like to reboot now?", colors.yellow)
             
             -- Draw reboot buttons
             local buttons = {
