@@ -165,16 +165,51 @@ function commands.executeCommand(command, gui)
         gui.drawSuccess("  reinstall     - Reinstall SCI Sentinel")
         gui.drawSuccess("  uninstall     - Uninstall SCI Sentinel")
     elseif cmd == "uninstall" then
-        -- Confirm uninstallation
-        gui.drawWarning("WARNING: This will completely remove SCI Sentinel from your computer.")
-        if not gui.confirm("Are you sure you want to proceed with uninstallation?") then
+        -- Draw uninstaller interface
+        term.clear()
+        term.setCursorPos(1,1)
+        
+        -- Draw header
+        gui.drawBox(1, 1, 51, 3)
+        term.setCursorPos(3, 2)
+        term.setTextColor(colors.red)
+        term.write("SCI Sentinel Uninstaller")
+        term.setTextColor(colors.white)
+
+        -- Initial warning
+        gui.drawBox(3, 5, 49, 9)
+        term.setCursorPos(5, 6)
+        term.setTextColor(colors.orange)
+        term.write("WARNING: This will completely remove")
+        term.setCursorPos(5, 7)
+        term.write("SCI Sentinel from your computer.")
+        term.setCursorPos(5, 8)
+        term.write("Are you sure you want to proceed?")
+        term.setTextColor(colors.white)
+
+        -- Draw buttons
+        gui.drawButton(10, 11, "Yes", colors.red)
+        gui.drawButton(30, 11, "No", colors.lime)
+        
+        -- Wait for user input
+        local event, button = gui.handleButtons()
+        if button ~= "Yes" then
             gui.drawSuccess("Uninstall cancelled")
             return true
         end
 
+        -- Show progress interface
+        term.clear()
+        term.setCursorPos(1,1)
+        gui.drawBox(1, 1, 51, 3)
+        term.setCursorPos(3, 2)
+        term.setTextColor(colors.red)
+        term.write("Uninstalling SCI Sentinel...")
+        term.setTextColor(colors.white)
+
         -- First, disable startup.lua to prevent reboot into SCI
         if fs.exists("startup.lua") then
-            gui.drawInfo("Disabling startup.lua...")
+            gui.drawProgressBar(3, 5, 45, "Disabling startup file...", 0.2)
             local success = pcall(function()
                 local file = fs.open("startup.lua", "w")
                 if file then
@@ -185,9 +220,10 @@ function commands.executeCommand(command, gui)
                 end
             end)
             if success then
-                gui.drawSuccess("Startup file has been disabled and will be removed on next boot")
+                gui.drawProgressBar(3, 5, 45, "Startup file disabled", 0.4)
             else
                 gui.drawError("Could not disable startup file")
+                os.sleep(2)
             end
         end
 
@@ -198,19 +234,12 @@ function commands.executeCommand(command, gui)
                     if fs.isDir(path) then
                         fs.delete(path)
                     else
-                        -- Try to delete directly first
                         fs.delete(path)
                     end
                 end)
-                if success and not fs.exists(path) then
-                    gui.drawSuccess("Removed: " .. path)
-                    return true
-                else
-                    gui.drawError("Failed to remove: " .. path)
-                    return false
-                end
+                return success and not fs.exists(path)
             end
-            return true -- File doesn't exist, consider it removed
+            return true
         end
 
         -- List of files to remove
@@ -224,41 +253,52 @@ function commands.executeCommand(command, gui)
             "scios/file_hashes.db"
         }
 
-        -- Remove all files except startup.lua
+        -- Remove files with progress bar
+        gui.drawProgressBar(3, 5, 45, "Removing SCI files...", 0.6)
         for _, file in ipairs(files_to_remove) do
             deleteFile(file)
         end
 
         -- Try to remove the scios directory
+        gui.drawProgressBar(3, 5, 45, "Cleaning up...", 0.8)
         if fs.exists("scios") then
-            local success = pcall(function() 
-                -- Try to remove any remaining files
+            pcall(function() 
                 for _, file in ipairs(fs.list("scios")) do
                     local path = fs.combine("scios", file)
                     deleteFile(path)
                 end
-                -- Then remove directory
                 fs.delete("scios") 
             end)
-            
-            if success and not fs.exists("scios") then
-                gui.drawSuccess("Removed SCIOS directory")
-            else
-                gui.drawWarning("Could not remove SCIOS directory completely")
-                if fs.exists("scios") and fs.list("scios") then
-                    gui.drawWarning("Remaining files in SCIOS directory:")
-                    for _, file in ipairs(fs.list("scios")) do
-                        gui.drawWarning("  - " .. file)
-                    end
-                end
-            end
         end
 
-        gui.drawSuccess("SCI Sentinel has been uninstalled.")
-        gui.drawSuccess("The startup file will be removed when the computer reboots.")
-        gui.drawSuccess("Rebooting in 3 seconds...")
-        os.sleep(3)
-        os.reboot()
+        gui.drawProgressBar(3, 5, 45, "Uninstall complete!", 1.0)
+        os.sleep(1)
+
+        -- Final screen
+        term.clear()
+        term.setCursorPos(1,1)
+        gui.drawBox(1, 1, 51, 3)
+        term.setCursorPos(3, 2)
+        term.setTextColor(colors.lime)
+        term.write("SCI Sentinel Uninstalled Successfully!")
+        term.setTextColor(colors.white)
+
+        gui.drawBox(3, 5, 49, 9)
+        term.setCursorPos(5, 6)
+        term.write("The startup file will be removed on next boot.")
+        term.setCursorPos(5, 8)
+        term.write("Would you like to reboot now?")
+
+        -- Draw reboot buttons
+        gui.drawButton(10, 11, "Yes", colors.lime)
+        gui.drawButton(30, 11, "No", colors.red)
+        
+        -- Wait for user input
+        local event, button = gui.handleButtons()
+        if button == "Yes" then
+            os.reboot()
+        end
+        
         return true
     else
         -- Only run recognized commands
