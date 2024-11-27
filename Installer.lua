@@ -228,20 +228,73 @@ local function cleanInstall()
     return true
 end
 
--- Main installation process
-local gui = require("GUI")
+-- Add the current directory to package path
+local currentDir = shell.dir()
+package.path = currentDir .. "/?.lua;" .. package.path
 
--- Clear the screen
+-- Try to load GUI module, create basic functions if not available
+local gui
+local function initGUI()
+    if fs.exists("GUI.lua") then
+        gui = require("GUI")
+    else
+        -- Create temporary basic GUI functions if module not available
+        gui = {
+            drawBox = function(x, y, width, height, title)
+                term.setCursorPos(x, y)
+                write("+" .. string.rep("-", width-2) .. "+")
+                for i = 1, height-2 do
+                    term.setCursorPos(x, y+i)
+                    write("|" .. string.rep(" ", width-2) .. "|")
+                end
+                term.setCursorPos(x, y+height-1)
+                write("+" .. string.rep("-", width-2) .. "+")
+                if title then
+                    term.setCursorPos(x + math.floor((width - #title) / 2), y)
+                    write(title)
+                end
+            end,
+            drawCenteredText = function(y, text, color)
+                local w, _ = term.getSize()
+                term.setCursorPos(math.floor((w - #text) / 2), y)
+                if color then term.setTextColor(color) end
+                write(text)
+                term.setTextColor(colors.white)
+            end,
+            drawButton = function(x, y, text, color)
+                local oldColor = term.getBackgroundColor()
+                if color then term.setBackgroundColor(color) end
+                term.setCursorPos(x, y)
+                write(" " .. text .. " ")
+                term.setBackgroundColor(oldColor)
+                return {
+                    x = x,
+                    y = y,
+                    width = #text + 2,
+                    text = text
+                }
+            end
+        }
+    end
+    return gui
+end
+
+-- Initialize GUI
+gui = initGUI()
+
+-- Main installation process
 term.clear()
 term.setCursorPos(1,1)
 
 -- Draw main interface
-gui.drawFancyBox(1, 1, 51, 16, "[ SCI Sentinel Installer ]", colors.gray, colors.white)
+gui.drawBox(1, 1, 51, 16, "[ SCI Sentinel Installer ]")
 
 -- Draw welcome message
-gui.drawHeader(3, 3, "Welcome to SCI Sentinel", colors.yellow)
-term.setCursorPos(3, 5)
+term.setCursorPos(3, 3)
+term.setTextColor(colors.yellow)
+write("Welcome to SCI Sentinel")
 term.setTextColor(colors.white)
+term.setCursorPos(3, 5)
 write("This installer will set up SCI Sentinel on your")
 term.setCursorPos(3, 6)
 write("computer. SCI Sentinel provides security and")
@@ -249,99 +302,108 @@ term.setCursorPos(3, 7)
 write("monitoring features for your system.")
 
 -- Draw installation options
-gui.drawHeader(3, 9, "Installation Options", colors.lime)
+term.setCursorPos(3, 9)
+term.setTextColor(colors.lime)
+write("Installation Options")
+term.setTextColor(colors.white)
 
--- Create clickable buttons
-local buttons = {
-    gui.drawClickableButton(3, 11, "Install", colors.green, colors.lime),
-    gui.drawClickableButton(15, 11, "Exit", colors.red, colors.orange)
-}
+-- Create buttons
+local installButton = gui.drawButton(3, 11, "Install", colors.green)
+local exitButton = gui.drawButton(15, 11, "Exit", colors.red)
 
--- Handle button clicks
-local choice = gui.handleMouseEvents(buttons)
-
-if choice == "Install" then
-    -- Installation process
-    term.clear()
-    term.setCursorPos(1,1)
-    gui.drawFancyBox(1, 1, 51, 16, "[ Installing SCI Sentinel ]", colors.gray, colors.white)
+-- Handle button input
+while true do
+    local event, button, x, y = os.pullEvent("mouse_click")
     
-    -- Initialize progress tracking
-    local function updateProgress(status, progress)
-        gui.updateProgress(3, 4, 45, "Installing", progress, status)
-    end
-    
-    -- Create directories
-    updateProgress("Creating directories...", 0.1)
-    if not fs.exists("scios") then
-        fs.makeDir("scios")
-    end
-    os.sleep(0.2)
-    
-    -- Download files
-    local files = {
-        "sci_sentinel.lua",
-        "GUI.lua",
-        "Commands.lua",
-        "Updater.lua"
-    }
-    
-    for i, file in ipairs(files) do
-        updateProgress("Downloading: " .. file, 0.2 + (0.5 * (i/#files)))
-        -- Simulate file download/copy
-        os.sleep(0.3)
-        -- Here you would actually download or copy the file
-    end
-    
-    -- Configure startup
-    updateProgress("Configuring startup...", 0.8)
-    local startup = fs.open("startup.lua", "w")
-    if startup then
-        startup.write('shell.run("scios/sci_sentinel.lua")')
-        startup.close()
-    end
-    os.sleep(0.2)
-    
-    -- Complete installation
-    updateProgress("Installation Complete!", 1.0)
-    os.sleep(1)
-    
-    -- Show completion screen
-    term.clear()
-    term.setCursorPos(1,1)
-    gui.drawFancyBox(1, 1, 51, 16, "[ Installation Complete ]", colors.gray, colors.white)
-    
-    gui.drawHeader(3, 4, "Success!", colors.lime)
-    term.setCursorPos(3, 6)
-    term.setTextColor(colors.white)
-    write("SCI Sentinel has been installed successfully.")
-    term.setCursorPos(3, 7)
-    write("The system will start automatically on boot.")
-    
-    gui.drawHeader(3, 9, "What's Next?", colors.yellow)
-    term.setCursorPos(3, 11)
-    write("Would you like to reboot now?")
-    
-    -- Create reboot buttons
-    local rebootButtons = {
-        gui.drawClickableButton(3, 13, "Reboot", colors.green, colors.lime),
-        gui.drawClickableButton(15, 13, "Later", colors.red, colors.orange)
-    }
-    
-    -- Handle reboot choice
-    local rebootChoice = gui.handleMouseEvents(rebootButtons)
-    if rebootChoice == "Reboot" then
+    -- Check Install button
+    if y == installButton.y and x >= installButton.x and x < installButton.x + installButton.width then
+        -- Start installation
         term.clear()
         term.setCursorPos(1,1)
-        gui.drawCenteredText(8, "Rebooting...", colors.yellow)
-        os.sleep(1)
-        os.reboot()
-    else
+        gui.drawBox(1, 1, 51, 16, "[ Installing SCI Sentinel ]")
+        
+        -- Create directories
+        term.setCursorPos(3, 4)
+        write("Creating directories...")
+        if not fs.exists("scios") then
+            fs.makeDir("scios")
+        end
+        os.sleep(0.2)
+        
+        -- Copy files
+        local files = {
+            {"GUI.lua", "scios/GUI.lua"},
+            {"Commands.lua", "scios/Commands.lua"},
+            {"sci_sentinel.lua", "scios/sci_sentinel.lua"},
+            {"Updater.lua", "scios/Updater.lua"}
+        }
+        
+        for i, file in ipairs(files) do
+            term.setCursorPos(3, 5)
+            write(string.format("Installing: %s", file[1]))
+            if fs.exists(file[1]) then
+                fs.copy(file[1], file[2])
+            end
+            os.sleep(0.3)
+        end
+        
+        -- Configure startup
+        term.setCursorPos(3, 6)
+        write("Configuring startup...")
+        local startup = fs.open("startup.lua", "w")
+        if startup then
+            startup.write('shell.run("scios/sci_sentinel.lua")')
+            startup.close()
+        end
+        os.sleep(0.2)
+        
+        -- Show completion screen
         term.clear()
         term.setCursorPos(1,1)
+        gui.drawBox(1, 1, 51, 16, "[ Installation Complete ]")
+        
+        term.setCursorPos(3, 4)
+        term.setTextColor(colors.lime)
+        write("Success!")
+        term.setTextColor(colors.white)
+        term.setCursorPos(3, 6)
+        write("SCI Sentinel has been installed successfully.")
+        term.setCursorPos(3, 7)
+        write("The system will start automatically on boot.")
+        
+        term.setCursorPos(3, 9)
+        term.setTextColor(colors.yellow)
+        write("What's Next?")
+        term.setTextColor(colors.white)
+        term.setCursorPos(3, 11)
+        write("Would you like to reboot now?")
+        
+        -- Create reboot buttons
+        local rebootButton = gui.drawButton(3, 13, "Reboot", colors.green)
+        local laterButton = gui.drawButton(15, 13, "Later", colors.red)
+        
+        -- Handle reboot choice
+        while true do
+            local event, button, x, y = os.pullEvent("mouse_click")
+            if y == rebootButton.y then
+                if x >= rebootButton.x and x < rebootButton.x + rebootButton.width then
+                    term.clear()
+                    term.setCursorPos(1,1)
+                    gui.drawCenteredText(8, "Rebooting...", colors.yellow)
+                    os.sleep(1)
+                    os.reboot()
+                elseif x >= laterButton.x and x < laterButton.x + laterButton.width then
+                    term.clear()
+                    term.setCursorPos(1,1)
+                    return
+                end
+            end
+        end
+        
+    -- Check Exit button
+    elseif y == exitButton.y and x >= exitButton.x and x < exitButton.x + exitButton.width then
+        term.clear()
+        term.setCursorPos(1,1)
+        return
     end
-else
-    -- Exit installer
-    term.clear()
-    term.setCursorPos(1,1)
 end
