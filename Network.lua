@@ -19,7 +19,12 @@ function network.init()
     local peripheralList = peripheral.getNames()
     for _, name in ipairs(peripheralList) do
         if peripheral.getType(name) == "modem" then
-            modems[name] = peripheral.wrap(name)
+            local modem = peripheral.wrap(name)
+            modems[name] = modem
+            -- Set wireless modem range to maximum
+            if modem.isWireless and modem.isWireless() then
+                modem.setStrength(128)  -- Maximum range
+            end
         end
     end
     
@@ -63,7 +68,12 @@ function network.scan()
     end
     
     local computers = {}
-    rednet.broadcast("", protocols.DISCOVER)
+    
+    -- Broadcast discovery request
+    rednet.broadcast({
+        id = os.getComputerID(),
+        label = os.getComputerLabel() or "Unknown"
+    }, protocols.DISCOVER)
     
     -- Wait for responses (with timeout)
     local timeout = os.startTimer(2)
@@ -72,12 +82,13 @@ function network.scan()
         if event == "timer" and id == timeout then
             break
         elseif event == "rednet_message" and protocol == protocols.DISCOVER then
-            local label = os.getComputerLabel() or tostring(id)
-            computers[id] = {
-                id = id,
-                label = label,
-                distance = message.distance or "unknown"
-            }
+            if type(message) == "table" then
+                computers[id] = {
+                    id = id,
+                    label = message.label or ("Computer " .. id),
+                    distance = message.distance or "unknown"
+                }
+            end
         end
     end
     
@@ -130,12 +141,11 @@ function network.listen(callback)
             rednet.send(senderId, "", protocols.PING)
         elseif protocol == protocols.DISCOVER then
             -- Auto-respond to discovery
-            local response = {
+            rednet.send(senderId, {
                 id = os.getComputerID(),
-                label = os.getComputerLabel(),
-                distance = "unknown" -- Could be calculated with wireless modems
-            }
-            rednet.send(senderId, response, protocols.DISCOVER)
+                label = os.getComputerLabel() or "Unknown",
+                distance = "unknown"  -- Could be calculated with wireless modems
+            }, protocols.DISCOVER)
         elseif protocol == protocols.MESSAGE then
             -- Handle regular messages
             if callback then
