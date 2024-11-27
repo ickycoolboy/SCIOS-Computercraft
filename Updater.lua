@@ -71,6 +71,46 @@ function updater.getGitHubRawURL(filepath)
         os.epoch("utc"))
 end
 
+function updater.verifyFile(path, content)
+    if not fs.exists(path) then
+        return false, "File does not exist after download"
+    end
+    
+    local file = fs.open(path, "r")
+    if not file then
+        return false, "Cannot open file for verification"
+    end
+    
+    local fileContent = file.readAll()
+    file.close()
+    
+    if fileContent ~= content then
+        return false, "File content verification failed"
+    end
+    
+    return true
+end
+
+function updater.backupFile(path)
+    if fs.exists(path) then
+        local backupPath = path .. ".backup"
+        fs.delete(backupPath)
+        fs.copy(path, backupPath)
+        return backupPath
+    end
+    return nil
+end
+
+function updater.restoreBackup(path, backupPath)
+    if backupPath and fs.exists(backupPath) then
+        fs.delete(path)
+        fs.copy(backupPath, path)
+        fs.delete(backupPath)
+        return true
+    end
+    return false
+end
+
 function updater.downloadFile(url, path)
     if not updater.gui then return false end
     
@@ -79,6 +119,9 @@ function updater.downloadFile(url, path)
     if response then
         local content = response.readAll()
         response.close()
+        
+        -- Create backup of existing file
+        local backupPath = updater.backupFile(path)
         
         -- Create directory if needed
         local dir = fs.getDir(path)
@@ -91,8 +134,26 @@ function updater.downloadFile(url, path)
         if file then
             file.write(content)
             file.close()
-            updater.gui.drawSuccess("Downloaded: " .. path)
-            return true
+            
+            -- Verify file
+            local success, error = updater.verifyFile(path, content)
+            if success then
+                updater.gui.drawSuccess("Successfully downloaded and verified: " .. path)
+                if backupPath then
+                    fs.delete(backupPath)
+                end
+                return true
+            else
+                updater.gui.drawError("File verification failed: " .. (error or "unknown error"))
+                if backupPath then
+                    updater.gui.drawInfo("Restoring backup...")
+                    if updater.restoreBackup(path, backupPath) then
+                        updater.gui.drawSuccess("Backup restored")
+                    else
+                        updater.gui.drawError("Failed to restore backup")
+                    end
+                end
+            end
         end
     end
     updater.gui.drawError("Failed to download: " .. path)
@@ -136,6 +197,7 @@ function updater.checkForUpdates()
     end
 
     local updates_available = false
+    local updates_installed = false
     updater.gui.drawInfo("Checking for updates...")
     
     for name, info in pairs(updater.modules) do
@@ -152,6 +214,7 @@ function updater.checkForUpdates()
                     local url = updater.getGitHubRawURL(info.path)
                     if updater.downloadFile(url, info.target) then
                         info.version = remote_version
+                        updates_installed = true
                         updater.gui.drawSuccess("Successfully updated " .. name)
                     end
                 end
@@ -163,7 +226,11 @@ function updater.checkForUpdates()
         end
     end
     
-    if not updates_available then
+    if updates_installed then
+        if updater.gui.confirm("Updates installed. Reboot system to apply changes?") then
+            os.reboot()
+        end
+    elseif not updates_available then
         updater.gui.drawSuccess("All modules are up to date")
     end
     
