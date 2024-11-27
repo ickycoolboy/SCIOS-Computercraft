@@ -17,6 +17,13 @@ local GITHUB_REPO = {
     branch = "Github-updating-test"
 }
 
+-- Module file mappings
+local MODULE_FILES = {
+    updater = "Updater.lua",
+    gui = "GUI.lua",
+    core = "sci_sentinel.lua"
+}
+
 local function getGitHubRawURL(filepath)
     return string.format(
         "https://raw.githubusercontent.com/%s/%s/%s/%s",
@@ -44,86 +51,55 @@ local function downloadFromGitHub(filepath, destination)
     return false
 end
 
-local function checkSelfUpdate()
-    print("Checking for core updates...")
-    local tempFile = "scios/sci_sentinel_temp.lua"
-    
-    if downloadFromGitHub("sci_sentinel.lua", tempFile) then
-        -- Compare files
-        local current = fs.open("scios/sci_sentinel.lua", "r")
-        local new = fs.open(tempFile, "r")
-        
-        if current and new then
-            local currentContent = current.readAll()
-            local newContent = new.readAll()
-            current.close()
-            new.close()
-            
-            if currentContent ~= newContent then
-                print("Update found! Installing...")
-                fs.delete("scios/sci_sentinel.lua")
-                fs.move(tempFile, "scios/sci_sentinel.lua")
-                print("Core updated. Rebooting...")
-                os.sleep(2)
-                os.reboot()
-            else
-                fs.delete(tempFile)
-                print("No updates found.")
-            end
-        end
-    else
-        print("Failed to check for updates.")
-    end
-end
-
 local function initialSetup()
     print("Performing initial installation...")
     
     -- Download updater module first
-    if not downloadFromGitHub("updater.lua", "scios/updater.lua") then
+    print("Downloading Updater module...")
+    if not downloadFromGitHub(MODULE_FILES.updater, "scios/" .. MODULE_FILES.updater) then
         print("Failed to download updater module")
         return false
     end
     
-    -- Load updater module
-    local success, updater = pcall(require, "updater")
-    if not success then
-        print("Failed to load updater module")
+    -- Download GUI module
+    print("Downloading GUI module...")
+    if not downloadFromGitHub(MODULE_FILES.gui, "scios/" .. MODULE_FILES.gui) then
+        print("Failed to download GUI module")
         return false
     end
     
-    -- Use updater to install everything else
-    return updater.initialInstall()
+    print("Initial setup complete!")
+    return true
 end
 
--- Check if modules are already installed, otherwise perform initial update
-if not fs.exists("scios/gui.lua") or 
-   not fs.exists("scios/commands.lua") or 
-   not fs.exists("scios/updater.lua") or 
-   not fs.exists("scios/sci_sentinel.lua") then
-    initialSetup()
-    return
+-- Check if modules exist, otherwise perform initial setup
+if not fs.exists("scios/" .. MODULE_FILES.updater) or 
+   not fs.exists("scios/" .. MODULE_FILES.gui) then
+    if not initialSetup() then
+        print("Initial setup failed!")
+        return
+    end
+    print("Rebooting in 3 seconds...")
+    os.sleep(3)
+    os.reboot()
 end
-
--- Check for self-updates first
-checkSelfUpdate()
 
 -- Load modules
-local function loadModule(name, required)
+local function loadModule(name)
     local success, module = pcall(require, name)
-    if not success or not module then
-        if required then
-            error("Failed to load " .. name .. " module: " .. tostring(module))
-        end
+    if not success then
+        print("Failed to load " .. name .. ": " .. tostring(module))
         return nil
     end
     return module
 end
 
 -- Load required modules
-local gui = loadModule("gui", true)
-local commands = loadModule("commands", true)
-local updater = loadModule("updater", true)
+local gui = loadModule("GUI")
+if not gui then return end
+
+local updater = loadModule("Updater")
+if not updater then return end
 
 -- Main Loop
 local function startSentinelOS()
@@ -132,21 +108,21 @@ local function startSentinelOS()
         gui.printPrompt()
         local input = read()
         if input then
-            if not commands.executeCommand(input, gui) then
+            if input == "exit" then
                 break
+            elseif input == "update" then
+                updater.checkForUpdates()
+            else
+                print("Unknown command: " .. input)
             end
         end
     end
-    gui.drawSuccess("Shutting down SCI Sentinel OS...")
+    print("Shutting down SCI Sentinel OS...")
 end
 
 -- Start the OS
 print("Starting SCI Sentinel OS...")
 local ok, err = pcall(startSentinelOS)
 if not ok then
-    if gui then
-        gui.drawError("An unexpected error occurred: " .. tostring(err))
-    else
-        print("An unexpected error occurred: " .. tostring(err))
-    end
+    print("An unexpected error occurred: " .. tostring(err))
 end
