@@ -5,37 +5,10 @@ local gui = require("SCI Sentinel GUI")
 
 local updater = {}
 
--- Module version information
-updater.modules = {
-    ["core"] = {
-        version = "1.0.0",
-        pastebin = "your_core_pastebin_code"
-    },
-    ["gui"] = {
-        version = "1.0.0",
-        pastebin = "your_gui_pastebin_code"
-    },
-    ["commands"] = {
-        version = "1.0.0",
-        pastebin = "your_commands_pastebin_code"
-    }
-}
-
-function updater.downloadFromPastebin(pastebinCode, targetFile)
-    local response = http.get(
-        string.format("https://pastebin.com/raw/%s", pastebinCode)
-    )
-    
-    if response then
-        local content = response.readAll()
-        response.close()
-        
-        local file = fs.open(targetFile, "w")
-        file.write(content)
-        file.close()
-        return true
+local function ensureDirectoryExists(dir)
+    if not fs.exists(dir) then
+        fs.makeDir(dir)
     end
-    return false
 end
 
 function updater.checkForUpdates()
