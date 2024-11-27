@@ -331,32 +331,47 @@ end
 
 -- System information commands
 local function mem()
-    local total = math.floor((_G._HOST or ""):match("(%d+)") or 0)
-    local used = math.floor(collectgarbage("count"))
-    local free = total - used
+    -- Get available memory from os.getComputerFreeSpace()
+    local freeSpace = os.getFreeSpace("/")
+    local totalSpace = 1000000  -- ComputerCraft typically has 1MB space
+    local usedSpace = totalSpace - freeSpace
     
-    gui.drawInfo("Memory Information:")
-    gui.drawInfo(string.format("Total Memory: %d KB", total))
-    gui.drawInfo(string.format("Used Memory: %d KB", used))
-    gui.drawInfo(string.format("Free Memory: %d KB", free))
+    gui.drawInfo("Storage Information:")
+    gui.drawInfo(string.format("Total Space: %d bytes", totalSpace))
+    gui.drawInfo(string.format("Used Space: %d bytes", usedSpace))
+    gui.drawInfo(string.format("Free Space: %d bytes", freeSpace))
+    
+    -- Memory usage (if available)
+    if _G._HOST then
+        local memLimit = tonumber((_G._HOST):match("(%d+)")) or 0
+        gui.drawInfo("")
+        gui.drawInfo("Memory Information:")
+        gui.drawInfo(string.format("Memory Limit: %d KB", memLimit))
+    end
+    
     return true
 end
 
 local function ps()
-    local running = {}
-    for i=1, math.huge do
-        local co = coroutine.running(i)
-        if not co then break end
-        table.insert(running, {
-            id = i,
-            status = coroutine.status(co)
-        })
+    local running = parallel.getRunningTasks and parallel.getRunningTasks() or {}
+    
+    if #running == 0 then
+        gui.drawInfo("No active parallel tasks found")
+        
+        -- Show basic computer info instead
+        gui.drawInfo("")
+        gui.drawInfo("Computer Information:")
+        gui.drawInfo(string.format("Computer ID: %d", os.getComputerID()))
+        gui.drawInfo(string.format("Computer Label: %s", os.getComputerLabel() or "None"))
+        gui.drawInfo(string.format("Time: %d", os.time()))
+        gui.drawInfo(string.format("Day: %d", os.day()))
+    else
+        gui.drawInfo("Running Parallel Tasks:")
+        for i, task in ipairs(running) do
+            gui.drawInfo(string.format("Task %d: %s", i, tostring(task)))
+        end
     end
     
-    gui.drawInfo("Running Processes:")
-    for _, proc in ipairs(running) do
-        gui.drawInfo(string.format("PID %d: %s", proc.id, proc.status))
-    end
     return true
 end
 

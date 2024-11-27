@@ -166,25 +166,31 @@ local commands = {
     },
     MEM = {
         syntax = "MEM",
-        description = "Displays memory usage information.",
+        description = "Displays storage and memory information.",
         details = {
-            "Shows detailed memory usage statistics for the system.",
+            "Shows detailed storage and memory statistics.",
             "",
             "Information displayed:",
-            " - Total Memory: Total available system memory in KB",
-            " - Used Memory:  Currently used memory in KB",
-            " - Free Memory:  Available memory in KB"
+            " - Total Storage Space in bytes",
+            " - Used Storage Space in bytes",
+            " - Free Storage Space in bytes",
+            " - Memory Limit (if available)",
+            "",
+            "Use this command to monitor system resources."
         }
     },
     PS = {
         syntax = "PS",
-        description = "Displays information about active processes.",
+        description = "Displays system status and running tasks.",
         details = {
-            "Lists all currently running processes and their status.",
+            "Shows computer information and running parallel tasks.",
             "",
             "Information displayed:",
-            " - Process ID (PID)",
-            " - Process Status (running, suspended, dead)",
+            " - Computer ID",
+            " - Computer Label",
+            " - Current Time",
+            " - Current Day",
+            " - List of running parallel tasks (if any)",
             "",
             "Use this command to monitor system activity."
         }
