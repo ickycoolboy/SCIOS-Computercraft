@@ -154,7 +154,7 @@ function network.scan()
     end
     
     if _G.DEBUG then 
-        gui.drawInfo("[DEBUG] Scan complete. Found " .. tostring(next(computers) and table.getn(computers) or 0) .. " computers")
+        gui.drawInfo("[DEBUG] Scan complete. Found " .. tostring(next(computers) and #computers or 0) .. " computers")
     end
     
     return computers

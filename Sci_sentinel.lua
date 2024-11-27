@@ -229,31 +229,42 @@ local function mainLoop(gui, updater, commands, help, displayManager, login)
     local running = true
     local lastUpdateCheck = os.epoch("utc")
     
-    while running do
-        local currentTime = os.epoch("utc")
-        
-        -- Only check for updates every hour (3600000 milliseconds)
-        if currentTime - lastUpdateCheck >= 3600000 then
-            protected_call(function()
-                updater.autoUpdateCheck()
-            end)
-            lastUpdateCheck = currentTime
-        end
+    -- Start network message handler in parallel
+    parallel.waitForAny(
+        function()
+            -- Main command loop
+            while running do
+                local currentTime = os.epoch("utc")
+                
+                -- Only check for updates every hour (3600000 milliseconds)
+                if currentTime - lastUpdateCheck >= 3600000 then
+                    protected_call(function()
+                        updater.autoUpdateCheck()
+                    end)
+                    lastUpdateCheck = currentTime
+                end
 
-        -- Command processing
-        gui.printPrompt()
-        local input = read()
-        if input then
-            running = executeCommand(input, gui, updater, commands, help, displayManager, login)
-        end
+                -- Command processing
+                gui.printPrompt()
+                local input = read()
+                if input then
+                    running = executeCommand(input, gui, updater, commands, help, displayManager, login)
+                end
 
-        -- Error recovery
-        if not running then
-            if gui.confirm("Do you want to restart SCI Sentinel?") then
-                os.reboot()
+                -- Error recovery
+                if not running then
+                    if gui.confirm("Do you want to restart SCI Sentinel?") then
+                        os.reboot()
+                    end
+                end
             end
+        end,
+        function()
+            -- Network message handler
+            local network = require("Network")
+            network.handleMessages()
         end
-    end
+    )
 end
 
 -- Main entry point with error handling
