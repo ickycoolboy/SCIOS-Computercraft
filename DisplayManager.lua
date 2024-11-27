@@ -1,6 +1,11 @@
 -- Display Manager Module for SCI Sentinel OS
 local displayManager = {}
 
+-- Add current directory to package path if it's not already there
+if not package.path:find("./?.lua;") then
+    package.path = "./?.lua;" .. package.path
+end
+
 -- Configuration
 local config = {
     mirrorEnabled = false,

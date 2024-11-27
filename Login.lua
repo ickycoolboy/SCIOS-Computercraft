@@ -1,3 +1,8 @@
+-- Add current directory to package path if it's not already there
+if not package.path:find("./?.lua;") then
+    package.path = "./?.lua;" .. package.path
+end
+
 local login = {}
 local displayManager = require("DisplayManager")
 

@@ -1,6 +1,11 @@
 -- SCI Sentinel GUI Module
 local version = "1.0.1"
 
+-- Add current directory to package path if it's not already there
+if not package.path:find("./?.lua;") then
+    package.path = "./?.lua;" .. package.path
+end
+
 local gui = {}
 local background = {}
 -- Add display manager
