@@ -20,35 +20,66 @@ function network.init()
     
     -- Find all modems (wired and wireless)
     local peripheralList = peripheral.getNames()
+    gui.drawInfo("Found peripherals: " .. textutils.serialize(peripheralList))
+    
     for _, name in ipairs(peripheralList) do
-        if peripheral.getType(name) == "modem" then
+        local pType = peripheral.getType(name)
+        gui.drawInfo("Checking " .. name .. " (type: " .. pType .. ")")
+        
+        if pType == "modem" then
             local modem = peripheral.wrap(name)
             if modem then
                 modems[name] = modem
+                gui.drawInfo("Added modem: " .. name)
+                
                 -- Set wireless modem range to maximum
                 if modem.isWireless and modem.isWireless() then
                     modem.setStrength(128)  -- Maximum range
+                    gui.drawInfo("Set wireless range for " .. name)
                 end
+                
                 -- Close the modem first to ensure clean state
                 if rednet.isOpen(name) then
                     rednet.close(name)
+                    gui.drawInfo("Closed existing rednet on " .. name)
                 end
+            else
+                gui.drawError("Failed to wrap modem: " .. name)
             end
         end
     end
     
     isRednetOpen = false
-    return #modems > 0
+    local modemCount = 0
+    for _ in pairs(modems) do modemCount = modemCount + 1 end
+    gui.drawInfo("Found " .. modemCount .. " modems")
+    
+    return modemCount > 0
 end
 
 -- Open rednet on all modems
 function network.openRednet()
-    network.init()  -- Reinitialize to ensure clean state
+    gui.drawInfo("Initializing network...")
+    if not network.init() then
+        gui.drawError("No modems found during initialization")
+        return false
+    end
     
     local opened = false
     for name, modem in pairs(modems) do
+        gui.drawInfo("Attempting to open rednet on " .. name)
         if not rednet.isOpen(name) then
-            rednet.open(name)
+            local success, err = pcall(function()
+                rednet.open(name)
+            end)
+            if success then
+                opened = true
+                gui.drawInfo("Successfully opened rednet on " .. name)
+            else
+                gui.drawError("Failed to open rednet on " .. name .. ": " .. tostring(err))
+            end
+        else
+            gui.drawInfo(name .. " was already open")
             opened = true
         end
     end
@@ -63,7 +94,10 @@ function network.closeRednet()
     for name, _ in pairs(modems) do
         if rednet.isOpen(name) then
             rednet.close(name)
+            gui.drawInfo("Closed rednet on " .. name)
             closed = true
+        else
+            gui.drawInfo(name .. " was already closed")
         end
     end
     
@@ -168,14 +202,24 @@ end
 -- Get list of connected modems
 function network.getModems()
     local modemList = {}
+    gui.drawInfo("Getting modem list...")
+    
     for name, modem in pairs(modems) do
+        local isOpen = rednet.isOpen(name)
+        local isWireless = modem.isWireless and modem.isWireless() or false
+        
+        gui.drawInfo(string.format("Modem %s: wireless=%s, open=%s", 
+            name, tostring(isWireless), tostring(isOpen)))
+            
         table.insert(modemList, {
             name = name,
             side = name,  -- The name is usually the side
-            isWireless = modem.isWireless and modem.isWireless() or false,
-            isOpen = rednet.isOpen(name)
+            isWireless = isWireless,
+            isOpen = isOpen
         })
     end
+    
+    gui.drawInfo("Found " .. #modemList .. " modems")
     return modemList
 end
 

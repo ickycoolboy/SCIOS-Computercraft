@@ -235,6 +235,9 @@ end
 
 -- Network commands
 local function net(args)
+    -- Initialize network module first
+    network.init()
+    
     if #args == 0 then
         gui.drawError("Usage: NET <command>")
         gui.drawInfo("Available commands:")
@@ -249,9 +252,6 @@ local function net(args)
     table.remove(args, 1)
     
     if cmd == "status" then
-        -- Initialize network if needed
-        network.init()
-        
         -- Show modem information
         local modems = network.getModems()
         if #modems == 0 then
@@ -260,7 +260,7 @@ local function net(args)
         end
         
         gui.drawInfo("Network Status:")
-        gui.drawInfo("")
+        gui.drawInfo("-------------")
         gui.drawInfo("Computer ID: " .. os.getComputerID())
         gui.drawInfo("Label: " .. (os.getComputerLabel() or "None"))
         gui.drawInfo("")
@@ -294,6 +294,7 @@ local function net(args)
         return true
         
     elseif cmd == "open" then
+        gui.drawInfo("Opening network...")
         if network.openRednet() then
             gui.drawSuccess("Network opened")
             return true
@@ -303,12 +304,13 @@ local function net(args)
         end
         
     elseif cmd == "close" then
+        gui.drawInfo("Closing network...")
         if network.closeRednet() then
             gui.drawSuccess("Network closed")
             return true
         else
-            gui.drawError("No modems were open")
-            return false
+            gui.drawInfo("No modems were open")
+            return true
         end
         
     else
