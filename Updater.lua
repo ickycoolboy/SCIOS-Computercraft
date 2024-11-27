@@ -39,6 +39,11 @@ updater.modules = {
         path = "Startup.lua",
         target = "startup.lua",
         hash = nil
+    },
+    ["displaymanager"] = {
+        path = "DisplayManager.lua",
+        target = "scios/DisplayManager.lua",
+        hash = nil
     }
 }
 

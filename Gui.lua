@@ -20,6 +20,14 @@ function gui.drawScreen()
     print("#       Welcome to SCI Sentinel       #")
     print("#######################################")
     term.setTextColor(colors.white)
+    
+    -- Add display manager
+    local displayManager = require("DisplayManager")
+    
+    -- Mirror content if enabled
+    if displayManager.isMirroringEnabled() then
+        displayManager.mirrorContent()
+    end
 end
 
 function gui.printPrompt()

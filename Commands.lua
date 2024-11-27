@@ -244,8 +244,23 @@ local function help()
     gui.drawSuccess("  UPDATE         - Check for updates")
     gui.drawSuccess("  REINSTALL      - Reinstall SCI Sentinel")
     gui.drawSuccess("  UNINSTALL      - Uninstall SCI Sentinel")
+    gui.drawSuccess("  MIRROR         - Toggle display mirroring")
     return true
 end
+
+-- Display management commands
+commands["mirror"] = {
+    action = function(args)
+        local displayManager = require("DisplayManager")
+        local enabled = displayManager.toggleMirroring()
+        if enabled then
+            gui.drawSuccess("Display mirroring enabled")
+        else
+            gui.drawSuccess("Display mirroring disabled")
+        end
+    end,
+    help = "Toggle display mirroring for secondary monitors"
+}
 
 -- Command handler
 function commands.handleCommand(input)
@@ -485,6 +500,16 @@ function commands.handleCommand(input)
             
             return true
         end,
+        mirror = function(args)
+            local displayManager = require("DisplayManager")
+            local enabled = displayManager.toggleMirroring()
+            if enabled then
+                gui.drawSuccess("Display mirroring enabled")
+            else
+                gui.drawSuccess("Display mirroring disabled")
+            end
+            return true
+        end
     }
     
     -- Run command
