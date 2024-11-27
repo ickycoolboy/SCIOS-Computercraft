@@ -335,6 +335,8 @@ function commands.handleCommand(input)
             -- Handle button click
             local choice = gui.handleButtons(buttons)
             if choice ~= "Uninstall" then
+                term.clear()
+                term.setCursorPos(1,1)
                 gui.drawSuccess("Uninstall cancelled")
                 return true
             end
@@ -343,6 +345,13 @@ function commands.handleCommand(input)
             term.clear()
             term.setCursorPos(1,1)
             gui.drawBox(1, 1, 51, 16, "[ Uninstalling SCI Sentinel ]")
+            
+            -- Initialize progress tracking
+            local currentProgress = 0
+            local function updateProgress(status, progress)
+                currentProgress = progress
+                gui.updateProgress(3, 4, 45, "Uninstalling", progress, status)
+            end
             
             -- Function to simulate or perform actual file operations
             local function performOperation(operation, debugMode)
@@ -355,9 +364,8 @@ function commands.handleCommand(input)
             end
             
             -- First, disable startup.lua
+            updateProgress("Disabling startup file...", 0.1)
             if fs.exists("startup.lua") or debugMode then
-                gui.drawAnimatedProgressBar(3, 4, 45, "Disabling startup file", 0, 0.25, 1.0)
-                
                 local success = performOperation(function()
                     local file = fs.open("startup.lua", "w")
                     if file then
@@ -371,10 +379,10 @@ function commands.handleCommand(input)
                 end, debugMode)
                 
                 if success then
-                    gui.drawCenteredText(6, "Startup file disabled successfully", colors.lime)
+                    updateProgress("Startup file disabled successfully", 0.25)
                 else
-                    gui.drawCenteredText(6, "Failed to disable startup file", colors.red)
-                    os.sleep(2)
+                    updateProgress("Failed to disable startup file", 0.25)
+                    os.sleep(1)
                 end
             end
             
@@ -404,14 +412,17 @@ function commands.handleCommand(input)
                 "scios/file_hashes.db"
             }
             
-            -- Remove files with animated progress
-            gui.drawAnimatedProgressBar(3, 8, 45, "Removing SCI files", 0.25, 0.75, 2.0)
-            for _, file in ipairs(files_to_remove) do
+            -- Remove files with progress updates
+            updateProgress("Removing SCI files...", 0.3)
+            for i, file in ipairs(files_to_remove) do
                 deleteFile(file)
+                local fileProgress = 0.3 + (0.4 * (i / #files_to_remove))
+                updateProgress("Removing: " .. file, fileProgress)
+                os.sleep(0.2) -- Small delay to show progress
             end
             
             -- Clean up SCIOS directory
-            gui.drawAnimatedProgressBar(3, 10, 45, "Cleaning up", 0.75, 1.0, 1.0)
+            updateProgress("Cleaning up SCIOS directory...", 0.8)
             if fs.exists("scios") or debugMode then
                 performOperation(function()
                     for _, file in ipairs(fs.list("scios")) do
@@ -422,6 +433,10 @@ function commands.handleCommand(input)
                     return true
                 end, debugMode)
             end
+            
+            -- Show completion
+            updateProgress("Uninstall Complete!", 1.0)
+            os.sleep(1)
             
             -- Show completion screen
             term.clear()
@@ -454,6 +469,10 @@ function commands.handleCommand(input)
                 gui.drawCenteredText(8, "Rebooting...", colors.yellow)
                 os.sleep(1)
                 os.reboot()
+            else
+                -- Clear screen before exiting
+                term.clear()
+                term.setCursorPos(1,1)
             end
             
             return true

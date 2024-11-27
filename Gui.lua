@@ -74,6 +74,42 @@ function gui.drawProgressBar(current, total, width)
     print(string.format("[%s] %d%%", bar, (current / total) * 100))
 end
 
+-- Draw a continuous progress bar
+function gui.drawProgressBar(x, y, width, text, progress, showPercent)
+    -- Draw the progress bar
+    term.setCursorPos(x, y)
+    term.setTextColor(colors.white)
+    write(text .. " [")
+    term.setTextColor(colors.lime)
+    
+    local barWidth = width - #text - 3
+    local filled = math.floor(barWidth * progress)
+    write(string.rep("=", filled))
+    term.setTextColor(colors.gray)
+    write(string.rep("-", barWidth - filled))
+    term.setTextColor(colors.white)
+    write("]")
+    
+    -- Add percentage display if requested
+    if showPercent then
+        local percent = math.floor(progress * 100)
+        term.setCursorPos(x + width + 1, y)
+        write(string.format(" %3d%%", percent))
+    end
+end
+
+-- Update progress with status message
+function gui.updateProgress(x, y, width, text, progress, status)
+    gui.drawProgressBar(x, y, width, text, progress, true)
+    if status then
+        term.setCursorPos(x, y + 1)
+        term.setTextColor(colors.white)
+        write(status)
+        -- Clear the rest of the line
+        write(string.rep(" ", width - #status))
+    end
+end
+
 -- Message box
 function gui.messageBox(title, message)
     local oldBg = term.getBackgroundColor()
