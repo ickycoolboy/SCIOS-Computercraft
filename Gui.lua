@@ -18,26 +18,33 @@ function gui.getBackground()
 end
 
 function gui.mirrorCurrentDisplay()
-    if displayManager then
-        pcall(function()
-            if displayManager.isMirroringEnabled() then
-                -- Allow a small delay for terminal updates
-                os.sleep(0.05)
-                displayManager.mirrorContent()
-            end
-        end)
+    -- Remove this function as it's no longer needed
+    -- The dual terminal handles mirroring automatically
+end
+
+function gui.write(text)
+    -- Use display manager's write function if available
+    if displayManager and displayManager.write then
+        displayManager.write(text)
+    else
+        term.write(text)
     end
 end
 
+function gui.print(text)
+    gui.write(text)
+    gui.write("\n")
+end
+
 function gui.drawScreen()
-    local currentTerm = term.current()
-    term.clear()
-    term.setCursorPos(1,1)
-    term.setTextColor(colors.yellow)
-    print("#######################################")
-    print("#       Welcome to SCI Sentinel       #")
-    print("#######################################")
-    term.setTextColor(colors.white)
+    local dualTerm = displayManager.getDualTerm() or term.current()
+    dualTerm.clear()
+    dualTerm.setCursorPos(1,1)
+    dualTerm.setTextColor(colors.yellow)
+    gui.print("#######################################")
+    gui.print("#       Welcome to SCI Sentinel       #")
+    gui.print("#######################################")
+    dualTerm.setTextColor(colors.white)
 end
 
 function gui.printPrompt()

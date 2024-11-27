@@ -22,14 +22,12 @@ end
 local function createDualTerminal(primary, secondary)
     return {
         write = function(text)
-            debug("Writing text: " .. text)
             primary.write(text)
             if config.mirrorEnabled then
                 secondary.write(text)
             end
         end,
         blit = function(text, textColors, backColors)
-            debug("Blitting text: " .. text)
             primary.blit(text, textColors, backColors)
             if config.mirrorEnabled then
                 secondary.blit(text, textColors, backColors)
@@ -107,9 +105,9 @@ function displayManager.detectMonitors()
                 secondaryMonitor.setBackgroundColor(colors.black)
                 secondaryMonitor.setTextColor(colors.white)
                 
-                -- Create and set dual terminal
+                -- Create dual terminal without redirection
                 local dualTerm = createDualTerminal(term.current(), secondaryMonitor)
-                term.redirect(dualTerm)
+                _G.dualTerm = dualTerm  -- Store globally for access
                 
                 debug("Monitor initialized")
                 return true
@@ -166,6 +164,20 @@ end
 -- Get mirroring status
 function displayManager.isMirroringEnabled()
     return config.mirrorEnabled
+end
+
+-- Get the dual terminal object
+function displayManager.getDualTerm()
+    return _G.dualTerm
+end
+
+-- Write text to both displays
+function displayManager.write(text)
+    if _G.dualTerm then
+        _G.dualTerm.write(text)
+    else
+        term.write(text)
+    end
 end
 
 return displayManager
