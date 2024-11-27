@@ -172,9 +172,90 @@ function commands.executeCommand(command, gui)
             return true
         end
 
+        -- Debug: Check current directory and startup.lua location
+        gui.drawInfo("Current directory: " .. shell.dir())
+        if fs.exists("startup.lua") then
+            gui.drawInfo("startup.lua exists at: " .. fs.getDir("startup.lua"))
+        else
+            gui.drawInfo("startup.lua not found in current directory")
+            -- Check root directory
+            if fs.exists("/startup.lua") then
+                gui.drawInfo("startup.lua found in root directory")
+            end
+        end
+
+        -- Aggressive startup file removal
+        local function removeStartup()
+            -- Try multiple possible locations
+            local startup_locations = {
+                "startup.lua",
+                "/startup.lua",
+                "scios/startup.lua",
+                shell.dir() .. "/startup.lua"
+            }
+
+            for _, path in ipairs(startup_locations) do
+                if fs.exists(path) then
+                    gui.drawInfo("Attempting to remove startup file at: " .. path)
+                    -- Try multiple deletion methods
+                    local success = false
+                    
+                    -- Method 1: Direct deletion
+                    success = pcall(function() fs.delete(path) end)
+                    if success and not fs.exists(path) then
+                        gui.drawSuccess("Removed startup file using direct deletion")
+                        return true
+                    end
+                    
+                    -- Method 2: Open and truncate
+                    if not success then
+                        success = pcall(function()
+                            local f = fs.open(path, "w")
+                            if f then
+                                f.write("")
+                                f.close()
+                                fs.delete(path)
+                            end
+                        end)
+                        if success and not fs.exists(path) then
+                            gui.drawSuccess("Removed startup file using truncate method")
+                            return true
+                        end
+                    end
+                    
+                    -- Method 3: Shell delete command
+                    if not success then
+                        success = pcall(function()
+                            shell.run("rm", path)
+                        end)
+                        if success and not fs.exists(path) then
+                            gui.drawSuccess("Removed startup file using shell command")
+                            return true
+                        end
+                    end
+                    
+                    if fs.exists(path) then
+                        gui.drawError("Failed to remove startup file at: " .. path)
+                    end
+                end
+            end
+            return false
+        end
+
+        -- Try to remove startup file first
+        if not removeStartup() then
+            gui.drawError("WARNING: Could not remove startup file. System may still boot into SCI Sentinel.")
+            if not gui.confirm("Continue with uninstallation anyway?") then
+                gui.drawSuccess("Uninstall cancelled")
+                return true
+            end
+        end
+
         local files_to_remove = {
             -- Core system files
             "startup.lua",
+            "/startup.lua",
+            "scios/startup.lua",
             "scios/Sci_sentinel.lua",
             "scios/Gui.lua",
             "scios/Commands.lua",
@@ -188,12 +269,6 @@ function commands.executeCommand(command, gui)
             "scios/*.bak",
             "scios/*.tmp"
         }
-
-        -- First, remove startup.lua to prevent reboot into SCI
-        if fs.exists("startup.lua") then
-            fs.delete("startup.lua")
-            gui.drawSuccess("Removed startup file")
-        end
 
         -- Function to delete files including wildcards
         local function deleteWithPattern(pattern)
@@ -239,7 +314,27 @@ function commands.executeCommand(command, gui)
             end
         end
 
-        gui.drawSuccess("SCI Sentinel has been uninstalled.")
+        -- Final verification
+        local sentinel_files_exist = false
+        for _, path in ipairs({
+            "startup.lua",
+            "/startup.lua",
+            "scios/startup.lua",
+            "scios"
+        }) do
+            if fs.exists(path) then
+                sentinel_files_exist = true
+                gui.drawError("File still exists after uninstall: " .. path)
+            end
+        end
+
+        if sentinel_files_exist then
+            gui.drawError("Some SCI Sentinel files could not be removed.")
+            gui.drawError("You may need to manually delete them or use 'rm' command.")
+        else
+            gui.drawSuccess("SCI Sentinel has been successfully uninstalled.")
+        end
+
         gui.drawSuccess("The computer will reboot in 3 seconds...")
         os.sleep(3)
         os.reboot()
