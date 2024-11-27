@@ -73,14 +73,27 @@ function updater.loadVersions()
             local content = file.readAll()
             file.close()
             
-            for name, version in string.gmatch(content, "(%w+):([%d%.]+)") do
+            for name, version, hash in string.gmatch(content, "(%w+):([%d%.]+):(%x+)") do
                 if updater.modules[name] then
                     updater.modules[name].version = version
+                    updater.modules[name].hash = hash
                 end
             end
         end
     else
-        -- If no versions file exists, create it with current versions
+        -- Calculate initial hashes for existing files
+        for name, info in pairs(updater.modules) do
+            local path = "scios/" .. info.path
+            if fs.exists(path) then
+                local file = fs.open(path, "r")
+                if file then
+                    local content = file.readAll()
+                    file.close()
+                    info.hash = updater.calculateHash(content)
+                end
+            end
+        end
+        -- Save initial versions
         updater.saveVersions()
     end
 end
@@ -90,7 +103,7 @@ function updater.saveVersions()
     local file = fs.open("scios/versions.db", "w")
     if file then
         for name, info in pairs(updater.modules) do
-            file.write(string.format("%s:%s\n", name, info.version))
+            file.write(string.format("%s:%s:%s\n", name, info.version, info.hash or ""))
         end
         file.close()
     end
@@ -118,7 +131,7 @@ function updater.downloadFile(url, path)
         local content = response.readAll()
         response.close()
         
-        -- Calculate and store hash before saving
+        -- Calculate hash before saving
         local hash = updater.calculateHash(content)
         
         -- Ensure parent directory exists
@@ -127,19 +140,15 @@ function updater.downloadFile(url, path)
             fs.makeDir(dir)
         end
         
+        -- Delete existing file if it exists
+        if fs.exists(path) then
+            fs.delete(path)
+        end
+        
         local file = fs.open(path, "w")
         if file then
             file.write(content)
             file.close()
-            
-            -- Update hash in modules table
-            for _, info in pairs(updater.modules) do
-                if info.path == fs.getName(path) then
-                    info.hash = hash
-                    break
-                end
-            end
-            
             return true, hash
         end
     end
@@ -187,16 +196,21 @@ function updater.checkForUpdates(auto_mode)
     -- Update last check time
     updater.settings.last_check = os.epoch("utc")
     
+    -- Load current versions and hashes
+    updater.loadVersions()
+    
     for name, info in pairs(updater.modules) do
         local remote_version, remote_hash = updater.getRemoteVersion(info.path)
         if remote_version then
             local version_diff = updater.compareVersions(remote_version, info.version)
-            if version_diff > 0 or (version_diff == 0 and remote_hash ~= info.hash) then
+            local hash_diff = (info.hash ~= remote_hash)
+            
+            if version_diff > 0 or (version_diff == 0 and hash_diff) then
                 if not auto_mode then
                     if version_diff > 0 then
                         gui.drawSuccess(string.format("Update available for %s: %s -> %s", 
                             name, info.version, remote_version))
-                    else
+                    elseif hash_diff then
                         gui.drawSuccess(string.format("File changes detected for %s", name))
                     end
                 end
