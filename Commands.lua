@@ -749,10 +749,23 @@ function commands.handleCommand(input)
             return true
         end,
         uninstall = function(args)
+            -- Debug logging setup
+            local function logDebug(message)
+                local logFile = fs.open("uninstall_debug.log", "a")
+                if logFile then
+                    logFile.writeLine(os.date("[%Y-%m-%d %H:%M:%S]") .. " " .. message)
+                    logFile.close()
+                end
+            end
+
+            logDebug("Starting uninstallation process")
+
             -- Save current terminal state
             local oldTerm = term.current()
             local oldBg = term.getBackgroundColor()
             local oldFg = term.getTextColor()
+
+            logDebug("Terminal state saved")
 
             -- Debug logging function
             local function debug(msg)
@@ -816,10 +829,12 @@ function commands.handleCommand(input)
                 
                 -- Handle button click
                 local choice = gui.handleMouseEvents(buttons)
+                logDebug("Button click handled, choice: " .. tostring(choice))
                 if choice ~= "Yes" then
                     gui.drawCenteredText(3, "Cancelled", colors.lime)
                     os.sleep(1)
                     cleanup()
+                    logDebug("Uninstallation cancelled")
                     return true
                 end
             else
@@ -840,10 +855,12 @@ function commands.handleCommand(input)
                 
                 -- Handle button click
                 local choice = gui.handleMouseEvents(buttons)
+                logDebug("Button click handled, choice: " .. tostring(choice))
                 if choice ~= "Yes" then
                     gui.drawCenteredText(7, "Uninstall cancelled", colors.lime)
                     os.sleep(1)
                     cleanup()
+                    logDebug("Uninstallation cancelled")
                     return true
                 end
             end
@@ -868,10 +885,12 @@ function commands.handleCommand(input)
                 
                 -- Handle button click
                 local choice = gui.handleMouseEvents(buttons)
+                logDebug("Button click handled, choice: " .. tostring(choice))
                 if choice ~= "Yes" then
                     gui.drawCenteredText(3, "Cancelled", colors.lime)
                     os.sleep(1)
                     cleanup()
+                    logDebug("Uninstallation cancelled")
                     return true
                 end
             else
@@ -891,15 +910,17 @@ function commands.handleCommand(input)
                 
                 -- Handle button click
                 local choice = gui.handleMouseEvents(buttons)
+                logDebug("Button click handled, choice: " .. tostring(choice))
                 if choice ~= "Yes" then
                     gui.drawCenteredText(7, "Uninstall cancelled", colors.lime)
                     os.sleep(1)
                     cleanup()
+                    logDebug("Uninstallation cancelled")
                     return true
                 end
             end
 
-            debug("User confirmed. Creating uninstall script")
+            logDebug("User confirmed. Creating uninstall script")
 
             -- Create the uninstall script
             local script = [[
@@ -1032,19 +1053,19 @@ os.sleep(1)
 os.reboot()
 ]]
 
-            debug("Writing uninstall script")
+            logDebug("Writing uninstall script")
             local f = fs.open("uninstall.lua", "w")
             if f then
                 f.write(script)
                 f.close()
             else
-                debug("Failed to create uninstall script")
+                logDebug("Failed to create uninstall script")
                 print("Error: Could not create uninstall script")
                 return false
             end
 
             -- Modify startup.lua to run the uninstall script
-            debug("Modifying startup.lua")
+            logDebug("Modifying startup.lua")
             local startup = [[
 -- SCI Sentinel uninstall in progress
 if fs.exists("uninstall.lua") then
@@ -1063,7 +1084,7 @@ end
                 end
             end
 
-            debug("Setup complete")
+            logDebug("Setup complete")
             
             -- Show reboot prompt
             if isPocketPC then
@@ -1078,6 +1099,7 @@ end
                 
                 -- Handle button click
                 local choice = gui.handleMouseEvents(buttons)
+                logDebug("Button click handled, choice: " .. tostring(choice))
                 if choice == "Yes" then
                     gui.drawCenteredText(3, "Rebooting...", colors.lime)
                     os.sleep(1)
@@ -1104,6 +1126,7 @@ end
                 
                 -- Handle button click
                 local choice = gui.handleMouseEvents(buttons)
+                logDebug("Button click handled, choice: " .. tostring(choice))
                 if choice == "Yes" then
                     gui.drawCenteredText(7, "Rebooting to complete uninstallation...", colors.lime)
                     os.sleep(1)
@@ -1114,7 +1137,7 @@ end
                 end
             end
 
-            debug("Function completed successfully")
+            logDebug("Function completed successfully")
             cleanup()
             return true
         end,
