@@ -38,7 +38,6 @@ function gui.drawScreen()
     print("#       Welcome to SCI Sentinel       #")
     print("#######################################")
     term.setTextColor(colors.white)
-    gui.mirrorCurrentDisplay()
 end
 
 function gui.printPrompt()
@@ -50,42 +49,36 @@ function gui.printPrompt()
     term.setTextColor(colors.lime)
     write("> ")
     term.setTextColor(colors.white)
-    gui.mirrorCurrentDisplay()
 end
 
 function gui.drawSuccess(message)
     term.setTextColor(colors.lime)
     print(message)
     term.setTextColor(colors.white)
-    gui.mirrorCurrentDisplay()
 end
 
 function gui.drawError(message)
     term.setTextColor(colors.red)
     print("Error: " .. message)
     term.setTextColor(colors.white)
-    gui.mirrorCurrentDisplay()
 end
 
 function gui.drawWarning(message)
     term.setTextColor(colors.yellow)
     print("Warning: " .. message)
     term.setTextColor(colors.white)
-    gui.mirrorCurrentDisplay()
 end
 
 function gui.drawInfo(message)
     term.setTextColor(colors.white)
     print(message)
     term.setTextColor(colors.white)
-    gui.mirrorCurrentDisplay()
 end
 
 function gui.confirm(message)
     term.setTextColor(colors.yellow)
     print(message .. " (y/n)")
-    term.setTextColor(colors.white)
-    gui.printPrompt()
+    term.printPrompt()
     local input = read():lower()
     return input == "y" or input == "yes"
 end
@@ -96,7 +89,6 @@ function gui.drawProgressBar(current, total, width)
     local progress = math.floor((current / total) * width)
     local bar = string.rep("=", progress) .. string.rep("-", width - progress)
     print(string.format("[%s] %d%%", bar, (current / total) * 100))
-    gui.mirrorCurrentDisplay()
 end
 
 -- Draw a continuous progress bar
@@ -123,7 +115,6 @@ function gui.drawProgressBar(x, y, width, text, progress, showPercent)
         local percent = math.floor(progress * 100)
         write(string.format(" %3d%%", percent))
     end
-    gui.mirrorCurrentDisplay()
 end
 
 -- Update progress with status message
@@ -139,7 +130,6 @@ function gui.updateProgress(x, y, width, text, progress, status)
             write(string.rep(" ", remaining))
         end
     end
-    gui.mirrorCurrentDisplay()
 end
 
 -- Message box
@@ -191,7 +181,6 @@ function gui.drawBox(x, y, width, height, title)
         term.setCursorPos(x + math.floor((width - #title) / 2), y)
         write(title)
     end
-    gui.mirrorCurrentDisplay()
 end
 
 -- Draw a button
@@ -241,7 +230,6 @@ function gui.drawFancyProgressBar(x, y, width, text, progress)
     write(string.rep("-", barWidth - filled))
     term.setTextColor(colors.white)
     write("]")
-    gui.mirrorCurrentDisplay()
 end
 
 -- Draw a centered text line
@@ -254,7 +242,6 @@ function gui.drawCenteredText(y, text, textColor)
     end
     write(text)
     term.setTextColor(colors.white)
-    gui.mirrorCurrentDisplay()
 end
 
 -- Draw an animated progress bar
@@ -291,7 +278,6 @@ function gui.drawAnimatedProgressBar(x, y, width, text, startProgress, endProgre
         
         -- Small delay for animation
         os.sleep(0.05)
-        gui.mirrorCurrentDisplay()
     end
 end
 
@@ -337,7 +323,6 @@ function gui.drawFancyBox(x, y, width, height, title, bgColor, fgColor)
     -- Restore colors
     term.setBackgroundColor(oldBg)
     term.setTextColor(oldFg)
-    gui.mirrorCurrentDisplay()
 end
 
 -- Draw a clickable button with hover effect
@@ -390,7 +375,6 @@ function gui.handleMouseEvents(buttons)
                 end
             end
         end
-        gui.mirrorCurrentDisplay()
     end
 end
 
@@ -400,7 +384,6 @@ function gui.drawHeader(x, y, text, color)
     term.setTextColor(color or colors.yellow)
     write("[ " .. text .. " ]")
     term.setTextColor(colors.white)
-    gui.mirrorCurrentDisplay()
 end
 
 return gui

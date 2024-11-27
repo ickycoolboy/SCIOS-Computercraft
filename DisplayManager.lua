@@ -10,13 +10,83 @@ local config = {
 -- Store monitor references
 local secondaryMonitor = nil
 local originalTerm = term.current()
-local redirectedTerm = nil
 
 -- Debug function
 local function debug(msg)
     if config.debug then
         print("[DisplayManager] " .. tostring(msg))
     end
+end
+
+-- Create a terminal object that writes to both screens
+local function createDualTerminal(primary, secondary)
+    return {
+        write = function(text)
+            primary.write(text)
+            if config.mirrorEnabled then
+                secondary.write(text)
+            end
+        end,
+        blit = function(text, textColors, backColors)
+            primary.blit(text, textColors, backColors)
+            if config.mirrorEnabled then
+                secondary.blit(text, textColors, backColors)
+            end
+        end,
+        clear = function()
+            primary.clear()
+            if config.mirrorEnabled then
+                secondary.clear()
+            end
+        end,
+        clearLine = function()
+            primary.clearLine()
+            if config.mirrorEnabled then
+                secondary.clearLine()
+            end
+        end,
+        getCursorPos = primary.getCursorPos,
+        setCursorPos = function(x, y)
+            primary.setCursorPos(x, y)
+            if config.mirrorEnabled then
+                secondary.setCursorPos(x, y)
+            end
+        end,
+        getCursorBlink = primary.getCursorBlink,
+        setCursorBlink = function(blink)
+            primary.setCursorBlink(blink)
+            if config.mirrorEnabled then
+                secondary.setCursorBlink(blink)
+            end
+        end,
+        getSize = primary.getSize,
+        scroll = function(lines)
+            primary.scroll(lines)
+            if config.mirrorEnabled then
+                secondary.scroll(lines)
+            end
+        end,
+        setTextColor = function(color)
+            primary.setTextColor(color)
+            if config.mirrorEnabled then
+                secondary.setTextColor(color)
+            end
+        end,
+        setBackgroundColor = function(color)
+            primary.setBackgroundColor(color)
+            if config.mirrorEnabled then
+                secondary.setBackgroundColor(color)
+            end
+        end,
+        getTextColor = primary.getTextColor,
+        getBackgroundColor = primary.getBackgroundColor,
+        isColor = primary.isColor,
+        setTextScale = function(scale)
+            if config.mirrorEnabled and secondary.setTextScale then
+                secondary.setTextScale(scale)
+            end
+        end
+    }
 end
 
 -- Check for connected monitors
@@ -35,9 +105,9 @@ function displayManager.detectMonitors()
                 secondaryMonitor.setBackgroundColor(colors.black)
                 secondaryMonitor.setTextColor(colors.white)
                 
-                -- Create redirected terminal
-                redirectedTerm = term.redirect(secondaryMonitor)
-                term.redirect(originalTerm)
+                -- Create and set dual terminal
+                local dualTerm = createDualTerminal(term.current(), secondaryMonitor)
+                term.redirect(dualTerm)
                 
                 debug("Monitor initialized")
                 return true
@@ -54,11 +124,6 @@ function displayManager.enableMirroring()
     if displayManager.detectMonitors() then
         config.mirrorEnabled = true
         debug("Mirroring enabled")
-        -- Set up terminal redirection
-        if secondaryMonitor then
-            redirectedTerm = term.redirect(secondaryMonitor)
-            term.redirect(originalTerm)
-        end
         return true
     end
     debug("Failed to enable mirroring")
@@ -90,49 +155,9 @@ function displayManager.toggleMirroring()
     return config.mirrorEnabled
 end
 
--- Mirror content to secondary display
-function displayManager.mirrorContent()
-    if not config.mirrorEnabled or not secondaryMonitor then
-        return
-    end
-
-    local status, err = pcall(function()
-        -- Save current terminal
-        local currentTerm = term.current()
-        
-        -- Redirect to secondary monitor
-        term.redirect(secondaryMonitor)
-        
-        -- Copy from original terminal
-        local width, height = originalTerm.getSize()
-        
-        -- Clear the monitor
-        term.clear()
-        term.setCursorPos(1,1)
-        
-        -- Copy content from original terminal
-        for y = 1, height do
-            term.setCursorPos(1, y)
-            local line = originalTerm.getLine(y)
-            if line then
-                term.write(line)
-            end
-        end
-        
-        -- Restore original terminal
-        term.redirect(currentTerm)
-    end)
-
-    if not status then
-        debug("Error mirroring content: " .. tostring(err))
-        displayManager.disableMirroring()
-    end
-end
-
 -- Initialize display manager
 function displayManager.init()
     debug("Initializing display manager")
-    originalTerm = term.current() -- Store original terminal
     displayManager.detectMonitors()
 end
 
