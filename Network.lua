@@ -16,7 +16,7 @@ local protocols = {
 -- Debug function
 local function debug(msg)
     if _G.DEBUG then
-        print("[DEBUG] " .. msg)
+        gui.drawInfo("[DEBUG] " .. msg)
     end
 end
 
@@ -67,7 +67,7 @@ end
 -- Open rednet on all modems
 function network.openRednet()
     if not network.init() then
-        print("Error: No modems found")
+        gui.drawError("Error: No modems found")
         return false
     end
     
@@ -81,10 +81,10 @@ function network.openRednet()
             if success then
                 opened = true
                 debug("Successfully opened rednet on " .. name)
-                print("Opened rednet on " .. name)
+                gui.drawInfo("Opened rednet on " .. name)
             else
                 debug("Failed to open rednet on " .. name .. ": " .. tostring(err))
-                print("Error opening rednet on " .. name)
+                gui.drawError("Error opening rednet on " .. name)
             end
         else
             debug(name .. " was already open")
@@ -103,7 +103,7 @@ function network.closeRednet()
         if rednet.isOpen(name) then
             rednet.close(name)
             debug("Closed rednet on " .. name)
-            print("Closed rednet on " .. name)
+            gui.drawInfo("Closed rednet on " .. name)
             closed = true
         else
             debug(name .. " was already closed")
