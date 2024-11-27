@@ -52,6 +52,11 @@ updater.settings = {
 function updater.init(guiInstance)
     if not guiInstance then
         error("GUI instance required")
+        return nil
+    end
+    if type(guiInstance.drawInfo) ~= "function" then
+        error("GUI instance missing required functions")
+        return nil
     end
     updater.gui = guiInstance
     return updater
@@ -67,6 +72,8 @@ function updater.getGitHubRawURL(filepath)
 end
 
 function updater.downloadFile(url, path)
+    if not updater.gui then return false end
+    
     updater.gui.drawInfo("Downloading: " .. path)
     local response = http.get(url)
     if response then
@@ -123,6 +130,11 @@ function updater.compareVersions(v1, v2)
 end
 
 function updater.checkForUpdates()
+    if not updater.gui then 
+        error("Updater not initialized with GUI")
+        return false 
+    end
+
     local updates_available = false
     updater.gui.drawInfo("Checking for updates...")
     

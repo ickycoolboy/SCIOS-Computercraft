@@ -156,8 +156,13 @@ local function initSystem()
 
     local updater = loadModule("Updater", true)
     if not updater then return false end
+    
     -- Initialize updater with GUI instance
     updater = updater.init(gui)
+    if not updater then 
+        gui.drawError("Failed to initialize updater")
+        return false 
+    end
 
     local commands = loadModule("Commands", true)
     if not commands then return false end
@@ -171,9 +176,12 @@ local function executeCommand(command, gui, updater, commands)
         return false
     elseif command == "update" then
         protected_call(function()
-            gui.drawInfo("Starting update check...")
+            if not updater or not updater.checkForUpdates then
+                gui.drawError("Update module not properly initialized")
+                return
+            end
             local updates = updater.checkForUpdates()
-            if not updates then
+            if updates == false then
                 gui.drawSuccess("No updates available")
             end
         end)

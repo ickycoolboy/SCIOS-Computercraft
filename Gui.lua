@@ -51,6 +51,12 @@ function gui.drawWarning(message)
     term.setTextColor(colors.white)
 end
 
+function gui.drawInfo(message)
+    term.setTextColor(colors.white)
+    print(message)
+    term.setTextColor(colors.white)
+end
+
 function gui.confirm(message)
     term.setTextColor(colors.yellow)
     print(message .. " (y/n)")
