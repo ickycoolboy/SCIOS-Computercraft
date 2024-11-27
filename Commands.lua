@@ -390,12 +390,8 @@ function commands.handleCommand(input)
             local function deleteFile(path)
                 if fs.exists(path) or debugMode then
                     return performOperation(function()
-                        if fs.isDir(path) then
-                            fs.delete(path)
-                        else
-                            fs.delete(path)
-                        end
-                        return not fs.exists(path)
+                        fs.delete(path)
+                        return true
                     end, debugMode)
                 end
                 return true
@@ -414,8 +410,11 @@ function commands.handleCommand(input)
             
             -- Remove files with progress updates
             updateProgress("Removing SCI files...", 0.3)
+            local allFilesRemoved = true
             for i, file in ipairs(files_to_remove) do
-                local success = deleteFile(file)
+                if not deleteFile(file) then
+                    allFilesRemoved = false
+                end
                 local fileProgress = 0.3 + (0.4 * (i / #files_to_remove))
                 updateProgress("Removing: " .. file, fileProgress)
                 os.sleep(0.2) -- Small delay to show progress
@@ -426,19 +425,21 @@ function commands.handleCommand(input)
             local success = true
             if fs.exists("scios") or debugMode then
                 success = performOperation(function()
-                    for _, file in ipairs(fs.list("scios")) do
-                        local path = fs.combine("scios", file)
-                        if not deleteFile(path) then
-                            return false
+                    -- First try to delete any remaining files
+                    if fs.exists("scios") then
+                        for _, file in ipairs(fs.list("scios")) do
+                            local path = fs.combine("scios", file)
+                            fs.delete(path)
                         end
+                        -- Then try to remove the directory
+                        fs.delete("scios")
                     end
-                    fs.delete("scios")
                     return true
                 end, debugMode)
             end
             
             -- Show completion
-            if success then
+            if allFilesRemoved and success then
                 updateProgress("Uninstall Complete!", 1.0)
                 os.sleep(1)
                 
