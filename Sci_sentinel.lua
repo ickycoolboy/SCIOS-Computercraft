@@ -1,4 +1,4 @@
--- SCI Sentinel OS: A Modular Operating System for Advanced Pocket Computer with Update Capability
+-- SCI Sentinel OS: A Modular Operating System for Advanced Computer with Update Capability
 local version = "1.0.1"
 
 -- Set up the module path

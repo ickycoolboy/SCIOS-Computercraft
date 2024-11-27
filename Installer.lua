@@ -13,6 +13,9 @@ local config = {
         {name = "GUI", file = "Gui.lua"},
         {name = "Commands", file = "Commands.lua"},
         {name = "Startup", file = "Startup.lua"}
+    },
+    root_files = {
+        {name = "Startup", file = "startup.lua"}
     }
 }
 
@@ -34,10 +37,17 @@ local function downloadFile(url, path)
         local content = response.readAll()
         response.close()
         
-        -- Ensure parent directory exists
-        local dir = fs.getDir(path)
-        if dir and dir ~= "" and not fs.exists(dir) then
-            fs.makeDir(dir)
+        -- Ensure parent directory exists if not a root file
+        if not fs.getName(path) == path then
+            local dir = fs.getDir(path)
+            if dir and dir ~= "" and not fs.exists(dir) then
+                fs.makeDir(dir)
+            end
+        end
+        
+        -- Delete existing file if it exists
+        if fs.exists(path) then
+            fs.delete(path)
         end
         
         local file = fs.open(path, "w")
@@ -50,63 +60,12 @@ local function downloadFile(url, path)
     return false
 end
 
--- Create startup file
-local function createStartup()
-    print("Creating startup file...")
-    local startup = [[
--- SCI Sentinel OS Startup
-local version = "1.0.1"
-
--- System file protection
-local protected_files = {
-    "scios/Sci_sentinel.lua",
-    "scios/Gui.lua",
-    "scios/Commands.lua",
-    "scios/Updater.lua",
-    "startup.lua",
-    "scios/versions.db"
-}
-
--- Override fs.delete for protected files
-local original_delete = fs.delete
-fs.delete = function(path)
-    path = fs.combine("", path) -- Normalize path
-    for _, protected in ipairs(protected_files) do
-        if path == protected then
-            return false -- Prevent deletion of protected files
-        end
-    end
-    return original_delete(path)
-end
-
--- Load the main OS file
-if fs.exists("scios/Sci_sentinel.lua") then
-    shell.run("scios/Sci_sentinel.lua")
-else
-    print("SCI Sentinel OS not found. Please run the installer.")
-end
-]]
-    local file = fs.open("startup.lua", "w")
-    if file then
-        file.write(startup)
-        file.close()
-        return true
-    end
-    return false
-end
-
 -- Main installation process
 print("Performing initial installation...")
 
 -- Create install directory if it doesn't exist
 if not fs.exists(config.install_dir) then
     fs.makeDir(config.install_dir)
-end
-
--- Create startup file
-if not createStartup() then
-    print("Failed to create startup file!")
-    return
 end
 
 -- Download and install core modules
@@ -118,6 +77,20 @@ for _, module in ipairs(config.modules) do
     )
     if not success then
         print(string.format("Failed to download %s module", module.name))
+        print("Initial setup failed!")
+        return
+    end
+end
+
+-- Download and install root files
+for _, file in ipairs(config.root_files) do
+    print(string.format("Downloading %s file...", file.name))
+    local success = downloadFile(
+        getGitHubRawURL(file.file),
+        file.file
+    )
+    if not success then
+        print(string.format("Failed to download %s file", file.name))
         print("Initial setup failed!")
         return
     end

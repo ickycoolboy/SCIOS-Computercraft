@@ -52,9 +52,9 @@ updater.modules = {
     },
     ["startup"] = {
         version = "1.0.1",
-        path = "Startup.lua",
+        path = "startup.lua",
         hash = nil,
-        special = "startup" -- Mark as special file
+        root = true
     }
 }
 
@@ -136,16 +136,21 @@ function updater.downloadFile(url, path)
         -- Calculate hash before saving
         local hash = updater.calculateHash(content)
         
-        -- Ensure parent directory exists
-        local dir = fs.getDir(path)
-        if dir and dir ~= "" and not fs.exists(dir) then
-            fs.makeDir(dir)
+        -- Handle root directory files
+        local targetPath = path
+        for _, info in pairs(updater.modules) do
+            if info.root and info.path == fs.getName(path) then
+                targetPath = info.path
+                break
+            end
         end
         
-        -- Special handling for startup file
-        local targetPath = path
-        if path:match("Startup.lua$") then
-            targetPath = "startup.lua"
+        -- For non-root files, ensure parent directory exists
+        if not fs.getName(targetPath) == targetPath then
+            local dir = fs.getDir(targetPath)
+            if dir and dir ~= "" and not fs.exists(dir) then
+                fs.makeDir(dir)
+            end
         end
         
         -- Delete existing file if it exists
