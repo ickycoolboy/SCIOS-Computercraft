@@ -53,14 +53,70 @@ local function downloadFile(url, path)
         if file then
             file.write(content)
             file.close()
-            return true
+            return true, content
         end
     end
     return false
 end
 
+-- Check for installer updates
+local function checkInstallerUpdate()
+    local installerPath = shell.getRunningProgram()
+    local url = getGitHubRawURL("Installer.lua")
+    local success, content = downloadFile(url, "installer_new.lua")
+    
+    if success then
+        -- Check if content is different
+        local currentFile = fs.open(installerPath, "r")
+        local currentContent = currentFile.readAll()
+        currentFile.close()
+        
+        if content ~= currentContent then
+            print("Installer update available. Installing...")
+            fs.delete(installerPath)
+            fs.move("installer_new.lua", installerPath)
+            print("Installer updated. Restarting...")
+            os.sleep(1)
+            os.reboot()
+        else
+            fs.delete("installer_new.lua")
+        end
+    end
+end
+
+-- List files to be installed
+local function listFilesToInstall()
+    print("\nThe following files will be installed:")
+    print("\nCore modules (in /scios):")
+    for _, module in ipairs(config.modules) do
+        print(string.format("  - %s", module.file))
+    end
+    
+    print("\nRoot files:")
+    for _, file in ipairs(config.root_files) do
+        print(string.format("  - %s", file.file))
+    end
+    print("\nTotal size: Approximately 10,000 Terrabytes *roughly*")
+    print("\nNote: Existing files will be overwritten.")
+end
+
 -- Main installation process
-print("Performing initial installation...")
+print("SCI Sentinel OS Installer v" .. version)
+
+-- Check for installer updates first
+print("\nChecking for installer updates...")
+checkInstallerUpdate()
+
+-- Ask for confirmation
+listFilesToInstall()
+write("\nDo you want to install SCI Sentinel OS? (y/n): ")
+local input = read():lower()
+if input ~= "y" and input ~= "yes" then
+    print("Installation cancelled.")
+    return
+end
+
+print("\nPerforming installation...")
 
 -- Create install directory if it doesn't exist
 if not fs.exists(config.install_dir) then
@@ -95,7 +151,7 @@ for _, file in ipairs(config.root_files) do
     end
 end
 
-print("Installation complete!")
+print("\nInstallation complete!")
 print("Rebooting in 3 seconds...")
 os.sleep(3)
 os.reboot()
