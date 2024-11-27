@@ -17,7 +17,9 @@ function gui.getBackground()
 end
 
 function gui.mirrorCurrentDisplay()
-    if displayManager.isMirroringEnabled() then
+    -- Add a small delay to ensure screen is fully drawn
+    os.sleep(0.05)
+    if displayManager and displayManager.isMirroringEnabled() then
         displayManager.mirrorContent()
     end
 end
@@ -30,6 +32,7 @@ function gui.drawScreen()
     print("#       Welcome to SCI Sentinel       #")
     print("#######################################")
     term.setTextColor(colors.white)
+    -- Mirror after complete screen draw
     gui.mirrorCurrentDisplay()
 end
 
