@@ -778,7 +778,7 @@ function commands.handleCommand(input)
             local minWidth = isPocketPC and 26 or 51
             local minHeight = isPocketPC and 8 or 16
 
-            -- Draw confirmation screen
+            -- First confirmation screen
             term.clear()
             term.setCursorPos(1,1)
             
@@ -787,32 +787,93 @@ function commands.handleCommand(input)
                 gui.drawCenteredText(3, "Remove SCIOS?", colors.red)
                 if debugMode then
                     gui.drawCenteredText(4, "(Debug Mode)", colors.lime)
+                    gui.drawCenteredText(5, "No files will be modified", colors.lime)
                 end
-                gui.drawCenteredText(6, "Type 'yes':", colors.white)
+                
+                -- Draw buttons
+                local buttons = {
+                    gui.drawButton(3, 6, "Yes", colors.lime),
+                    gui.drawButton(minWidth-6, 6, "No", colors.red)
+                }
+                
+                -- Handle button click
+                local choice = gui.handleButtons(buttons)
+                if choice ~= "Yes" then
+                    gui.drawCenteredText(3, "Cancelled", colors.lime)
+                    os.sleep(1)
+                    return true
+                end
             else
                 gui.drawBox(1, 1, minWidth, minHeight, "[ SCI Sentinel Uninstaller ]")
                 gui.drawCenteredText(3, "WARNING!", colors.red)
                 gui.drawCenteredText(5, "This will completely remove", colors.orange)
                 gui.drawCenteredText(6, "SCI Sentinel from your computer.", colors.orange)
                 if debugMode then
-                    gui.drawCenteredText(7, "(Debug Mode - No files will be modified)", colors.lime)
+                    gui.drawCenteredText(7, "[ DEBUG MODE ]", colors.lime)
+                    gui.drawCenteredText(8, "No files will be modified", colors.lime)
                 end
-                gui.drawCenteredText(9, "Type 'yes' to confirm:", colors.white)
+                
+                -- Draw buttons
+                local buttons = {
+                    gui.drawButton(15, 12, "Yes", colors.lime),
+                    gui.drawButton(30, 12, "No", colors.red)
+                }
+                
+                -- Handle button click
+                local choice = gui.handleButtons(buttons)
+                if choice ~= "Yes" then
+                    gui.drawCenteredText(7, "Uninstall cancelled", colors.lime)
+                    os.sleep(1)
+                    return true
+                end
             end
 
-            term.setCursorPos(isPocketPC and 3 or 15, isPocketPC and 7 or 11)
-            local input = read():lower()
-            debug("Got input: " .. input)
+            -- Second confirmation screen
+            term.clear()
+            term.setCursorPos(1,1)
             
-            if input ~= "yes" then
-                debug("User cancelled")
-                if isPocketPC then
-                    gui.drawCenteredText(3, "Cancelled", colors.lime)
-                else
-                    gui.drawCenteredText(7, "Uninstall cancelled", colors.lime)
+            if isPocketPC then
+                gui.drawBox(1, 1, minWidth, minHeight, "[ Confirm ]")
+                gui.drawCenteredText(3, "Are you sure?", colors.yellow)
+                if debugMode then
+                    gui.drawCenteredText(4, "(Debug Mode)", colors.lime)
                 end
-                os.sleep(1)
-                return true
+                
+                -- Draw buttons
+                local buttons = {
+                    gui.drawButton(3, 6, "Yes", colors.lime),
+                    gui.drawButton(minWidth-6, 6, "No", colors.red)
+                }
+                
+                -- Handle button click
+                local choice = gui.handleButtons(buttons)
+                if choice ~= "Yes" then
+                    gui.drawCenteredText(3, "Cancelled", colors.lime)
+                    os.sleep(1)
+                    return true
+                end
+            else
+                gui.drawBox(1, 1, minWidth, minHeight, "[ Final Confirmation ]")
+                gui.drawCenteredText(3, "Last Chance!", colors.yellow)
+                gui.drawCenteredText(5, "Are you absolutely sure you want", colors.white)
+                gui.drawCenteredText(6, "to uninstall SCI Sentinel?", colors.white)
+                if debugMode then
+                    gui.drawCenteredText(7, "[ DEBUG MODE - No files will be modified ]", colors.lime)
+                end
+                
+                -- Draw buttons
+                local buttons = {
+                    gui.drawButton(15, 12, "Yes", colors.lime),
+                    gui.drawButton(30, 12, "No", colors.red)
+                }
+                
+                -- Handle button click
+                local choice = gui.handleButtons(buttons)
+                if choice ~= "Yes" then
+                    gui.drawCenteredText(7, "Uninstall cancelled", colors.lime)
+                    os.sleep(1)
+                    return true
+                end
             end
 
             debug("User confirmed. Creating uninstall script")
@@ -820,18 +881,22 @@ function commands.handleCommand(input)
             -- Create the uninstall script
             local script = [[
 -- SCI Sentinel Uninstall Script
+local debugMode = ]] .. tostring(debugMode) .. [[
+
 local function removeFile(path)
     if fs.exists(path) then
-        local success, err = pcall(function() fs.delete(path) end)
-        if not success then
-            -- If deletion fails, try to clear the file contents instead
-            pcall(function()
-                local f = fs.open(path, "w")
-                if f then
-                    f.write("")
-                    f.close()
-                end
-            end)
+        if not debugMode then
+            local success, err = pcall(function() fs.delete(path) end)
+            if not success then
+                -- If deletion fails, try to clear the file contents instead
+                pcall(function()
+                    local f = fs.open(path, "w")
+                    if f then
+                        f.write("")
+                        f.close()
+                    end
+                end)
+            end
         end
     end
 end
@@ -856,7 +921,7 @@ term.clear()
 term.setCursorPos(1,1)
 local w, h = term.getSize()
 local isPocketPC = h <= 13
-local title = isPocketPC and "[ Removing ]" or "[ Removing SCI Sentinel ]"
+local title = debugMode and "[ Debug Uninstall ]" or "[ Removing SCI Sentinel ]"
 local width = isPocketPC and 26 or 51
 local height = isPocketPC and 8 or 16
 
@@ -880,7 +945,11 @@ for i, file in ipairs(files) do
     
     -- Show current file
     term.setCursorPos(2, isPocketPC and 6 or 7)
-    term.write(string.sub(file, 1, width - 4))
+    if debugMode then
+        term.write("Simulating: " .. string.sub(file, 1, width - 15))
+    else
+        term.write("Removing: " .. string.sub(file, 1, width - 13))
+    end
     term.write(string.rep(" ", width - #file - 4))
     
     removeFile(file)
@@ -903,12 +972,18 @@ if fs.exists("scios") then
                 removeFile(fullPath)
             end
         end
-        pcall(function() fs.delete(path) end)
+        if not debugMode then
+            pcall(function() fs.delete(path) end)
+        end
     end
     
     -- Update progress for directory removal
     term.setCursorPos(2, isPocketPC and 6 or 7)
-    term.write("Removing SCIOS directory" .. string.rep(" ", width - 23))
+    if debugMode then
+        term.write("Simulating directory removal" .. string.rep(" ", width - 26))
+    else
+        term.write("Removing SCIOS directory" .. string.rep(" ", width - 23))
+    end
     removeDir("scios")
 end
 
@@ -916,11 +991,17 @@ end
 term.clear()
 term.setCursorPos(1,1)
 print(string.rep("-", width))
-print("|" .. string.rep(" ", math.floor((width - 16) / 2)) .. "[ Uninstalled! ]" .. string.rep(" ", width - 16 - math.floor((width - 16) / 2) - 2) .. "|")
+if debugMode then
+    print("|" .. string.rep(" ", math.floor((width - 20) / 2)) .. "[ Debug Complete! ]" .. string.rep(" ", width - 20 - math.floor((width - 20) / 2) - 2) .. "|")
+else
+    print("|" .. string.rep(" ", math.floor((width - 16) / 2)) .. "[ Uninstalled! ]" .. string.rep(" ", width - 16 - math.floor((width - 16) / 2) - 2) .. "|")
+end
 print(string.rep("-", width))
 
-if fs.exists("uninstall.lua") then
-    fs.delete("uninstall.lua")
+if not debugMode then
+    if fs.exists("uninstall.lua") then
+        fs.delete("uninstall.lua")
+    end
 end
 
 -- Clean up and reboot
@@ -951,10 +1032,12 @@ if fs.exists("startup.lua") then
 end
 ]]
             
-            local f = fs.open("startup.lua", "w")
-            if f then
-                f.write(startup)
-                f.close()
+            if not debugMode then
+                local f = fs.open("startup.lua", "w")
+                if f then
+                    f.write(startup)
+                    f.close()
+                end
             end
 
             debug("Setup complete")
@@ -963,32 +1046,49 @@ end
             if isPocketPC then
                 gui.drawBox(1, 1, minWidth, minHeight, "[ Ready ]")
                 gui.drawCenteredText(3, "Reboot now?", colors.yellow)
-                gui.drawCenteredText(5, "Type 'yes':", colors.white)
+                
+                -- Draw buttons
+                local buttons = {
+                    gui.drawButton(3, 6, "Yes", colors.lime),
+                    gui.drawButton(minWidth-6, 6, "No", colors.red)
+                }
+                
+                -- Handle button click
+                local choice = gui.handleButtons(buttons)
+                if choice == "Yes" then
+                    gui.drawCenteredText(3, "Rebooting...", colors.lime)
+                    os.sleep(1)
+                    os.reboot()
+                else
+                    gui.drawCenteredText(3, "Reboot later", colors.lime)
+                    os.sleep(1)
+                end
             else
                 gui.drawBox(1, 1, minWidth, minHeight, "[ Ready to Uninstall ]")
-                gui.drawCenteredText(4, "Uninstaller is ready!", colors.lime)
+                if debugMode then
+                    gui.drawCenteredText(4, "Debug simulation complete!", colors.lime)
+                else
+                    gui.drawCenteredText(4, "Uninstaller is ready!", colors.lime)
+                end
                 gui.drawCenteredText(6, "System will be uninstalled on reboot.", colors.white)
                 gui.drawCenteredText(8, "Would you like to reboot now?", colors.yellow)
-                gui.drawCenteredText(9, "Type 'yes' to reboot:", colors.white)
-            end
-            
-            term.setCursorPos(isPocketPC and 3 or 15, isPocketPC and 7 or 11)
-            local reboot = read():lower()
-            if reboot == "yes" then
-                if isPocketPC then
-                    gui.drawCenteredText(3, "Rebooting...", colors.lime)
-                else
+                
+                -- Draw buttons
+                local buttons = {
+                    gui.drawButton(15, 12, "Yes", colors.lime),
+                    gui.drawButton(30, 12, "No", colors.red)
+                }
+                
+                -- Handle button click
+                local choice = gui.handleButtons(buttons)
+                if choice == "Yes" then
                     gui.drawCenteredText(7, "Rebooting to complete uninstallation...", colors.lime)
-                end
-                os.sleep(1)
-                os.reboot()
-            else
-                if isPocketPC then
-                    gui.drawCenteredText(3, "Reboot later", colors.lime)
+                    os.sleep(1)
+                    os.reboot()
                 else
                     gui.drawCenteredText(7, "Please reboot to complete uninstallation", colors.lime)
+                    os.sleep(1)
                 end
-                os.sleep(1)
             end
 
             debug("Function completed successfully")
