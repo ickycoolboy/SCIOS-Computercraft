@@ -15,25 +15,35 @@ local protocols = {
 
 -- Initialize network
 function network.init()
+    -- Clear existing modems
+    modems = {}
+    
     -- Find all modems (wired and wireless)
     local peripheralList = peripheral.getNames()
     for _, name in ipairs(peripheralList) do
         if peripheral.getType(name) == "modem" then
             local modem = peripheral.wrap(name)
-            modems[name] = modem
-            -- Set wireless modem range to maximum
-            if modem.isWireless and modem.isWireless() then
-                modem.setStrength(128)  -- Maximum range
+            if modem then
+                modems[name] = modem
+                -- Set wireless modem range to maximum
+                if modem.isWireless and modem.isWireless() then
+                    modem.setStrength(128)  -- Maximum range
+                end
+                -- Close the modem first to ensure clean state
+                if rednet.isOpen(name) then
+                    rednet.close(name)
+                end
             end
         end
     end
     
+    isRednetOpen = false
     return #modems > 0
 end
 
 -- Open rednet on all modems
 function network.openRednet()
-    if isRednetOpen then return true end
+    network.init()  -- Reinitialize to ensure clean state
     
     local opened = false
     for name, modem in pairs(modems) do
@@ -49,16 +59,16 @@ end
 
 -- Close rednet on all modems
 function network.closeRednet()
-    if not isRednetOpen then return true end
-    
+    local closed = false
     for name, _ in pairs(modems) do
         if rednet.isOpen(name) then
             rednet.close(name)
+            closed = true
         end
     end
     
     isRednetOpen = false
-    return true
+    return closed
 end
 
 -- Scan for nearby computers
@@ -161,6 +171,7 @@ function network.getModems()
     for name, modem in pairs(modems) do
         table.insert(modemList, {
             name = name,
+            side = name,  -- The name is usually the side
             isWireless = modem.isWireless and modem.isWireless() or false,
             isOpen = rednet.isOpen(name)
         })

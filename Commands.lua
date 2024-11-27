@@ -268,8 +268,10 @@ local function net(args)
         for _, modem in ipairs(modems) do
             local status = modem.isOpen and "OPEN" or "CLOSED"
             local type = modem.isWireless and "Wireless" or "Wired"
-            gui.drawInfo(string.format("  %s: %s (%s) - %s", modem.name, type, status, modem.side or ""))
+            local side = modem.side and (" on " .. modem.side) or ""
+            gui.drawInfo(string.format("  %s Modem%s: %s", type, side, status))
         end
+        return true
         
     elseif cmd == "scan" then
         gui.drawInfo("Scanning for nearby computers...")
@@ -287,22 +289,25 @@ local function net(args)
         gui.drawInfo("Found computers:")
         for id, info in pairs(computers) do
             gui.drawInfo(string.format("  ID: %d, Label: %s, Distance: %s", 
-                info.id, info.label, info.distance))
+                info.id, info.label or ("Computer " .. id), info.distance))
         end
+        return true
         
     elseif cmd == "open" then
         if network.openRednet() then
             gui.drawSuccess("Network opened")
+            return true
         else
-            gui.drawError("Failed to open network")
+            gui.drawError("Failed to open network - No modems available")
             return false
         end
         
     elseif cmd == "close" then
         if network.closeRednet() then
             gui.drawSuccess("Network closed")
+            return true
         else
-            gui.drawError("Failed to close network")
+            gui.drawError("No modems were open")
             return false
         end
         
@@ -310,8 +315,6 @@ local function net(args)
         gui.drawError("Unknown network command: " .. cmd)
         return false
     end
-    
-    return true
 end
 
 local function ping(args)
