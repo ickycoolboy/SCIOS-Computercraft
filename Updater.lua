@@ -3,7 +3,7 @@ local version = "1.0.2"
 
 -- Load required modules
 -- local gui = require("Gui")
-
+-- this comment is a test for version checking
 local updater = {}
 
 -- GitHub repository information
