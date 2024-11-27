@@ -20,77 +20,74 @@ end
 
 -- Create a terminal object that writes to both screens
 local function createDualTerminal(primary, secondary)
-    -- Store the original write functions
-    local primaryWrite = primary.write
-    local primaryBlit = primary.blit
-    
     return {
         write = function(text)
-            if text then
-                primaryWrite(text)
-                if config.mirrorEnabled and secondary then
-                    secondary.setCursorPos(term.getCursorPos())
-                    secondary.write(text)
-                end
+            debug("Writing text: " .. text)
+            primary.write(text)
+            if config.mirrorEnabled then
+                secondary.write(text)
             end
         end,
         blit = function(text, textColors, backColors)
-            primaryBlit(text, textColors, backColors)
-            if config.mirrorEnabled and secondary then
-                secondary.setCursorPos(term.getCursorPos())
+            debug("Blitting text: " .. text)
+            primary.blit(text, textColors, backColors)
+            if config.mirrorEnabled then
                 secondary.blit(text, textColors, backColors)
             end
         end,
         clear = function()
             primary.clear()
-            if config.mirrorEnabled and secondary then
+            if config.mirrorEnabled then
                 secondary.clear()
             end
         end,
         clearLine = function()
             primary.clearLine()
-            if config.mirrorEnabled and secondary then
+            if config.mirrorEnabled then
                 secondary.clearLine()
             end
         end,
         getCursorPos = primary.getCursorPos,
         setCursorPos = function(x, y)
             primary.setCursorPos(x, y)
-            if config.mirrorEnabled and secondary then
+            if config.mirrorEnabled then
                 secondary.setCursorPos(x, y)
             end
         end,
         getCursorBlink = primary.getCursorBlink,
         setCursorBlink = function(blink)
             primary.setCursorBlink(blink)
-            if config.mirrorEnabled and secondary then
+            if config.mirrorEnabled then
                 secondary.setCursorBlink(blink)
             end
         end,
         getSize = primary.getSize,
         scroll = function(lines)
             primary.scroll(lines)
-            if config.mirrorEnabled and secondary then
+            if config.mirrorEnabled then
                 secondary.scroll(lines)
             end
         end,
         setTextColor = function(color)
             primary.setTextColor(color)
-            if config.mirrorEnabled and secondary then
+            if config.mirrorEnabled then
                 secondary.setTextColor(color)
             end
         end,
         setBackgroundColor = function(color)
             primary.setBackgroundColor(color)
-            if config.mirrorEnabled and secondary then
+            if config.mirrorEnabled then
                 secondary.setBackgroundColor(color)
             end
         end,
         getTextColor = primary.getTextColor,
         getBackgroundColor = primary.getBackgroundColor,
         isColor = primary.isColor,
-        getLine = primary.getLine,
-        native = primary.native or primary
+        setTextScale = function(scale)
+            if config.mirrorEnabled and secondary.setTextScale then
+                secondary.setTextScale(scale)
+            end
+        end
     }
 end
 
@@ -104,8 +101,6 @@ function displayManager.detectMonitors()
             secondaryMonitor = peripheral.wrap(side)
             if secondaryMonitor then
                 debug("Successfully wrapped monitor")
-                
-                -- Set up monitor
                 secondaryMonitor.setTextScale(0.5)
                 secondaryMonitor.clear()
                 secondaryMonitor.setCursorPos(1,1)
@@ -113,7 +108,7 @@ function displayManager.detectMonitors()
                 secondaryMonitor.setTextColor(colors.white)
                 
                 -- Create and set dual terminal
-                local dualTerm = createDualTerminal(term.native(), secondaryMonitor)
+                local dualTerm = createDualTerminal(term.current(), secondaryMonitor)
                 term.redirect(dualTerm)
                 
                 debug("Monitor initialized")
