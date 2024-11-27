@@ -30,28 +30,31 @@ end
 -- MS-DOS style command implementations
 local function dir(args)
     local path = args[1] or "."
-    if not fs.exists(path) then
+    -- Combine the current directory with the requested path
+    local fullPath = fs.combine(shell.dir(), path)
+    
+    if not fs.exists(fullPath) then
         gui.drawError("Path not found - " .. path)
         return false
     end
     
-    local files = fs.list(path)
+    local files = fs.list(fullPath)
     local totalFiles = 0
     local totalDirs = 0
     local totalSize = 0
     
     -- Header
-    gui.drawInfo(" Directory of " .. shell.dir() .. "\\" .. path)
+    gui.drawInfo(" Directory of " .. fullPath)
     gui.drawInfo("")
     
     -- List files and directories
     for _, file in ipairs(files) do
-        local fullPath = fs.combine(path, file)
-        if fs.isDir(fullPath) then
+        local filePath = fs.combine(fullPath, file)
+        if fs.isDir(filePath) then
             gui.drawInfo(string.format("%-20s <DIR>", file))
             totalDirs = totalDirs + 1
         else
-            local size = fs.getSize(fullPath)
+            local size = fs.getSize(filePath)
             gui.drawInfo(string.format("%-20s %8d bytes", file, size))
             totalFiles = totalFiles + 1
             totalSize = totalSize + size
@@ -66,16 +69,19 @@ end
 
 local function cd(args)
     local path = args[1] or ""
+    local current = shell.dir()
+    
     if path == ".." then
-        local current = shell.dir()
         if current ~= "" then
             shell.setDir(fs.getDir(current))
         end
     elseif path == "\\" or path == "/" then
         shell.setDir("")
     else
-        if fs.exists(path) and fs.isDir(path) then
-            shell.setDir(path)
+        -- Combine current directory with requested path
+        local newPath = fs.combine(current, path)
+        if fs.exists(newPath) and fs.isDir(newPath) then
+            shell.setDir(newPath)
         else
             gui.drawError("The system cannot find the path specified.")
             return false
