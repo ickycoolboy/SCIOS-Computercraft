@@ -235,9 +235,6 @@ end
 
 -- Network commands
 local function net(args)
-    -- Initialize network module first
-    network.init()
-    
     if #args == 0 then
         gui.drawError("Usage: NET <command>")
         gui.drawInfo("Available commands:")
@@ -245,13 +242,26 @@ local function net(args)
         gui.drawInfo("  NET SCAN      - Scan for nearby computers")
         gui.drawInfo("  NET OPEN      - Open all modems")
         gui.drawInfo("  NET CLOSE     - Close all modems")
+        gui.drawInfo("  NET DEBUG     - Toggle debug mode")
         return false
     end
     
     local cmd = args[1]:lower()
     table.remove(args, 1)
     
-    if cmd == "status" then
+    if cmd == "debug" then
+        _G.DEBUG = not _G.DEBUG
+        if _G.DEBUG then
+            gui.drawSuccess("Network debugging enabled")
+        else
+            gui.drawSuccess("Network debugging disabled")
+        end
+        return true
+        
+    elseif cmd == "status" then
+        -- Initialize network if needed
+        network.init()
+        
         -- Show modem information
         local modems = network.getModems()
         if #modems == 0 then
@@ -259,18 +269,19 @@ local function net(args)
             return false
         end
         
-        gui.drawInfo("Network Status:")
-        gui.drawInfo("-------------")
+        -- Display network status
+        gui.drawInfo("=== Network Status ===")
         gui.drawInfo("Computer ID: " .. os.getComputerID())
         gui.drawInfo("Label: " .. (os.getComputerLabel() or "None"))
         gui.drawInfo("")
-        gui.drawInfo("Modems:")
+        gui.drawInfo("Connected Modems:")
         for _, modem in ipairs(modems) do
             local status = modem.isOpen and "OPEN" or "CLOSED"
             local type = modem.isWireless and "Wireless" or "Wired"
-            local side = modem.side and (" on " .. modem.side) or ""
+            local side = modem.side and (" (" .. modem.side .. ")") or ""
             gui.drawInfo(string.format("  %s Modem%s: %s", type, side, status))
         end
+        gui.drawInfo("===================")
         return true
         
     elseif cmd == "scan" then
@@ -294,9 +305,8 @@ local function net(args)
         return true
         
     elseif cmd == "open" then
-        gui.drawInfo("Opening network...")
         if network.openRednet() then
-            gui.drawSuccess("Network opened")
+            gui.drawSuccess("Network opened successfully")
             return true
         else
             gui.drawError("Failed to open network - No modems available")
@@ -304,9 +314,8 @@ local function net(args)
         end
         
     elseif cmd == "close" then
-        gui.drawInfo("Closing network...")
         if network.closeRednet() then
-            gui.drawSuccess("Network closed")
+            gui.drawSuccess("Network closed successfully")
             return true
         else
             gui.drawInfo("No modems were open")

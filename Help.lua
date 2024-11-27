@@ -277,10 +277,12 @@ local commands = {
             "  NET SCAN      - Scan for nearby computers",
             "  NET OPEN      - Open all modems for networking",
             "  NET CLOSE     - Close all modems",
+            "  NET DEBUG     - Toggle network debugging mode",
             "",
             "Examples:",
             "  NET STATUS    Shows current network status and modem information",
-            "  NET SCAN      Scans for nearby computers and displays their IDs"
+            "  NET SCAN      Scans for nearby computers and displays their IDs",
+            "  NET DEBUG     Enables or disables detailed network debugging output"
         }
     },
     PING = {
