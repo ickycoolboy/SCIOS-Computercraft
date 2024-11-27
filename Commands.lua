@@ -232,34 +232,95 @@ local function ver()
     return true
 end
 
+-- Pagination helper function
+local function displayPaginatedText(lines, title)
+    local w, h = term.getSize()
+    local linesPerPage = h - 4  -- Leave room for header and footer
+    local totalPages = math.ceil(#lines / linesPerPage)
+    local currentPage = 1
+    
+    while true do
+        term.clear()
+        term.setCursorPos(1,1)
+        
+        -- Display title
+        if title then
+            gui.drawInfo(title)
+            gui.drawInfo(string.rep("-", w))
+        end
+        
+        -- Calculate page bounds
+        local startLine = (currentPage - 1) * linesPerPage + 1
+        local endLine = math.min(startLine + linesPerPage - 1, #lines)
+        
+        -- Display current page content
+        for i = startLine, endLine do
+            gui.drawInfo(lines[i])
+        end
+        
+        -- Display footer with page info and navigation help
+        local footer = string.format(
+            "Page %d of %d - Press: N(ext) P(rev) Q(uit)",
+            currentPage, totalPages
+        )
+        term.setCursorPos(1, h-1)
+        gui.drawInfo(string.rep("-", w))
+        gui.drawInfo(footer)
+        
+        -- Handle input
+        local event, key = os.pullEvent("key")
+        if key == keys.n and currentPage < totalPages then
+            currentPage = currentPage + 1
+        elseif key == keys.p and currentPage > 1 then
+            currentPage = currentPage - 1
+        elseif key == keys.q then
+            break
+        end
+    end
+    
+    -- Clear screen after exiting
+    term.clear()
+    term.setCursorPos(1,1)
+end
+
 local function displayHelp(args)
     if #args == 0 then
         -- Display list of all commands
-        gui.drawInfo("SCI Sentinel OS Help System")
-        gui.drawInfo("The following commands are available:")
-        gui.drawInfo("")
+        local lines = {
+            "SCI Sentinel OS Help System",
+            "The following commands are available:",
+            ""
+        }
         
         local cmdList = help.listCommands()
         for _, cmd in ipairs(cmdList) do
-            gui.drawInfo(string.format("%-10s - %s", cmd.name, cmd.desc))
+            table.insert(lines, string.format("%-12s - %s", cmd.name, cmd.desc))
         end
         
-        gui.drawInfo("")
-        gui.drawInfo("For more information on a specific command, type HELP command-name")
+        table.insert(lines, "")
+        table.insert(lines, "For more information on a specific command, type HELP command-name")
+        
+        displayPaginatedText(lines, "SCI Sentinel Help")
     else
         -- Display help for specific command
         local cmdHelp = help.getCommandHelp(args[1])
         if cmdHelp then
-            gui.drawInfo("Help for " .. args[1]:upper())
-            gui.drawInfo("")
-            gui.drawInfo("Syntax:")
-            gui.drawInfo("  " .. cmdHelp.syntax)
-            gui.drawInfo("")
-            gui.drawInfo(cmdHelp.description)
-            gui.drawInfo("")
+            local lines = {
+                "Help for " .. args[1]:upper(),
+                "",
+                "Syntax:",
+                "  " .. cmdHelp.syntax,
+                "",
+                cmdHelp.description,
+                ""
+            }
+            
+            -- Add all detail lines
             for _, line in ipairs(cmdHelp.details) do
-                gui.drawInfo(line)
+                table.insert(lines, line)
             end
+            
+            displayPaginatedText(lines, "Command Help: " .. args[1]:upper())
         else
             gui.drawError("No help available for '" .. args[1] .. "'")
             return false
