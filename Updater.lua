@@ -1,5 +1,5 @@
 -- SCI Sentinel OS Updater Module
-local version = "1.0.2" -- Minor version bump for improved file handling
+local version = "1.0.2"
 
 -- Load required modules
 local gui = require("Gui")
@@ -13,116 +13,41 @@ updater.repo = {
     branch = "Github-updating-test"
 }
 
--- Protected files that cannot be deleted
-updater.protected_files = {
-    "scios/Sci_sentinel.lua",
-    "scios/Gui.lua",
-    "scios/Commands.lua",
-    "scios/Updater.lua",
-    "startup.lua",
-    "scios/versions.db"
-}
-
--- Module version information and file hashes
+-- Module version information
 updater.modules = {
     ["core"] = {
-        version = "1.0.2",  -- Updated for startup handling improvements
+        version = "1.0.2",
         path = "Sci_sentinel.lua",
-        target = "scios/Sci_sentinel.lua",
-        hash = nil
+        target = "scios/Sci_sentinel.lua"
     },
     ["gui"] = {
-        version = "1.0.1",  -- No changes
+        version = "1.0.1",
         path = "Gui.lua",
-        target = "scios/Gui.lua",
-        hash = nil
+        target = "scios/Gui.lua"
     },
     ["commands"] = {
-        version = "1.0.1",  -- No changes
+        version = "1.0.1",
         path = "Commands.lua",
-        target = "scios/Commands.lua",
-        hash = nil
+        target = "scios/Commands.lua"
     },
     ["updater"] = {
-        version = "1.0.2",  -- This file's version
+        version = "1.0.2",
         path = "Updater.lua",
-        target = "scios/Updater.lua",
-        hash = nil
-    },
-    ["installer"] = {
-        version = "1.1.0",  -- Major version bump for installer
-        path = "Installer.lua",
-        target = "Installer.lua",
-        hash = nil
+        target = "scios/Updater.lua"
     },
     ["startup"] = {
-        version = "1.0.1",  -- Properly cased version
+        version = "1.0.1",
         path = "Startup.lua",
-        target = "startup.lua",
-        hash = nil,
-        root = true
+        target = "startup.lua"
     }
 }
 
 -- Auto-update settings
 updater.settings = {
     auto_check = true,
-    check_interval = 3600, -- Check every hour
-    last_check = 0,
-    auto_install = false -- Require confirmation by default
+    check_interval = 3600,
+    last_check = 0
 }
-
--- Load saved versions from file
-function updater.loadVersions()
-    if fs.exists("scios/versions.db") then
-        local file = fs.open("scios/versions.db", "r")
-        if file then
-            local content = file.readAll()
-            file.close()
-            
-            for name, version, hash in string.gmatch(content, "(%w+):([%d%.]+):(%x+)") do
-                if updater.modules[name] then
-                    updater.modules[name].version = version
-                    updater.modules[name].hash = hash
-                end
-            end
-        end
-    else
-        -- Calculate initial hashes for existing files
-        for name, info in pairs(updater.modules) do
-            local path = info.target
-            if fs.exists(path) then
-                local file = fs.open(path, "r")
-                if file then
-                    local content = file.readAll()
-                    file.close()
-                    info.hash = updater.calculateHash(content)
-                end
-            end
-        end
-        -- Save initial versions
-        updater.saveVersions()
-    end
-end
-
--- Save current versions to file
-function updater.saveVersions()
-    local file = fs.open("scios/versions.db", "w")
-    if file then
-        for name, info in pairs(updater.modules) do
-            file.write(string.format("%s:%s:%s\n", name, info.version, info.hash or ""))
-        end
-        file.close()
-    end
-end
-
-function updater.calculateHash(content)
-    local hash = 0
-    for i = 1, #content do
-        hash = (hash * 31 + string.byte(content, i)) % 2^32
-    end
-    return string.format("%08x", hash)
-end
 
 function updater.getGitHubRawURL(filepath)
     return string.format("https://raw.githubusercontent.com/%s/%s/%s/%s?cb=%d",
@@ -130,7 +55,7 @@ function updater.getGitHubRawURL(filepath)
         updater.repo.name,
         updater.repo.branch,
         filepath,
-        os.epoch("utc")) -- Restore cache-busting timestamp
+        os.epoch("utc"))
 end
 
 function updater.downloadFile(url, path)
@@ -140,40 +65,19 @@ function updater.downloadFile(url, path)
         local content = response.readAll()
         response.close()
         
-        -- Create parent directory if it doesn't exist
+        -- Create directory if needed
         local dir = fs.getDir(path)
         if dir ~= "" and not fs.exists(dir) then
             fs.makeDir(dir)
         end
         
-        -- Check if file is protected
-        local isProtected = false
-        for _, pfile in ipairs(updater.protected_files) do
-            if pfile == path then
-                isProtected = true
-                break
-            end
-        end
-        
-        -- Handle protected files
-        if isProtected and fs.exists(path) then
-            if not gui.confirm("Warning: " .. path .. " is a protected system file.\nAre you sure you want to modify it?", colors.red) then
-                gui.drawError("Update cancelled for " .. path)
-                return false
-            end
-        end
-        
-        -- Delete existing file if it exists
-        if fs.exists(path) then
-            fs.delete(path)
-        end
-        
+        -- Save file
         local file = fs.open(path, "w")
         if file then
             file.write(content)
             file.close()
             gui.drawSuccess("Downloaded: " .. path)
-            return true, updater.calculateHash(content)
+            return true
         end
     end
     gui.drawError("Failed to download: " .. path)
@@ -181,20 +85,14 @@ function updater.downloadFile(url, path)
 end
 
 function updater.getRemoteVersion(filepath)
-    gui.drawInfo("Checking version for: " .. filepath)
     local url = updater.getGitHubRawURL(filepath)
     local response = http.get(url)
     if response then
         local content = response.readAll()
         response.close()
-        
-        -- Look for version string in the file
         local version = string.match(content, "version%s*=%s*[\"']([%d%.]+)[\"']")
-        if version then
-            return version, updater.calculateHash(content)
-        end
+        return version
     end
-    gui.drawError("Failed to get version for: " .. filepath)
     return nil
 end
 
@@ -216,76 +114,50 @@ function updater.compareVersions(v1, v2)
     else return 0 end
 end
 
-function updater.checkForUpdates(auto_mode)
+function updater.checkForUpdates()
     local updates_available = false
-    local updates_installed = false
-    
-    if not auto_mode then
-        gui.drawInfo("Checking for updates...")
-    end
-    
-    -- Update last check time
-    updater.settings.last_check = os.epoch("utc")
-    
-    -- Load current versions and hashes
-    updater.loadVersions()
+    gui.drawInfo("Checking for updates...")
     
     for name, info in pairs(updater.modules) do
-        if not auto_mode then
-            gui.drawInfo(string.format("Checking %s...", name))
-        end
+        gui.drawInfo("Checking " .. name .. "...")
+        local remote_version = updater.getRemoteVersion(info.path)
         
-        -- Get remote version and hash
-        local remote_version, remote_hash = updater.getRemoteVersion(info.path)
         if remote_version then
-            local version_diff = updater.compareVersions(remote_version, info.version)
-            local hash_diff = (info.hash ~= remote_hash)
-            
-            if version_diff > 0 or (version_diff == 0 and hash_diff) then
-                if not auto_mode then
-                    if version_diff > 0 then
-                        gui.drawSuccess(string.format("Update available for %s: %s -> %s", 
-                            name, info.version, remote_version))
-                    elseif hash_diff then
-                        gui.drawSuccess(string.format("File changes detected for %s", name))
-                    end
-                end
+            if updater.compareVersions(remote_version, info.version) > 0 then
+                gui.drawSuccess(string.format("Update available for %s: %s -> %s", 
+                    name, info.version, remote_version))
                 updates_available = true
                 
-                if auto_mode and updater.settings.auto_install or
-                   not auto_mode and gui.confirm("Install update for " .. name .. "?") then
-                    -- Download the update
+                if gui.confirm("Install update for " .. name .. "?") then
                     local url = updater.getGitHubRawURL(info.path)
-                    local success, new_hash = updater.downloadFile(url, info.target)
-                    if success then
-                        -- Update local version and hash
+                    if updater.downloadFile(url, info.target) then
                         info.version = remote_version
-                        info.hash = new_hash
-                        updates_installed = true
+                        gui.drawSuccess("Successfully updated " .. name)
                     end
                 end
-            elseif not auto_mode then
-                gui.drawSuccess(string.format("%s is up to date", name))
+            else
+                gui.drawSuccess(name .. " is up to date")
             end
+        else
+            gui.drawError("Failed to check " .. name .. " for updates")
         end
     end
     
-    -- Save updated versions and reboot if needed
-    if updates_installed then
-        updater.saveVersions()
-        if not auto_mode then
-            gui.drawSuccess("Updates installed. Rebooting in 3 seconds...")
-            os.sleep(3)
-            shell.run("reboot")
-        end
-    elseif not auto_mode then
-        gui.drawSuccess("No updates available.")
+    if not updates_available then
+        gui.drawSuccess("All modules are up to date")
     end
     
     return updates_available
 end
 
--- Initialize
-updater.loadVersions() -- Load saved versions
+function updater.autoUpdateCheck()
+    local current_time = os.epoch("utc")
+    if updater.settings.auto_check and 
+       (current_time - updater.settings.last_check) >= updater.settings.check_interval then
+        updater.settings.last_check = current_time
+        return updater.checkForUpdates()
+    end
+    return false
+end
 
 return updater

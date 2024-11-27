@@ -150,6 +150,36 @@ local function handlePendingUpdate()
     end
 end
 
+-- Progress bar function
+local function drawProgressBar(x, y, width, progress, text)
+    local filled = math.floor(progress * width)
+    term.setCursorPos(x, y)
+    term.write(string.rep("=", filled) .. string.rep("-", width - filled))
+    if text then
+        term.setCursorPos(x + math.floor((width - #text) / 2), y - 1)
+        term.write(text)
+    end
+end
+
+-- Animated loading function
+local function animateLoading(duration, message)
+    local chars = {"|", "/", "-", "\\"}
+    local startTime = os.epoch("utc")
+    local width = term.getSize()
+    local x = math.floor((width - #message) / 2)
+    
+    while os.epoch("utc") - startTime < duration do
+        for _, char in ipairs(chars) do
+            term.setCursorPos(x, 10)
+            term.write(message .. " " .. char)
+            os.sleep(0.1)
+        end
+    end
+    term.setCursorPos(x, 10)
+    term.write(message .. " ")
+    os.sleep(0.5)
+end
+
 -- List files to be installed
 local function listFilesToInstall()
     print("\nThe following files will be installed:")
@@ -199,21 +229,27 @@ local function cleanInstall()
 end
 
 -- Main installation process
+term.clear()
+term.setCursorPos(1, 1)
 print("SCI Sentinel OS Installer v" .. version)
-print("Your friendly neighborhood OS installer")
+print("===============================")
+print("\nYour friendly neighborhood OS installer")
+print("(Now with 100% more progress bars!)")
 
 handlePendingUpdate()
 
-print("\nChecking for installer updates...")
-local updateAvailable = checkInstallerUpdate()
-
-listFilesToInstall()
-write("\nDo you want to install SCI Sentinel OS? (y/n): ")
+write("\nProceed with installation? (y/n): ")
 local input = read():lower()
 if input ~= "y" and input ~= "yes" then
-    print("Installation cancelled. The digital future will have to wait...")
+    print("\nInstallation cancelled.")
+    print("The digital future will have to wait...")
     return
 end
+
+term.clear()
+term.setCursorPos(1, 1)
+print("SCI Sentinel OS Installation")
+print("===========================")
 
 -- Check for force flag
 local args = {...}
@@ -226,66 +262,64 @@ for _, arg in ipairs(args) do
 end
 
 if forceInstall then
-    print("Force installation mode enabled")
+    animateLoading(2000, "Force cleaning old installation...")
     if not cleanInstall() then
         print("Failed to clean existing installation")
         return
     end
 end
 
-print("\nPerforming installation...")
-
 if not fs.exists(config.install_dir) then
     fs.makeDir(config.install_dir)
 end
 
+local totalFiles = #config.modules + #config.root_files
+local filesInstalled = 0
+
+-- Install modules
 for _, module in ipairs(config.modules) do
-    showLoadingMessage()
-    print(string.format("Downloading %s module...", module.name))
+    filesInstalled = filesInstalled + 1
+    local progress = filesInstalled / totalFiles
+    
+    drawProgressBar(2, 15, 40, progress, "Installing: " .. module.name)
+    animateLoading(1000, "Downloading " .. module.name .. " module")
+    
     local success = downloadFile(
         getGitHubRawURL(module.file),
         module.target
     )
-    if not success then
-        print(string.format("Failed to download %s module", module.name))
-        print("Initial setup failed! (Have you tried turning it off and on again?)")
+    
+    if not success and module.required then
+        print("\nFailed to download " .. module.name .. " module")
+        print("Installation failed! (Have you tried turning it off and on again?)")
         return
     end
 end
 
--- Download and install root files
+-- Install root files
 for _, file in ipairs(config.root_files) do
-    showLoadingMessage()
-    print(string.format("Downloading %s file...", file.name))
+    filesInstalled = filesInstalled + 1
+    local progress = filesInstalled / totalFiles
     
-    if file.target == "startup.lua" then
-        -- Try to download from GitHub first, fallback to local creation
-        local success = downloadFile(getGitHubRawURL(file.file), file.target)
-        if not success then
-            print("Creating startup file locally...")
-            local content = "-- SCI Sentinel OS Startup File\nshell.run(\"scios/sci_sentinel.lua\")"
-            success = safeWrite(file.target, content)
-        end
-        
-        if not success and file.required then
-            print("Failed to create startup file!")
-            return
-        end
-    else
-        -- Handle other root files normally
-        local target = file.target or file.file
-        local success = downloadFile(getGitHubRawURL(file.file), target)
-        if not success and file.required then
-            print(string.format("Failed to download required file: %s", file.name))
-            print("Initial setup failed! (Error 404: Success not found)")
-            return
-        end
+    drawProgressBar(2, 15, 40, progress, "Installing: " .. file.name)
+    animateLoading(1000, "Setting up " .. file.name)
+    
+    local success = downloadFile(getGitHubRawURL(file.file), file.target)
+    if not success and file.required then
+        print("\nFailed to download " .. file.name)
+        print("Installation failed! (Error 404: Success not found)")
+        return
     end
 end
 
-print("\nInstallation complete!")
-print("Your computer has been upgraded with approximately 10,000 Terabytes of awesomeness!")
-print("Rebooting in 3 seconds...")
-print("(Please ensure your quantum flux capacitor is properly aligned)")
+term.clear()
+term.setCursorPos(1, 1)
+print("Installation Complete!")
+print("=====================")
+print("\nYour computer has been upgraded with")
+print("approximately 10,000 Terabytes of awesomeness!")
+print("\nRebooting in 3 seconds...")
+print("(Please ensure your quantum flux capacitor")
+print("is properly aligned)")
 os.sleep(3)
 os.reboot()
