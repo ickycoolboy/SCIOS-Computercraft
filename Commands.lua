@@ -472,19 +472,74 @@ local function tail(args)
 end
 
 local function history()
-    local hist = {}
-    for i=1, math.huge do
-        local cmd = _G._G and _G._G.history and _G._G.history.getCommand(i)
-        if not cmd then break end
-        table.insert(hist, cmd)
+    if #commandHistory == 0 then
+        gui.drawInfo("No commands in history")
+        return true
     end
     
-    gui.drawInfo("Command History:")
-    for i, cmd in ipairs(hist) do
-        gui.drawInfo(string.format("%d: %s", i, cmd))
+    gui.drawInfo("Command History (most recent first):")
+    gui.drawInfo("")
+    for i, cmd in ipairs(commandHistory) do
+        gui.drawInfo(string.format("%2d: %s", i, cmd))
     end
     return true
 end
+
+-- Command history tracking
+local commandHistory = {}
+local MAX_HISTORY = 50  -- Maximum number of commands to remember
+
+local function addToHistory(command)
+    -- Don't add empty commands or duplicates of the last command
+    if command == "" or (commandHistory[1] and commandHistory[1] == command) then
+        return
+    end
+    
+    -- Add new command at the start
+    table.insert(commandHistory, 1, command)
+    
+    -- Remove oldest command if we exceed MAX_HISTORY
+    if #commandHistory > MAX_HISTORY then
+        table.remove(commandHistory)
+    end
+    
+    -- Save history to file
+    local file = fs.open("scios/.history", "w")
+    if file then
+        for i = #commandHistory, 1, -1 do
+            file.writeLine(commandHistory[i])
+        end
+        file.close()
+    end
+end
+
+local function loadHistory()
+    if fs.exists("scios/.history") then
+        local file = fs.open("scios/.history", "r")
+        if file then
+            local lines = {}
+            local line = file.readLine()
+            while line do
+                table.insert(lines, line)
+                line = file.readLine()
+            end
+            file.close()
+            
+            -- Reverse the order so newest commands are first
+            for i = #lines, 1, -1 do
+                table.insert(commandHistory, lines[i])
+            end
+            
+            -- Trim to MAX_HISTORY if needed
+            while #commandHistory > MAX_HISTORY do
+                table.remove(commandHistory)
+            end
+        end
+    end
+end
+
+-- Initialize command history
+loadHistory()
 
 -- Display management commands
 commands["mirror"] = {
@@ -512,6 +567,9 @@ function commands.handleCommand(input)
     
     local cmd = parts[1]:lower()
     table.remove(parts, 1)  -- Remove command, leaving only args
+    
+    -- Add command to history before executing
+    addToHistory(input)
     
     -- MS-DOS style command mapping
     local commandHandlers = {
