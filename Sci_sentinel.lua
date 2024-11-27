@@ -176,7 +176,7 @@ local function executeCommand(command, gui, updater, commands)
         return false
     else
         protected_call(function()
-            commands.executeCommand(command, gui)
+            commands.handleCommand(command)
         end)
     end
     return true

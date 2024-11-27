@@ -261,7 +261,7 @@ function commands.handleCommand(input)
     table.remove(parts, 1)  -- Remove command, leaving only args
     
     -- MS-DOS style command mapping
-    local commands = {
+    local commandHandlers = {
         dir = dir,
         cd = cd,
         cls = cls,
@@ -433,8 +433,8 @@ function commands.handleCommand(input)
     }
     
     -- Run command
-    if commands[cmd] then
-        return commands[cmd](parts)
+    if commandHandlers[cmd] then
+        return commandHandlers[cmd](parts)
     else
         -- Only run recognized commands
         gui.drawError("'" .. cmd .. "' is not recognized as an internal or external command.")
