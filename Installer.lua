@@ -37,6 +37,13 @@ local config = {
     }
 }
 
+-- Show a random loading message
+local function showLoadingMessage()
+    local msg = loading_messages[math.random(1, #loading_messages)]
+    print(msg)
+    os.sleep(0.5)
+end
+
 -- Create GitHub raw URL
 local function getGitHubRawURL(filepath)
     return string.format("https://raw.githubusercontent.com/%s/%s/%s/%s?cb=%d",
@@ -45,6 +52,35 @@ local function getGitHubRawURL(filepath)
         config.branch,
         filepath,
         os.epoch("utc")) -- Add timestamp to bust cache
+end
+
+-- Safe file write function for ComputerCraft
+local function safeWrite(path, content)
+    -- First try to delete the file if it exists
+    if fs.exists(path) then
+        local tries = 0
+        while tries < 3 do
+            if pcall(fs.delete, path) then
+                break
+            end
+            tries = tries + 1
+            os.sleep(0.5)  -- Give the system time to release file handles
+        end
+    end
+    
+    -- Now try to write the new file
+    local tries = 0
+    while tries < 3 do
+        local file = fs.open(path, "w")
+        if file then
+            file.write(content)
+            file.close()
+            return true
+        end
+        tries = tries + 1
+        os.sleep(0.5)  -- Wait before retrying
+    end
+    return false
 end
 
 -- Download a file from GitHub
@@ -63,15 +99,8 @@ local function downloadFile(url, path)
             end
         end
         
-        -- Delete existing file if it exists
-        if fs.exists(path) then
-            fs.delete(path)
-        end
-        
-        local file = fs.open(path, "w")
-        if file then
-            file.write(content)
-            file.close()
+        -- Use safe write function
+        if safeWrite(path, content) then
             return true, content
         end
     end
@@ -125,13 +154,6 @@ local function handlePendingUpdate()
         os.sleep(1)
         os.reboot()
     end
-end
-
--- Show a random loading message
-local function showLoadingMessage()
-    local msg = loading_messages[math.random(1, #loading_messages)]
-    print(msg)
-    os.sleep(0.5)
 end
 
 -- List files to be installed
@@ -198,21 +220,53 @@ local startup_installed = false
 for _, file in ipairs(config.root_files) do
     showLoadingMessage()
     print(string.format("Downloading %s file...", file.name))
-    local success = downloadFile(
-        getGitHubRawURL(file.file),
-        file.file  -- Root files go in root directory
-    )
-    if not success then
-        if file.required then
+    
+    -- Special handling for startup.lua
+    if file.file == "startup.lua" then
+        -- First try to download from GitHub
+        local success = downloadFile(getGitHubRawURL(file.file), "temp_startup.lua")
+        
+        if success then
+            -- Try to safely move the temp file to startup.lua
+            if fs.exists("startup.lua") then
+                print("Removing old startup file...")
+                fs.delete("startup.lua")
+                os.sleep(0.5)  -- Give the system time
+            end
+            
+            print("Installing new startup file...")
+            if pcall(fs.move, "temp_startup.lua", "startup.lua") then
+                startup_installed = true
+            else
+                print("Failed to move startup file, trying direct write...")
+                -- If move fails, try direct write
+                local content = "-- SCI Sentinel OS Startup File\nshell.run(\"scios/sci_sentinel.lua\")"
+                if safeWrite("startup.lua", content) then
+                    startup_installed = true
+                end
+            end
+        else
+            print("Failed to download startup.lua, creating locally...")
+            -- Create a basic startup file locally
+            local content = "-- SCI Sentinel OS Startup File\nshell.run(\"scios/sci_sentinel.lua\")"
+            if safeWrite("startup.lua", content) then
+                startup_installed = true
+            end
+        end
+        
+        if not startup_installed then
+            print("Failed to create startup file!")
+            if file.required then
+                return
+            end
+        end
+    else
+        -- Handle other root files normally
+        local success = downloadFile(getGitHubRawURL(file.file), file.file)
+        if not success and file.required then
             print(string.format("Failed to download required file: %s", file.name))
             print("Initial setup failed! (Error 404: Success not found)")
             return
-        else
-            print(string.format("Warning: Optional file %s not installed", file.name))
-        end
-    else
-        if file.file == "startup.lua" then
-            startup_installed = true
         end
     end
 end
