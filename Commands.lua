@@ -750,180 +750,176 @@ function commands.handleCommand(input)
         end,
         uninstall = function(args)
             -- Debug logging setup
-            local function logDebug(message)
+            local function logMessage(message)
                 local logFile = fs.open("uninstall_debug.log", "a")
                 if logFile then
-                    logFile.writeLine(os.date("[%Y-%m-%d %H:%M:%S]") .. " " .. message)
+                    logFile.writeLine(os.date("[%Y-%m-%d %H:%M:%S]") .. ": " .. tostring(message))
                     logFile.close()
                 end
             end
 
-            logDebug("Starting uninstallation process")
+            local function logError(err)
+                logMessage("ERROR: " .. tostring(err))
+            end
 
-            -- Save current terminal state
-            local oldTerm = term.current()
-            local oldBg = term.getBackgroundColor()
-            local oldFg = term.getTextColor()
+            logMessage("Starting uninstallation process")
 
-            logDebug("Terminal state saved")
+            -- Error handling wrapper
+            local success, err = pcall(function()
+                -- Save current terminal state
+                local oldTerm = term.current()
+                local oldBg = term.getBackgroundColor()
+                local oldFg = term.getTextColor()
 
-            -- Debug logging function
-            local function debug(msg)
-                local f = fs.open("uninstall_debug.log", "a")
-                if f then
-                    f.write(os.date("%Y-%m-%d %H:%M:%S") .. ": " .. tostring(msg) .. "\n")
-                    f.close()
+                logMessage("Terminal state saved")
+
+                -- Uninstallation logic
+                -- Create fresh log
+                if fs.exists("uninstall_debug.log") then
+                    fs.delete("uninstall_debug.log")
                 end
-            end
 
-            debug("Starting uninstall function")
-            
-            -- Create fresh log
-            if fs.exists("uninstall_debug.log") then
-                fs.delete("uninstall_debug.log")
-            end
+                debug("Checking debug mode")
+                local debugMode = false
+                if args[1] == "-debug" then
+                    debugMode = true
+                    debug("Debug mode enabled")
+                end
 
-            debug("Checking debug mode")
-            local debugMode = false
-            if args[1] == "-debug" then
-                debugMode = true
-                debug("Debug mode enabled")
-            end
+                -- Get screen dimensions and setup UI
+                local w, h = term.getSize()
+                local isPocketPC = h <= 13
+                local minWidth = isPocketPC and 26 or 51
+                local minHeight = isPocketPC and 8 or 16
 
-            -- Get screen dimensions and setup UI
-            local w, h = term.getSize()
-            local isPocketPC = h <= 13
-            local minWidth = isPocketPC and 26 or 51
-            local minHeight = isPocketPC and 8 or 16
+                -- Create a new terminal redirect for our UI
+                local window = window.create(oldTerm, 1, 1, w, h, true)
+                term.redirect(window)
 
-            -- Create a new terminal redirect for our UI
-            local window = window.create(oldTerm, 1, 1, w, h, true)
-            term.redirect(window)
-
-            -- First confirmation screen
-            term.setBackgroundColor(colors.black)
-            term.clear()
-            term.setCursorPos(1,1)
-            
-            local function cleanup()
-                term.redirect(oldTerm)
-                term.setBackgroundColor(oldBg)
-                term.setTextColor(oldFg)
+                -- First confirmation screen
+                term.setBackgroundColor(colors.black)
                 term.clear()
                 term.setCursorPos(1,1)
-            end
-            
-            if isPocketPC then
-                gui.drawBox(1, 1, minWidth, minHeight, "[ Uninstall ]")
-                gui.drawCenteredText(3, "Remove SCIOS?", colors.red)
-                if debugMode then
-                    gui.drawCenteredText(4, "(Debug Mode)", colors.lime)
-                    gui.drawCenteredText(5, "No files will be modified", colors.lime)
+                
+                local function cleanup()
+                    term.redirect(oldTerm)
+                    term.setBackgroundColor(oldBg)
+                    term.setTextColor(oldFg)
+                    term.clear()
+                    term.setCursorPos(1,1)
                 end
                 
-                -- Draw buttons
-                local buttons = {
-                    gui.drawClickableButton(3, 6, "Yes", colors.lime),
-                    gui.drawClickableButton(minWidth-6, 6, "No", colors.red)
-                }
-                
-                -- Handle button click
-                local choice = gui.handleMouseEvents(buttons)
-                logDebug("Button click handled, choice: " .. tostring(choice))
-                if choice ~= "Yes" then
-                    gui.drawCenteredText(3, "Cancelled", colors.lime)
-                    os.sleep(1)
-                    cleanup()
-                    logDebug("Uninstallation cancelled")
-                    return true
+                if isPocketPC then
+                    gui.drawBox(1, 1, minWidth, minHeight, "[ Uninstall ]")
+                    gui.drawCenteredText(3, "Remove SCIOS?", colors.red)
+                    if debugMode then
+                        gui.drawCenteredText(4, "(Debug Mode)", colors.lime)
+                        gui.drawCenteredText(5, "No files will be modified", colors.lime)
+                    end
+                    
+                    -- Draw buttons
+                    local buttons = {
+                        gui.drawClickableButton(3, 6, "Yes", colors.lime),
+                        gui.drawClickableButton(minWidth-6, 6, "No", colors.red)
+                    }
+                    
+                    -- Handle button click
+                    local choice = gui.handleMouseEvents(buttons)
+                    logMessage("Button click handled, choice: " .. tostring(choice))
+                    if choice ~= "Yes" then
+                        gui.drawCenteredText(3, "Cancelled", colors.lime)
+                        os.sleep(1)
+                        cleanup()
+                        logMessage("Uninstallation cancelled")
+                        return true
+                    end
+                else
+                    gui.drawBox(1, 1, minWidth, minHeight, "[ SCI Sentinel Uninstaller ]")
+                    gui.drawCenteredText(3, "WARNING!", colors.red)
+                    gui.drawCenteredText(5, "This will completely remove", colors.orange)
+                    gui.drawCenteredText(6, "SCI Sentinel from your computer.", colors.orange)
+                    if debugMode then
+                        gui.drawCenteredText(7, "[ DEBUG MODE ]", colors.lime)
+                        gui.drawCenteredText(8, "No files will be modified", colors.lime)
+                    end
+                    
+                    -- Draw buttons
+                    local buttons = {
+                        gui.drawClickableButton(15, 12, "Yes", colors.lime),
+                        gui.drawClickableButton(30, 12, "No", colors.red)
+                    }
+                    
+                    -- Handle button click
+                    local choice = gui.handleMouseEvents(buttons)
+                    logMessage("Button click handled, choice: " .. tostring(choice))
+                    if choice ~= "Yes" then
+                        gui.drawCenteredText(7, "Uninstall cancelled", colors.lime)
+                        os.sleep(1)
+                        cleanup()
+                        logMessage("Uninstallation cancelled")
+                        return true
+                    end
                 end
-            else
-                gui.drawBox(1, 1, minWidth, minHeight, "[ SCI Sentinel Uninstaller ]")
-                gui.drawCenteredText(3, "WARNING!", colors.red)
-                gui.drawCenteredText(5, "This will completely remove", colors.orange)
-                gui.drawCenteredText(6, "SCI Sentinel from your computer.", colors.orange)
-                if debugMode then
-                    gui.drawCenteredText(7, "[ DEBUG MODE ]", colors.lime)
-                    gui.drawCenteredText(8, "No files will be modified", colors.lime)
-                end
-                
-                -- Draw buttons
-                local buttons = {
-                    gui.drawClickableButton(15, 12, "Yes", colors.lime),
-                    gui.drawClickableButton(30, 12, "No", colors.red)
-                }
-                
-                -- Handle button click
-                local choice = gui.handleMouseEvents(buttons)
-                logDebug("Button click handled, choice: " .. tostring(choice))
-                if choice ~= "Yes" then
-                    gui.drawCenteredText(7, "Uninstall cancelled", colors.lime)
-                    os.sleep(1)
-                    cleanup()
-                    logDebug("Uninstallation cancelled")
-                    return true
-                end
-            end
 
-            -- Second confirmation screen
-            term.setBackgroundColor(colors.black)
-            term.clear()
-            term.setCursorPos(1,1)
-            
-            if isPocketPC then
-                gui.drawBox(1, 1, minWidth, minHeight, "[ Confirm ]")
-                gui.drawCenteredText(3, "Are you sure?", colors.yellow)
-                if debugMode then
-                    gui.drawCenteredText(4, "(Debug Mode)", colors.lime)
-                end
+                -- Second confirmation screen
+                term.setBackgroundColor(colors.black)
+                term.clear()
+                term.setCursorPos(1,1)
                 
-                -- Draw buttons
-                local buttons = {
-                    gui.drawClickableButton(3, 6, "Yes", colors.lime),
-                    gui.drawClickableButton(minWidth-6, 6, "No", colors.red)
-                }
-                
-                -- Handle button click
-                local choice = gui.handleMouseEvents(buttons)
-                logDebug("Button click handled, choice: " .. tostring(choice))
-                if choice ~= "Yes" then
-                    gui.drawCenteredText(3, "Cancelled", colors.lime)
-                    os.sleep(1)
-                    cleanup()
-                    logDebug("Uninstallation cancelled")
-                    return true
+                if isPocketPC then
+                    gui.drawBox(1, 1, minWidth, minHeight, "[ Confirm ]")
+                    gui.drawCenteredText(3, "Are you sure?", colors.yellow)
+                    if debugMode then
+                        gui.drawCenteredText(4, "(Debug Mode)", colors.lime)
+                    end
+                    
+                    -- Draw buttons
+                    local buttons = {
+                        gui.drawClickableButton(3, 6, "Yes", colors.lime),
+                        gui.drawClickableButton(minWidth-6, 6, "No", colors.red)
+                    }
+                    
+                    -- Handle button click
+                    local choice = gui.handleMouseEvents(buttons)
+                    logMessage("Button click handled, choice: " .. tostring(choice))
+                    if choice ~= "Yes" then
+                        gui.drawCenteredText(3, "Cancelled", colors.lime)
+                        os.sleep(1)
+                        cleanup()
+                        logMessage("Uninstallation cancelled")
+                        return true
+                    end
+                else
+                    gui.drawBox(1, 1, minWidth, minHeight, "[ Final Confirmation ]")
+                    gui.drawCenteredText(3, "Last Chance!", colors.yellow)
+                    gui.drawCenteredText(5, "Are you absolutely sure you want", colors.white)
+                    gui.drawCenteredText(6, "to uninstall SCI Sentinel?", colors.white)
+                    if debugMode then
+                        gui.drawCenteredText(7, "[ DEBUG MODE - No files will be modified ]", colors.lime)
+                    end
+                    
+                    -- Draw buttons
+                    local buttons = {
+                        gui.drawClickableButton(15, 12, "Yes", colors.lime),
+                        gui.drawClickableButton(30, 12, "No", colors.red)
+                    }
+                    
+                    -- Handle button click
+                    local choice = gui.handleMouseEvents(buttons)
+                    logMessage("Button click handled, choice: " .. tostring(choice))
+                    if choice ~= "Yes" then
+                        gui.drawCenteredText(7, "Uninstall cancelled", colors.lime)
+                        os.sleep(1)
+                        cleanup()
+                        logMessage("Uninstallation cancelled")
+                        return true
+                    end
                 end
-            else
-                gui.drawBox(1, 1, minWidth, minHeight, "[ Final Confirmation ]")
-                gui.drawCenteredText(3, "Last Chance!", colors.yellow)
-                gui.drawCenteredText(5, "Are you absolutely sure you want", colors.white)
-                gui.drawCenteredText(6, "to uninstall SCI Sentinel?", colors.white)
-                if debugMode then
-                    gui.drawCenteredText(7, "[ DEBUG MODE - No files will be modified ]", colors.lime)
-                end
-                
-                -- Draw buttons
-                local buttons = {
-                    gui.drawClickableButton(15, 12, "Yes", colors.lime),
-                    gui.drawClickableButton(30, 12, "No", colors.red)
-                }
-                
-                -- Handle button click
-                local choice = gui.handleMouseEvents(buttons)
-                logDebug("Button click handled, choice: " .. tostring(choice))
-                if choice ~= "Yes" then
-                    gui.drawCenteredText(7, "Uninstall cancelled", colors.lime)
-                    os.sleep(1)
-                    cleanup()
-                    logDebug("Uninstallation cancelled")
-                    return true
-                end
-            end
 
-            logDebug("User confirmed. Creating uninstall script")
+                logMessage("User confirmed. Creating uninstall script")
 
-            -- Create the uninstall script
-            local script = [[
+                -- Create the uninstall script
+                local script = [[
 -- SCI Sentinel Uninstall Script
 local debugMode = ]] .. tostring(debugMode) .. [[
 
@@ -1053,20 +1049,20 @@ os.sleep(1)
 os.reboot()
 ]]
 
-            logDebug("Writing uninstall script")
-            local f = fs.open("uninstall.lua", "w")
-            if f then
-                f.write(script)
-                f.close()
-            else
-                logDebug("Failed to create uninstall script")
-                print("Error: Could not create uninstall script")
-                return false
-            end
+                logMessage("Writing uninstall script")
+                local f = fs.open("uninstall.lua", "w")
+                if f then
+                    f.write(script)
+                    f.close()
+                else
+                    logMessage("Failed to create uninstall script")
+                    print("Error: Could not create uninstall script")
+                    return false
+                end
 
-            -- Modify startup.lua to run the uninstall script
-            logDebug("Modifying startup.lua")
-            local startup = [[
+                -- Modify startup.lua to run the uninstall script
+                logMessage("Modifying startup.lua")
+                local startup = [[
 -- SCI Sentinel uninstall in progress
 if fs.exists("uninstall.lua") then
     shell.run("uninstall.lua")
@@ -1075,70 +1071,81 @@ if fs.exists("startup.lua") then
     fs.delete("startup.lua")
 end
 ]]
-            
-            if not debugMode then
-                local f = fs.open("startup.lua", "w")
-                if f then
-                    f.write(startup)
-                    f.close()
+                
+                if not debugMode then
+                    local f = fs.open("startup.lua", "w")
+                    if f then
+                        f.write(startup)
+                        f.close()
+                    end
                 end
+
+                logMessage("Setup complete")
+                
+                -- Show reboot prompt
+                if isPocketPC then
+                    gui.drawBox(1, 1, minWidth, minHeight, "[ Ready ]")
+                    gui.drawCenteredText(3, "Reboot now?", colors.yellow)
+                    
+                    -- Draw buttons
+                    local buttons = {
+                        gui.drawClickableButton(3, 6, "Yes", colors.lime),
+                        gui.drawClickableButton(minWidth-6, 6, "No", colors.red)
+                    }
+                    
+                    -- Handle button click
+                    local choice = gui.handleMouseEvents(buttons)
+                    logMessage("Button click handled, choice: " .. tostring(choice))
+                    if choice == "Yes" then
+                        gui.drawCenteredText(3, "Rebooting...", colors.lime)
+                        os.sleep(1)
+                        os.reboot()
+                    else
+                        gui.drawCenteredText(3, "Reboot later", colors.lime)
+                        os.sleep(1)
+                    end
+                else
+                    gui.drawBox(1, 1, minWidth, minHeight, "[ Ready to Uninstall ]")
+                    if debugMode then
+                        gui.drawCenteredText(4, "Debug simulation complete!", colors.lime)
+                    else
+                        gui.drawCenteredText(4, "Uninstaller is ready!", colors.lime)
+                    end
+                    gui.drawCenteredText(6, "System will be uninstalled on reboot.", colors.white)
+                    gui.drawCenteredText(8, "Would you like to reboot now?", colors.yellow)
+                    
+                    -- Draw buttons
+                    local buttons = {
+                        gui.drawClickableButton(15, 12, "Yes", colors.lime),
+                        gui.drawClickableButton(30, 12, "No", colors.red)
+                    }
+                    
+                    -- Handle button click
+                    local choice = gui.handleMouseEvents(buttons)
+                    logMessage("Button click handled, choice: " .. tostring(choice))
+                    if choice == "Yes" then
+                        gui.drawCenteredText(7, "Rebooting to complete uninstallation...", colors.lime)
+                        os.sleep(1)
+                        os.reboot()
+                    else
+                        gui.drawCenteredText(7, "Please reboot to complete uninstallation", colors.lime)
+                        os.sleep(1)
+                    end
+                end
+
+                logMessage("Function completed successfully")
+                cleanup()
+                return true
+            end)
+
+            if not success then
+                logError(err)
+                print("An error occurred during uninstallation. Check uninstall_debug.log for details.")
+                return false
             end
 
-            logDebug("Setup complete")
-            
-            -- Show reboot prompt
-            if isPocketPC then
-                gui.drawBox(1, 1, minWidth, minHeight, "[ Ready ]")
-                gui.drawCenteredText(3, "Reboot now?", colors.yellow)
-                
-                -- Draw buttons
-                local buttons = {
-                    gui.drawClickableButton(3, 6, "Yes", colors.lime),
-                    gui.drawClickableButton(minWidth-6, 6, "No", colors.red)
-                }
-                
-                -- Handle button click
-                local choice = gui.handleMouseEvents(buttons)
-                logDebug("Button click handled, choice: " .. tostring(choice))
-                if choice == "Yes" then
-                    gui.drawCenteredText(3, "Rebooting...", colors.lime)
-                    os.sleep(1)
-                    os.reboot()
-                else
-                    gui.drawCenteredText(3, "Reboot later", colors.lime)
-                    os.sleep(1)
-                end
-            else
-                gui.drawBox(1, 1, minWidth, minHeight, "[ Ready to Uninstall ]")
-                if debugMode then
-                    gui.drawCenteredText(4, "Debug simulation complete!", colors.lime)
-                else
-                    gui.drawCenteredText(4, "Uninstaller is ready!", colors.lime)
-                end
-                gui.drawCenteredText(6, "System will be uninstalled on reboot.", colors.white)
-                gui.drawCenteredText(8, "Would you like to reboot now?", colors.yellow)
-                
-                -- Draw buttons
-                local buttons = {
-                    gui.drawClickableButton(15, 12, "Yes", colors.lime),
-                    gui.drawClickableButton(30, 12, "No", colors.red)
-                }
-                
-                -- Handle button click
-                local choice = gui.handleMouseEvents(buttons)
-                logDebug("Button click handled, choice: " .. tostring(choice))
-                if choice == "Yes" then
-                    gui.drawCenteredText(7, "Rebooting to complete uninstallation...", colors.lime)
-                    os.sleep(1)
-                    os.reboot()
-                else
-                    gui.drawCenteredText(7, "Please reboot to complete uninstallation", colors.lime)
-                    os.sleep(1)
-                end
-            end
+            logMessage("Uninstallation process completed")
 
-            logDebug("Function completed successfully")
-            cleanup()
             return true
         end,
         mirror = function(args)
