@@ -2,7 +2,7 @@
 
 -- Load required modules
 local gui = require("GUI")
-
+local test1 = 2
 local updater = {}
 
 -- GitHub repository information
