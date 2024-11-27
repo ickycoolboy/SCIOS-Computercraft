@@ -1,5 +1,6 @@
 -- SCI Sentinel OS Installer
-local version = "1.1.0" -- Major version bump due to significant changes in file handling and startup management
+local version = "1.2.0"
+local gui = require("GUI")
 
 -- Fun loading messages
 local loading_messages = {
@@ -42,11 +43,62 @@ local config = {
     }
 }
 
--- Show a random loading message
+-- Installation steps
+local steps = {
+    {name = "Welcome", description = "Welcome to SCI Sentinel OS Installation"},
+    {name = "License", description = "Please review the license agreement"},
+    {name = "Components", description = "Choose components to install"},
+    {name = "Installing", description = "Installing SCI Sentinel OS..."},
+    {name = "Complete", description = "Installation complete!"}
+}
+
+local currentStep = 1
+local screen = {width = 0, height = 0}
+
+-- Initialize screen
+local function initScreen()
+    screen.width, screen.height = term.getSize()
+    term.setBackgroundColor(gui.colors.background)
+    term.clear()
+end
+
+-- Draw installation wizard
+local function drawInstallationWizard()
+    -- Draw main window
+    gui.drawWindow(2, 2, screen.width - 2, screen.height - 2, "SCI Sentinel OS Installation")
+    
+    -- Draw step title
+    term.setBackgroundColor(gui.colors.windowBg)
+    term.setTextColor(gui.colors.text)
+    term.setCursorPos(4, 4)
+    write(steps[currentStep].name)
+    term.setCursorPos(4, 5)
+    write(steps[currentStep].description)
+    
+    -- Draw navigation buttons
+    if currentStep > 1 then
+        gui.drawButton(screen.width - 20, screen.height - 4, 8, "< Back", false)
+    end
+    if currentStep < #steps then
+        gui.drawButton(screen.width - 10, screen.height - 4, 8, "Next >", true)
+    end
+end
+
+-- Show a random loading message with animation
 local function showLoadingMessage()
     local msg = loading_messages[math.random(1, #loading_messages)]
-    print(msg)
-    os.sleep(0.5)
+    term.setBackgroundColor(gui.colors.windowBg)
+    term.setTextColor(gui.colors.text)
+    term.setCursorPos(4, screen.height - 6)
+    write(string.rep(" ", screen.width - 8))  -- Clear previous message
+    term.setCursorPos(4, screen.height - 6)
+    write(msg)
+end
+
+-- Draw installation progress
+local function drawProgress(current, total, message)
+    local progress = current / total
+    gui.drawAnimatedProgressBar(4, screen.height - 4, screen.width - 8, message, progress)
 end
 
 -- Create GitHub raw URL
@@ -154,176 +206,106 @@ local function handlePendingUpdate()
     end
 end
 
--- Progress bar function
-local function drawProgressBar(x, y, width, progress, text)
-    local filled = math.floor(progress * width)
-    term.setCursorPos(x, y)
-    term.write(string.rep("=", filled) .. string.rep("-", width - filled))
-    if text then
-        term.setCursorPos(x + math.floor((width - #text) / 2), y - 1)
-        term.write(text)
-    end
-end
-
--- Animated loading function
-local function animateLoading(duration, message)
-    local chars = {"|", "/", "-", "\\"}
-    local startTime = os.epoch("utc")
-    local width = term.getSize()
-    local x = math.floor((width - #message) / 2)
+-- Main installation process
+local function install()
+    initScreen()
     
-    while os.epoch("utc") - startTime < duration do
-        for _, char in ipairs(chars) do
-            term.setCursorPos(x, 10)
-            term.write(message .. " " .. char)
-            os.sleep(0.1)
+    while currentStep <= #steps do
+        drawInstallationWizard()
+        
+        if currentStep == 1 then
+            -- Welcome screen
+            term.setCursorPos(4, 7)
+            term.setBackgroundColor(gui.colors.windowBg)
+            term.setTextColor(gui.colors.text)
+            write("Welcome to SCI Sentinel OS Installation Wizard")
+            term.setCursorPos(4, 9)
+            write("This wizard will guide you through the installation")
+            term.setCursorPos(4, 10)
+            write("of SCI Sentinel OS version " .. version)
+            
+        elseif currentStep == 2 then
+            -- License screen
+            term.setCursorPos(4, 7)
+            term.setBackgroundColor(gui.colors.windowBg)
+            term.setTextColor(gui.colors.text)
+            write("By continuing, you agree to the terms of use")
+            
+        elseif currentStep == 3 then
+            -- Components selection
+            term.setCursorPos(4, 7)
+            term.setBackgroundColor(gui.colors.windowBg)
+            term.setTextColor(gui.colors.text)
+            write("The following components will be installed:")
+            
+            for i, module in ipairs(config.modules) do
+                term.setCursorPos(6, 8 + i)
+                write("[ ] " .. module.name)
+            end
+            
+        elseif currentStep == 4 then
+            -- Installation progress
+            local totalFiles = #config.modules + #config.root_files
+            local filesInstalled = 0
+            
+            for _, module in ipairs(config.modules) do
+                showLoadingMessage()
+                drawProgress(filesInstalled / totalFiles, "Installing: " .. module.name)
+                -- Download and install module
+                local success = downloadFile(getGitHubRawURL(module.file), module.target)
+                if not success and module.required then
+                    print("\nFailed to download " .. module.name .. " module")
+                    print("Installation failed! (Have you tried turning it off and on again?)")
+                    return
+                end
+                filesInstalled = filesInstalled + 1
+                os.sleep(0.5)  -- Add slight delay for visual effect
+            end
+            
+            for _, file in ipairs(config.root_files) do
+                showLoadingMessage()
+                drawProgress(filesInstalled / totalFiles, "Installing: " .. file.name)
+                -- Download and install file
+                local success = downloadFile(getGitHubRawURL(file.file), file.target)
+                if not success and file.required then
+                    print("\nFailed to download " .. file.name)
+                    print("Installation failed! (Error 404: Success not found)")
+                    return
+                end
+                filesInstalled = filesInstalled + 1
+                os.sleep(0.5)  -- Add slight delay for visual effect
+            end
+            
+            currentStep = currentStep + 1
+            
+        elseif currentStep == 5 then
+            -- Complete screen
+            term.setCursorPos(4, 7)
+            term.setBackgroundColor(gui.colors.windowBg)
+            term.setTextColor(gui.colors.text)
+            write("Installation Complete!")
+            term.setCursorPos(4, 9)
+            write("SCI Sentinel OS has been successfully installed.")
+            term.setCursorPos(4, 10)
+            write("Press any key to restart...")
+            os.pullEvent("key")
+            os.reboot()
+        end
+        
+        -- Wait for user input
+        local event, button, x, y = os.pullEvent("mouse_click")
+        
+        -- Handle navigation buttons
+        if y == screen.height - 4 then
+            if currentStep > 1 and x >= screen.width - 20 and x < screen.width - 12 then
+                currentStep = currentStep - 1
+            elseif currentStep < #steps and x >= screen.width - 10 and x < screen.width - 2 then
+                currentStep = currentStep + 1
+            end
         end
     end
-    term.setCursorPos(x, 10)
-    term.write(message .. " ")
-    os.sleep(0.5)
 end
 
--- List files to be installed
-local function listFilesToInstall()
-    print("\nThe following files will be installed:")
-    print("\nCore modules (in /scios):")
-    for _, module in ipairs(config.modules) do
-        print(string.format("  - %s", module.file))
-    end
-    
-    print("\nRoot files:")
-    for _, file in ipairs(config.root_files) do
-        print(string.format("  - %s%s", file.file, file.required and " (required)" or ""))
-    end
-    print("\nTotal size: Approximately 10,000 Terabytes *roughly*")
-    print("(Warning: May require downloading more RAM)")
-    print("\nNote: Existing files will be overwritten.")
-end
-
--- Force delete a file regardless of protection
-local function forceDelete(path)
-    if fs.exists(path) then
-        fs.delete(path)
-    end
-end
-
--- Clean install function
-local function cleanInstall()
-    print("Performing clean installation...")
-    
-    -- Force remove all existing files
-    forceDelete("startup.lua")
-    forceDelete("scios/Sci_sentinel.lua")
-    forceDelete("scios/Gui.lua")
-    forceDelete("scios/Commands.lua")
-    forceDelete("scios/Updater.lua")
-    forceDelete("scios/versions.db")
-    
-    if fs.exists("scios") and #fs.list("scios") == 0 then
-        fs.delete("scios")
-    end
-    
-    -- Create fresh scios directory
-    if not fs.exists("scios") then
-        fs.makeDir("scios")
-    end
-    
-    return true
-end
-
--- Main installation process
-term.clear()
-term.setCursorPos(1, 1)
-print("SCI Sentinel OS Installer v" .. version)
-print("===============================")
-print("\nYour friendly neighborhood OS installer")
-print("(Now with 100% more progress bars!)")
-
+-- Main entry point
 handlePendingUpdate()
-
-write("\nProceed with installation? (y/n): ")
-local input = read():lower()
-if input ~= "y" and input ~= "yes" then
-    print("\nInstallation cancelled.")
-    print("The digital future will have to wait...")
-    return
-end
-
-term.clear()
-term.setCursorPos(1, 1)
-print("SCI Sentinel OS Installation")
-print("===========================")
-
--- Check for force flag
-local args = {...}
-local forceInstall = false
-for _, arg in ipairs(args) do
-    if arg == "--force" then
-        forceInstall = true
-        break
-    end
-end
-
-if forceInstall then
-    animateLoading(2000, "Force cleaning old installation...")
-    if not cleanInstall() then
-        print("Failed to clean existing installation")
-        return
-    end
-end
-
-if not fs.exists(config.install_dir) then
-    fs.makeDir(config.install_dir)
-end
-
-local totalFiles = #config.modules + #config.root_files
-local filesInstalled = 0
-
--- Install modules
-for _, module in ipairs(config.modules) do
-    filesInstalled = filesInstalled + 1
-    local progress = filesInstalled / totalFiles
-    
-    drawProgressBar(2, 15, 40, progress, "Installing: " .. module.name)
-    animateLoading(1000, "Downloading " .. module.name .. " module")
-    
-    local success = downloadFile(
-        getGitHubRawURL(module.file),
-        module.target
-    )
-    
-    if not success and module.required then
-        print("\nFailed to download " .. module.name .. " module")
-        print("Installation failed! (Have you tried turning it off and on again?)")
-        return
-    end
-end
-
--- Install root files
-for _, file in ipairs(config.root_files) do
-    filesInstalled = filesInstalled + 1
-    local progress = filesInstalled / totalFiles
-    
-    drawProgressBar(2, 15, 40, progress, "Installing: " .. file.name)
-    animateLoading(1000, "Setting up " .. file.name)
-    
-    local success = downloadFile(getGitHubRawURL(file.file), file.target)
-    if not success and file.required then
-        print("\nFailed to download " .. file.name)
-        print("Installation failed! (Error 404: Success not found)")
-        return
-    end
-end
-
-term.clear()
-term.setCursorPos(1, 1)
-print("Installation Complete!")
-print("=====================")
-print("\nYour computer has been upgraded with")
-print("approximately 10,000 Terabytes of awesomeness!")
-print("\nRebooting in 3 seconds...")
-print("(Please ensure your quantum flux capacitor")
-print("is properly aligned)")
-os.sleep(3)
-os.reboot()
+install()
