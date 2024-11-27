@@ -148,7 +148,7 @@ local function startSentinelOS()
             elseif input == "update" then
                 updater.checkForUpdates()
             else
-                commands.handleCommand(input)
+                commands.executeCommand(input, gui)
             end
         end
     end
