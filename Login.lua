@@ -4,7 +4,25 @@ if not package.path:find("./?.lua;") then
 end
 
 local login = {}
-local displayManager = require("DisplayManager")
+
+-- Load DisplayManager using shell path
+local function loadModule(name)
+    local paths = {
+        "",
+        "scios/",
+        "/"
+    }
+    
+    for _, path in ipairs(paths) do
+        local modulePath = path .. name
+        if fs.exists(modulePath .. ".lua") then
+            return dofile(modulePath .. ".lua")
+        end
+    end
+    error("Could not find module: " .. name)
+end
+
+local displayManager = loadModule("DisplayManager")
 
 -- Default user credentials
 local users = {
