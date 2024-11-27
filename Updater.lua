@@ -13,53 +13,86 @@ updater.repo = {
     branch = "Github-updating-test"
 }
 
--- Module version information
+-- Module information
 updater.modules = {
     ["core"] = {
-        version = "1.0.2",
         path = "Sci_sentinel.lua",
-        target = "scios/Sci_sentinel.lua"
+        target = "scios/Sci_sentinel.lua",
+        hash = nil  -- Will be populated during runtime
     },
     ["gui"] = {
-        version = "1.0.1",
         path = "Gui.lua",
-        target = "scios/Gui.lua"
+        target = "scios/Gui.lua",
+        hash = nil
     },
     ["commands"] = {
-        version = "1.0.1",
         path = "Commands.lua",
-        target = "scios/Commands.lua"
+        target = "scios/Commands.lua",
+        hash = nil
     },
     ["updater"] = {
-        version = "1.0.2",
         path = "Updater.lua",
-        target = "scios/Updater.lua"
+        target = "scios/Updater.lua",
+        hash = nil
     },
     ["startup"] = {
-        version = "1.0.1",
         path = "Startup.lua",
-        target = "startup.lua"
+        target = "startup.lua",
+        hash = nil
     }
 }
 
--- Auto-update settings
-updater.settings = {
-    auto_check = true,
-    check_interval = 3600,
-    last_check = 0
-}
+-- Hash tracking
+updater.hash_file = "scios/file_hashes.db"
 
-function updater.init(guiInstance)
-    if not guiInstance then
-        error("GUI instance required")
-        return nil
+function updater.calculateHash(content)
+    -- Simple hash function since ComputerCraft doesn't have SHA-256
+    local hash = 0
+    for i = 1, #content do
+        hash = (hash * 31 + string.byte(content, i)) % 2^32
     end
-    if type(guiInstance.drawInfo) ~= "function" then
-        error("GUI instance missing required functions")
-        return nil
+    return string.format("%08x", hash)
+end
+
+function updater.loadStoredHashes()
+    if fs.exists(updater.hash_file) then
+        local file = fs.open(updater.hash_file, "r")
+        if file then
+            local content = file.readAll()
+            file.close()
+            local hashes = textutils.unserializeJSON(content) or {}
+            for name, info in pairs(updater.modules) do
+                info.hash = hashes[info.target]
+            end
+        end
     end
-    updater.gui = guiInstance
-    return updater
+    
+    -- Calculate hashes for existing files
+    for name, info in pairs(updater.modules) do
+        if fs.exists(info.target) then
+            local file = fs.open(info.target, "r")
+            if file then
+                local content = file.readAll()
+                file.close()
+                info.hash = updater.calculateHash(content)
+            end
+        end
+    end
+end
+
+function updater.saveHashes()
+    local hashes = {}
+    for name, info in pairs(updater.modules) do
+        if info.hash then
+            hashes[info.target] = info.hash
+        end
+    end
+    
+    local file = fs.open(updater.hash_file, "w")
+    if file then
+        file.write(textutils.serializeJSON(hashes))
+        file.close()
+    end
 end
 
 function updater.getGitHubRawURL(filepath)
@@ -69,6 +102,17 @@ function updater.getGitHubRawURL(filepath)
         updater.repo.branch,
         filepath,
         os.epoch("utc"))
+end
+
+function updater.getRemoteContent(filepath)
+    local url = updater.getGitHubRawURL(filepath)
+    local response = http.get(url)
+    if response then
+        local content = response.readAll()
+        response.close()
+        return content
+    end
+    return nil
 end
 
 function updater.verifyFile(path, content)
@@ -111,130 +155,77 @@ function updater.restoreBackup(path, backupPath)
     return false
 end
 
-function updater.downloadFile(url, path)
-    if not updater.gui then return false end
-    
-    updater.gui.drawInfo("Downloading: " .. path)
-    local response = http.get(url)
-    if response then
-        local content = response.readAll()
-        response.close()
-        
-        -- Create backup of existing file
-        local backupPath = updater.backupFile(path)
-        
-        -- Create directory if needed
-        local dir = fs.getDir(path)
-        if dir ~= "" and not fs.exists(dir) then
-            fs.makeDir(dir)
-        end
-        
-        -- Save file
-        local file = fs.open(path, "w")
-        if file then
-            file.write(content)
-            file.close()
-            
-            -- Verify file
-            local success, error = updater.verifyFile(path, content)
-            if success then
-                updater.gui.drawSuccess("Successfully downloaded and verified: " .. path)
-                if backupPath then
-                    fs.delete(backupPath)
-                end
-                return true
-            else
-                updater.gui.drawError("File verification failed: " .. (error or "unknown error"))
-                if backupPath then
-                    updater.gui.drawInfo("Restoring backup...")
-                    if updater.restoreBackup(path, backupPath) then
-                        updater.gui.drawSuccess("Backup restored")
-                    else
-                        updater.gui.drawError("Failed to restore backup")
-                    end
-                end
-            end
-        end
-    end
-    updater.gui.drawError("Failed to download: " .. path)
-    return false
-end
-
-function updater.getRemoteVersion(filepath)
-    local url = updater.getGitHubRawURL(filepath)
-    local response = http.get(url)
-    if response then
-        local content = response.readAll()
-        response.close()
-        
-        -- Try to find version string, ignoring comments
-        for line in content:gmatch("[^\r\n]+") do
-            local version = line:match("version%s*=%s*[\"']([%d%.]+)[\"']")
-            if version then
-                return version
-            end
-        end
-    end
-    return nil
-end
-
-function updater.compareVersions(v1, v2)
-    local function parseVersion(v)
-        local major, minor, patch = v:match("(%d+)%.(%d+)%.(%d+)")
-        return tonumber(major), tonumber(minor), tonumber(patch)
-    end
-    
-    local m1, n1, p1 = parseVersion(v1)
-    local m2, n2, p2 = parseVersion(v2)
-    
-    if m1 > m2 then return 1
-    elseif m1 < m2 then return -1
-    elseif n1 > n2 then return 1
-    elseif n1 < n2 then return -1
-    elseif p1 > p2 then return 1
-    elseif p1 < p2 then return -1
-    else return 0 end
-end
-
 function updater.checkForUpdates()
     if not updater.gui then 
         error("Updater not initialized with GUI")
         return false 
     end
 
+    -- Load current file hashes
+    updater.loadStoredHashes()
+
     local updates_available = false
     local updates_installed = false
     updater.gui.drawInfo("Checking for updates...")
     
-    -- First check all versions before updating any files
+    -- First check all files for changes
     local to_update = {}
     for name, info in pairs(updater.modules) do
         updater.gui.drawInfo("Checking " .. name .. "...")
-        local remote_version = updater.getRemoteVersion(info.path)
+        local remote_content = updater.getRemoteContent(info.path)
         
-        if remote_version then
-            if updater.compareVersions(remote_version, info.version) > 0 then
-                updater.gui.drawSuccess(string.format("Update available for %s: %s -> %s", 
-                    name, info.version, remote_version))
+        if remote_content then
+            local remote_hash = updater.calculateHash(remote_content)
+            if remote_hash ~= info.hash then
+                updater.gui.drawSuccess(string.format("Update available for %s", name))
                 updates_available = true
-                table.insert(to_update, {name = name, info = info, new_version = remote_version})
+                table.insert(to_update, {
+                    name = name, 
+                    info = info, 
+                    content = remote_content,
+                    new_hash = remote_hash
+                })
             else
                 updater.gui.drawSuccess(name .. " is up to date")
             end
         else
-            updater.gui.drawError("Failed to check " .. name .. " for updates")
+            updater.gui.drawError("Failed to check " .. name)
         end
     end
     
     -- If updates are available, ask to install all at once
     if #to_update > 0 and updater.gui.confirm("Install all available updates?") then
         for _, update in ipairs(to_update) do
-            local url = updater.getGitHubRawURL(update.info.path)
-            if updater.downloadFile(url, update.info.target) then
-                update.info.version = update.new_version
-                updates_installed = true
-                updater.gui.drawSuccess("Successfully updated " .. update.name)
+            -- Create backup of existing file
+            local backupPath = updater.backupFile(update.info.target)
+            
+            -- Save new content
+            local file = fs.open(update.info.target, "w")
+            if file then
+                file.write(update.content)
+                file.close()
+                
+                -- Verify the write was successful
+                local success, error = updater.verifyFile(update.info.target, update.content)
+                if success then
+                    update.info.hash = update.new_hash
+                    updates_installed = true
+                    updater.gui.drawSuccess("Successfully updated " .. update.name)
+                    if backupPath then
+                        fs.delete(backupPath)
+                    end
+                else
+                    updater.gui.drawError("Failed to verify " .. update.name .. ": " .. (error or "unknown error"))
+                    if backupPath then
+                        updater.restoreBackup(update.info.target, backupPath)
+                    end
+                end
             end
+        end
+        
+        -- Save new hashes after successful updates
+        if updates_installed then
+            updater.saveHashes()
         end
     end
     
@@ -243,10 +234,23 @@ function updater.checkForUpdates()
             os.reboot()
         end
     elseif not updates_available then
-        updater.gui.drawSuccess("All modules are up to date")
+        updater.gui.drawSuccess("All files are up to date")
     end
     
     return updates_available
+end
+
+function updater.init(guiInstance)
+    if not guiInstance then
+        error("GUI instance required")
+        return nil
+    end
+    if type(guiInstance.drawInfo) ~= "function" then
+        error("GUI instance missing required functions")
+        return nil
+    end
+    updater.gui = guiInstance
+    return updater
 end
 
 function updater.autoUpdateCheck()
@@ -258,5 +262,12 @@ function updater.autoUpdateCheck()
     end
     return false
 end
+
+-- Auto-update settings
+updater.settings = {
+    auto_check = true,
+    check_interval = 3600,
+    last_check = 0
+}
 
 return updater
