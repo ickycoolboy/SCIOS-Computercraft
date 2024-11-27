@@ -172,96 +172,22 @@ function commands.executeCommand(command, gui)
             return true
         end
 
-        -- Debug: Check current directory and startup.lua location
-        local current_dir = shell.dir()
-        gui.drawInfo("Current directory: " .. current_dir)
-
-        -- Get absolute paths
-        local function getAbsolutePath(path)
-            if path:sub(1,1) == "/" then
-                return path
-            else
-                return fs.combine(current_dir, path)
-            end
-        end
-
-        -- Aggressive startup file removal
-        local function removeStartup()
-            -- Try multiple possible locations with absolute paths
-            local startup_locations = {
-                "", -- root
-                "scios",
-                current_dir
-            }
-
-            for _, dir in ipairs(startup_locations) do
-                local path = fs.combine(dir, "startup.lua")
-                gui.drawInfo("Checking for startup.lua in: " .. path)
-                
-                if fs.exists(path) then
-                    gui.drawInfo("Found startup.lua at: " .. path)
-                    
-                    -- Method 1: Close all file handles and delete
-                    local success = pcall(function()
-                        -- Force close any open handles
-                        if fs.open(path, "r") then
-                            fs.close(path)
-                        end
-                        fs.delete(path)
-                    end)
-                    
-                    -- Verify deletion
-                    if success and not fs.exists(path) then
-                        gui.drawSuccess("Successfully removed startup.lua from: " .. path)
-                        return true
-                    end
-                    
-                    -- Method 2: Try to overwrite then delete
-                    if fs.exists(path) then
-                        success = pcall(function()
-                            local file = fs.open(path, "w")
-                            if file then
-                                file.write("-- Disabled by uninstaller\n")
-                                file.close()
-                                fs.delete(path)
-                            end
-                        end)
-                        
-                        if success and not fs.exists(path) then
-                            gui.drawSuccess("Successfully removed startup.lua after overwrite from: " .. path)
-                            return true
-                        end
-                    end
-                    
-                    -- Method 3: Use shell commands
-                    if fs.exists(path) then
-                        success = pcall(function()
-                            shell.run("delete", path)
-                            if fs.exists(path) then
-                                shell.run("rm", path)
-                            end
-                        end)
-                        
-                        if success and not fs.exists(path) then
-                            gui.drawSuccess("Successfully removed startup.lua using shell commands from: " .. path)
-                            return true
-                        end
-                    end
-                    
-                    if fs.exists(path) then
-                        gui.drawError("Failed to remove startup.lua from: " .. path)
-                    end
+        -- First, disable startup.lua to prevent reboot into SCI
+        if fs.exists("startup.lua") then
+            gui.drawInfo("Disabling startup.lua...")
+            local success = pcall(function()
+                local file = fs.open("startup.lua", "w")
+                if file then
+                    file.write("-- SCI Sentinel has been uninstalled.\n")
+                    file.write("-- This file will be removed on next boot.\n")
+                    file.write("shell.run('delete startup.lua')\n")
+                    file.close()
                 end
-            end
-            return false
-        end
-
-        -- Try to remove startup file first
-        if not removeStartup() then
-            gui.drawError("WARNING: Could not remove startup file. System may still boot into SCI Sentinel.")
-            if not gui.confirm("Continue with uninstallation anyway?") then
-                gui.drawSuccess("Uninstall cancelled")
-                return true
+            end)
+            if success then
+                gui.drawSuccess("Startup file has been disabled and will be removed on next boot")
+            else
+                gui.drawError("Could not disable startup file")
             end
         end
 
@@ -272,10 +198,7 @@ function commands.executeCommand(command, gui)
                     if fs.isDir(path) then
                         fs.delete(path)
                     else
-                        local file = fs.open(path, "w")
-                        if file then
-                            file.close()
-                        end
+                        -- Try to delete directly first
                         fs.delete(path)
                     end
                 end)
@@ -290,11 +213,8 @@ function commands.executeCommand(command, gui)
             return true -- File doesn't exist, consider it removed
         end
 
-        -- List of files to remove with proper paths
+        -- List of files to remove
         local files_to_remove = {
-            "startup.lua",
-            "/startup.lua",
-            "scios/startup.lua",
             "scios/Sci_sentinel.lua",
             "scios/Gui.lua",
             "scios/Commands.lua",
@@ -304,12 +224,12 @@ function commands.executeCommand(command, gui)
             "scios/file_hashes.db"
         }
 
-        -- Remove all files
+        -- Remove all files except startup.lua
         for _, file in ipairs(files_to_remove) do
-            deleteFile(getAbsolutePath(file))
+            deleteFile(file)
         end
 
-        -- Try to remove the scios directory itself
+        -- Try to remove the scios directory
         if fs.exists("scios") then
             local success = pcall(function() 
                 -- Try to remove any remaining files
@@ -334,35 +254,9 @@ function commands.executeCommand(command, gui)
             end
         end
 
-        -- Final verification
-        local function checkFile(path)
-            if fs.exists(path) then
-                gui.drawError("File still exists: " .. path)
-                return true
-            end
-            return false
-        end
-
-        local files_exist = false
-        for _, path in ipairs({
-            "startup.lua",
-            "/startup.lua",
-            "scios/startup.lua",
-            "scios"
-        }) do
-            if checkFile(getAbsolutePath(path)) then
-                files_exist = true
-            end
-        end
-
-        if files_exist then
-            gui.drawError("Some SCI Sentinel files could not be removed.")
-            gui.drawError("Please try to remove them manually using 'delete' or 'rm' commands.")
-        else
-            gui.drawSuccess("SCI Sentinel has been successfully uninstalled.")
-        end
-
-        gui.drawSuccess("The computer will reboot in 3 seconds...")
+        gui.drawSuccess("SCI Sentinel has been uninstalled.")
+        gui.drawSuccess("The startup file will be removed when the computer reboots.")
+        gui.drawSuccess("Rebooting in 3 seconds...")
         os.sleep(3)
         os.reboot()
         return true
