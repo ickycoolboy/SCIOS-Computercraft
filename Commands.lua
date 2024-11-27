@@ -810,8 +810,8 @@ function commands.handleCommand(input)
                 
                 -- Draw buttons
                 local buttons = {
-                    gui.drawButton(3, 6, "Yes", colors.lime),
-                    gui.drawButton(minWidth-6, 6, "No", colors.red)
+                    gui.drawClickableButton(3, 6, "Yes", colors.lime),
+                    gui.drawClickableButton(minWidth-6, 6, "No", colors.red)
                 }
                 
                 -- Handle button click
@@ -834,8 +834,8 @@ function commands.handleCommand(input)
                 
                 -- Draw buttons
                 local buttons = {
-                    gui.drawButton(15, 12, "Yes", colors.lime),
-                    gui.drawButton(30, 12, "No", colors.red)
+                    gui.drawClickableButton(15, 12, "Yes", colors.lime),
+                    gui.drawClickableButton(30, 12, "No", colors.red)
                 }
                 
                 -- Handle button click
@@ -862,8 +862,8 @@ function commands.handleCommand(input)
                 
                 -- Draw buttons
                 local buttons = {
-                    gui.drawButton(3, 6, "Yes", colors.lime),
-                    gui.drawButton(minWidth-6, 6, "No", colors.red)
+                    gui.drawClickableButton(3, 6, "Yes", colors.lime),
+                    gui.drawClickableButton(minWidth-6, 6, "No", colors.red)
                 }
                 
                 -- Handle button click
@@ -885,8 +885,8 @@ function commands.handleCommand(input)
                 
                 -- Draw buttons
                 local buttons = {
-                    gui.drawButton(15, 12, "Yes", colors.lime),
-                    gui.drawButton(30, 12, "No", colors.red)
+                    gui.drawClickableButton(15, 12, "Yes", colors.lime),
+                    gui.drawClickableButton(30, 12, "No", colors.red)
                 }
                 
                 -- Handle button click
@@ -1072,8 +1072,8 @@ end
                 
                 -- Draw buttons
                 local buttons = {
-                    gui.drawButton(3, 6, "Yes", colors.lime),
-                    gui.drawButton(minWidth-6, 6, "No", colors.red)
+                    gui.drawClickableButton(3, 6, "Yes", colors.lime),
+                    gui.drawClickableButton(minWidth-6, 6, "No", colors.red)
                 }
                 
                 -- Handle button click
@@ -1098,8 +1098,8 @@ end
                 
                 -- Draw buttons
                 local buttons = {
-                    gui.drawButton(15, 12, "Yes", colors.lime),
-                    gui.drawButton(30, 12, "No", colors.red)
+                    gui.drawClickableButton(15, 12, "Yes", colors.lime),
+                    gui.drawClickableButton(30, 12, "No", colors.red)
                 }
                 
                 -- Handle button click
