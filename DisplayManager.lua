@@ -3,56 +3,66 @@ local displayManager = {}
 
 -- Configuration
 local config = {
-    mirrorEnabled = false
+    mirrorEnabled = false,
+    debug = true -- Enable debug output
 }
 
 -- Store monitor references
-local mainMonitor = term.current()
 local secondaryMonitor = nil
-local currentMonitor = nil
+
+-- Debug function
+local function debug(msg)
+    if config.debug then
+        print("[DisplayManager] " .. tostring(msg))
+    end
+end
 
 -- Check for connected monitors
 function displayManager.detectMonitors()
+    debug("Detecting monitors...")
     for _, side in ipairs({"top", "bottom", "left", "right", "front", "back"}) do
+        debug("Checking " .. side)
         if peripheral.getType(side) == "monitor" then
+            debug("Found monitor on " .. side)
             secondaryMonitor = peripheral.wrap(side)
             if secondaryMonitor then
-                -- Initialize the monitor with same size as main
-                local w, h = term.getSize()
-                secondaryMonitor.setTextScale(0.5)  -- Start with smallest scale
+                debug("Successfully wrapped monitor")
+                secondaryMonitor.setTextScale(1)
                 secondaryMonitor.clear()
-                secondaryMonitor.setCursorPos(1,1)
-                secondaryMonitor.setBackgroundColor(colors.black)
-                secondaryMonitor.setTextColor(colors.white)
                 return true
             end
         end
     end
+    debug("No monitors found")
     return false
 end
 
 -- Enable display mirroring
 function displayManager.enableMirroring()
+    debug("Enabling mirroring")
     if displayManager.detectMonitors() then
         config.mirrorEnabled = true
+        debug("Mirroring enabled")
         return true
     end
+    debug("Failed to enable mirroring")
     return false
 end
 
 -- Disable display mirroring
 function displayManager.disableMirroring()
+    debug("Disabling mirroring")
     config.mirrorEnabled = false
     if secondaryMonitor then
-        secondaryMonitor.clear()
-        secondaryMonitor.setCursorPos(1,1)
-        secondaryMonitor.setBackgroundColor(colors.black)
-        secondaryMonitor.setTextColor(colors.white)
+        pcall(function()
+            secondaryMonitor.clear()
+        end)
     end
 end
 
 -- Toggle display mirroring
 function displayManager.toggleMirroring()
+    debug("Toggling mirroring")
     if config.mirrorEnabled then
         displayManager.disableMirroring()
     else
@@ -67,49 +77,26 @@ function displayManager.mirrorContent()
         return
     end
 
-    -- Store current cursor position and colors
-    local oldX, oldY = term.getCursorPos()
-    local oldBg = term.getBackgroundColor()
-    local oldFg = term.getTextColor()
-    
-    -- Get screen content
-    local width, height = term.getSize()
-    local lines = {}
-    local colors = {}
-    local bgColors = {}
-    
-    -- Capture current screen state
-    for y = 1, height do
-        term.setCursorPos(1, y)
-        lines[y] = term.getLine()
-        colors[y] = {}
-        bgColors[y] = {}
-        for x = 1, width do
-            term.setCursorPos(x, y)
-            colors[y][x] = term.getTextColor()
-            bgColors[y][x] = term.getBackgroundColor()
+    local status, err = pcall(function()
+        -- Get current terminal content
+        local text = term.current().getLine(1)
+        if text then
+            secondaryMonitor.clear()
+            secondaryMonitor.setCursorPos(1, 1)
+            secondaryMonitor.write(text)
         end
+    end)
+
+    if not status then
+        debug("Error mirroring content: " .. tostring(err))
+        -- Disable mirroring on error
+        displayManager.disableMirroring()
     end
-    
-    -- Write to secondary monitor
-    secondaryMonitor.clear()
-    for y = 1, height do
-        for x = 1, width do
-            secondaryMonitor.setCursorPos(x, y)
-            secondaryMonitor.setTextColor(colors[y][x])
-            secondaryMonitor.setBackgroundColor(bgColors[y][x])
-            secondaryMonitor.write(lines[y]:sub(x,x))
-        end
-    end
-    
-    -- Restore original cursor position and colors
-    term.setCursorPos(oldX, oldY)
-    term.setBackgroundColor(oldBg)
-    term.setTextColor(oldFg)
 end
 
 -- Initialize display manager
 function displayManager.init()
+    debug("Initializing display manager")
     displayManager.detectMonitors()
 end
 

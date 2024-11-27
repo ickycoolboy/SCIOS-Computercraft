@@ -3,6 +3,7 @@ local version = "1.0.1"
 
 local gui = {}
 local background = {}
+-- Add display manager
 local displayManager = require("DisplayManager")
 
 -- Initialize display manager
@@ -17,10 +18,12 @@ function gui.getBackground()
 end
 
 function gui.mirrorCurrentDisplay()
-    -- Add a small delay to ensure screen is fully drawn
-    os.sleep(0.05)
-    if displayManager and displayManager.isMirroringEnabled() then
-        displayManager.mirrorContent()
+    if displayManager then
+        pcall(function()
+            if displayManager.isMirroringEnabled() then
+                displayManager.mirrorContent()
+            end
+        end)
     end
 end
 
@@ -32,7 +35,6 @@ function gui.drawScreen()
     print("#       Welcome to SCI Sentinel       #")
     print("#######################################")
     term.setTextColor(colors.white)
-    -- Mirror after complete screen draw
     gui.mirrorCurrentDisplay()
 end
 
