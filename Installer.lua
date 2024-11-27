@@ -234,6 +234,9 @@ end
 
 -- Draw installation progress
 local function drawProgress(current, total, message)
+    -- Ensure we're working with numbers
+    current = tonumber(current) or 0
+    total = tonumber(total) or 1
     local progress = current / total
     gui.drawAnimatedProgressBar(4, screen.height - 4, screen.width - 8, message, progress)
 end
@@ -387,12 +390,16 @@ local function install()
             
             for _, module in ipairs(config.modules) do
                 showLoadingMessage()
-                drawProgress(filesInstalled / totalFiles, "Installing: " .. module.name)
+                drawProgress(filesInstalled, totalFiles, "Installing: " .. module.name)
                 -- Download and install module
                 local success = downloadFile(getGitHubRawURL(module.file), module.target)
                 if not success and module.required then
-                    print("\nFailed to download " .. module.name .. " module")
-                    print("Installation failed! (Have you tried turning it off and on again?)")
+                    term.setBackgroundColor(gui.colors.windowBg)
+                    term.setTextColor(gui.colors.text)
+                    term.setCursorPos(4, screen.height - 2)
+                    write("\nFailed to download " .. module.name .. " module")
+                    write("\nInstallation failed! (Have you tried turning it off and on again?)")
+                    os.sleep(3)
                     return
                 end
                 filesInstalled = filesInstalled + 1
@@ -401,12 +408,16 @@ local function install()
             
             for _, file in ipairs(config.root_files) do
                 showLoadingMessage()
-                drawProgress(filesInstalled / totalFiles, "Installing: " .. file.name)
+                drawProgress(filesInstalled, totalFiles, "Installing: " .. file.name)
                 -- Download and install file
                 local success = downloadFile(getGitHubRawURL(file.file), file.target)
                 if not success and file.required then
-                    print("\nFailed to download " .. file.name)
-                    print("Installation failed! (Error 404: Success not found)")
+                    term.setBackgroundColor(gui.colors.windowBg)
+                    term.setTextColor(gui.colors.text)
+                    term.setCursorPos(4, screen.height - 2)
+                    write("\nFailed to download " .. file.name)
+                    write("\nInstallation failed! (Error 404: Success not found)")
+                    os.sleep(3)
                     return
                 end
                 filesInstalled = filesInstalled + 1
