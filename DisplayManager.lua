@@ -15,7 +15,13 @@ function displayManager.detectMonitors()
     for _, side in ipairs({"top", "bottom", "left", "right", "front", "back"}) do
         if peripheral.getType(side) == "monitor" then
             secondaryMonitor = peripheral.wrap(side)
-            return true
+            -- Initialize the monitor
+            if secondaryMonitor then
+                secondaryMonitor.setTextScale(1)
+                secondaryMonitor.clear()
+                secondaryMonitor.setCursorPos(1,1)
+                return true
+            end
         end
     end
     return false
@@ -25,6 +31,8 @@ end
 function displayManager.enableMirroring()
     if displayManager.detectMonitors() then
         config.mirrorEnabled = true
+        -- Initial mirror
+        displayManager.mirrorContent()
         return true
     end
     return false
@@ -35,6 +43,7 @@ function displayManager.disableMirroring()
     config.mirrorEnabled = false
     if secondaryMonitor then
         secondaryMonitor.clear()
+        secondaryMonitor.setCursorPos(1,1)
     end
 end
 
@@ -54,41 +63,42 @@ function displayManager.mirrorContent()
         return
     end
     
+    -- Save current terminal state
+    local oldTerm = term.current()
+    
     -- Get main display content
-    local oldTerm = term.redirect(mainMonitor)
     local width, height = term.getSize()
     local content = {}
     
+    -- Capture the current screen content
     for y = 1, height do
         content[y] = {}
         for x = 1, width do
+            local char = {}
             term.setCursorPos(x, y)
-            content[y][x] = {
-                text = term.getLine(y):sub(x,x),
-                textColor = term.getTextColor(),
-                backgroundColor = term.getBackgroundColor()
-            }
+            char.text = term.getLine(y):sub(x,x)
+            char.textColor = term.getTextColor()
+            char.backgroundColor = term.getBackgroundColor()
+            content[y][x] = char
         end
     end
     
-    -- Restore main terminal
-    term.redirect(oldTerm)
-    
-    -- Mirror to secondary display
+    -- Switch to secondary monitor and mirror content
     term.redirect(secondaryMonitor)
     secondaryMonitor.setTextScale(1)
-    secondaryMonitor.clear()
     
+    -- Copy content to secondary monitor
     for y = 1, height do
         for x = 1, width do
-            local pixel = content[y][x]
-            term.setCursorPos(x, y)
-            term.setTextColor(pixel.textColor)
-            term.setBackgroundColor(pixel.backgroundColor)
-            term.write(pixel.text)
+            local char = content[y][x]
+            secondaryMonitor.setCursorPos(x, y)
+            secondaryMonitor.setTextColor(char.textColor)
+            secondaryMonitor.setBackgroundColor(char.backgroundColor)
+            secondaryMonitor.write(char.text)
         end
     end
     
+    -- Restore original terminal
     term.redirect(oldTerm)
 end
 
