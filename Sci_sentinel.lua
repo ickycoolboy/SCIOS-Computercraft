@@ -1,6 +1,5 @@
 -- SCI Sentinel OS: A Modular Operating System for Advanced Pocket Computer with Update Capability
-
--- This is the core boot module: sci_sentinel.lua
+local version = "1.0.1"
 
 -- Set up the module path
 if not fs.exists("scios") then
@@ -116,48 +115,127 @@ if not fs.exists("scios/" .. MODULE_FILES.updater) or
     os.reboot()
 end
 
--- Load modules
-local function loadModule(name)
-    local success, module = pcall(require, name)
-    if not success then
-        print("Failed to load " .. name .. ": " .. tostring(module))
-        return nil
+-- Error handling wrapper
+local function protected_call(func, ...)
+    local status, result = pcall(func, ...)
+    if not status then
+        -- Log the error
+        local file = fs.open("scios/error.log", "a")
+        if file then
+            file.write(string.format("[%s] %s\n", os.date(), result))
+            file.close()
+        end
+        return false, result
     end
-    return module
+    return true, result
 end
 
--- Load required modules
-local gui = loadModule("GUI")
-if not gui then return end
+-- Module loader with error recovery
+local function loadModule(name, required)
+    local status, result = protected_call(require, name)
+    if not status then
+        print(string.format("Failed to load %s: %s", name, result))
+        if required then
+            return nil
+        else
+            -- Return empty table for optional modules
+            return {}
+        end
+    end
+    return result
+end
 
-local updater = loadModule("Updater")
-if not updater then return end
+-- Initialize the system
+local function initSystem()
+    -- Add the scios directory to package path
+    package.path = "scios/?.lua;" .. package.path
 
-local commands = loadModule("Commands")
-if not commands then return end
+    -- Load required modules with error handling
+    local gui = loadModule("GUI", true)
+    if not gui then return false end
 
--- Main Loop
-local function startSentinelOS()
-    gui.drawScreen()
-    while true do
+    local updater = loadModule("Updater", true)
+    if not updater then return false end
+
+    local commands = loadModule("Commands", true)
+    if not commands then return false end
+
+    return gui, updater, commands
+end
+
+-- Command execution wrapper
+local function executeCommand(command, gui, updater, commands)
+    if command == "exit" then
+        return false
+    elseif command == "update" then
+        protected_call(function()
+            local updates = updater.checkForUpdates()
+            if not updates then
+                gui.drawSuccess("No updates available")
+            end
+        end)
+    else
+        protected_call(function()
+            commands.executeCommand(command, gui)
+        end)
+    end
+    return true
+end
+
+-- Main loop with error recovery
+local function mainLoop(gui, updater, commands)
+    local running = true
+    while running do
+        -- Auto-update check
+        protected_call(function()
+            updater.autoUpdateCheck()
+        end)
+
+        -- Command processing
         gui.printPrompt()
         local input = read()
         if input then
-            if input == "exit" then
-                break
-            elseif input == "update" then
-                updater.checkForUpdates()
-            else
-                commands.executeCommand(input, gui)
+            running = executeCommand(input, gui, updater, commands)
+        end
+
+        -- Error recovery
+        if not running then
+            if gui.confirm("Do you want to restart SCI Sentinel?") then
+                os.reboot()
             end
         end
     end
+end
+
+-- Main entry point with error handling
+local function main()
+    -- Initialize modules
+    local gui, updater, commands = initSystem()
+    if not gui then
+        print("Failed to initialize SCI Sentinel. Check error.log for details.")
+        return
+    end
+
+    -- Draw initial screen
+    gui.drawScreen()
+
+    -- Enter main loop
+    protected_call(function()
+        mainLoop(gui, updater, commands)
+    end)
+
+    -- Clean shutdown
     print("Shutting down SCI Sentinel OS...")
 end
 
--- Start the OS
-print("Starting SCI Sentinel OS...")
-local ok, err = pcall(startSentinelOS)
-if not ok then
-    print("An unexpected error occurred: " .. tostring(err))
+-- Start the OS with global error handler
+_G.debug.traceback = function(err)
+    local file = fs.open("scios/error.log", "a")
+    if file then
+        file.write(string.format("[%s] Traceback: %s\n", os.date(), err))
+        file.close()
+    end
+    return err
 end
+
+protected_call(main)
