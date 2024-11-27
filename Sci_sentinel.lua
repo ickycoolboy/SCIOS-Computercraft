@@ -174,17 +174,6 @@ end
 local function executeCommand(command, gui, updater, commands)
     if command == "exit" then
         return false
-    elseif command == "update" then
-        protected_call(function()
-            if not updater or not updater.checkForUpdates then
-                gui.drawError("Update module not properly initialized")
-                return
-            end
-            local updates = updater.checkForUpdates()
-            if updates == false then
-                gui.drawSuccess("No updates available")
-            end
-        end)
     else
         protected_call(function()
             commands.executeCommand(command, gui)

@@ -3,6 +3,7 @@ local version = "1.0.1"
 
 -- Load required modules
 local gui = require("Gui")
+local updater = require("Updater")
 
 local commands = {}
 local sentinel_state = {}
@@ -39,7 +40,20 @@ function commands.executeCommand(command, gui)
     local cmd = args[1]
     table.remove(args, 1)
 
-    if cmd == "shell" or cmd == "craftos" then
+    if cmd == "update" then
+        -- Initialize updater with GUI
+        updater = updater.init(gui)
+        if not updater then
+            gui.drawError("Failed to initialize updater")
+            return true
+        end
+        
+        local updates = updater.checkForUpdates()
+        if updates == false then
+            gui.drawSuccess("No updates available")
+        end
+        return true
+    elseif cmd == "shell" or cmd == "craftos" then
         commands.saveState()
         term.clear()
         term.setCursorPos(1,1)
@@ -214,10 +228,6 @@ function commands.executeCommand(command, gui)
         else
             gui.drawSuccess("Uninstall cancelled")
         end
-    elseif cmd == "update" then
-        -- Update command
-        gui.drawSuccess("Checking for updates...")
-        shell.run("wget", "run", "https://raw.githubusercontent.com/ickycoolboy/SCIOS-Computercraft/Github-updating-test/Updater.lua")
     else
         -- Try to run as CraftOS command if not recognized
         if shell.resolveProgram(cmd) then
