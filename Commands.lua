@@ -254,6 +254,126 @@ local function help()
     return true
 end
 
+-- System information commands
+local function mem()
+    local total = math.floor((_G._HOST or ""):match("(%d+)") or 0)
+    local used = math.floor(collectgarbage("count"))
+    local free = total - used
+    
+    gui.drawInfo("Memory Information:")
+    gui.drawInfo(string.format("Total Memory: %d KB", total))
+    gui.drawInfo(string.format("Used Memory: %d KB", used))
+    gui.drawInfo(string.format("Free Memory: %d KB", free))
+    return true
+end
+
+local function ps()
+    local running = {}
+    for i=1, math.huge do
+        local co = coroutine.running(i)
+        if not co then break end
+        table.insert(running, {
+            id = i,
+            status = coroutine.status(co)
+        })
+    end
+    
+    gui.drawInfo("Running Processes:")
+    for _, proc in ipairs(running) do
+        gui.drawInfo(string.format("PID %d: %s", proc.id, proc.status))
+    end
+    return true
+end
+
+local function find(args)
+    if #args < 1 then
+        gui.drawError("Usage: find <pattern>")
+        return false
+    end
+    
+    local pattern = args[1]
+    local results = {}
+    
+    local function searchDir(path)
+        local files = fs.list(path)
+        for _, file in ipairs(files) do
+            local fullPath = fs.combine(path, file)
+            if file:match(pattern) then
+                table.insert(results, fullPath)
+            end
+            if fs.isDir(fullPath) then
+                searchDir(fullPath)
+            end
+        end
+    end
+    
+    searchDir(shell.dir())
+    
+    if #results > 0 then
+        gui.drawInfo(string.format("Found %d matches:", #results))
+        for _, path in ipairs(results) do
+            gui.drawInfo(path)
+        end
+    else
+        gui.drawInfo("No matches found.")
+    end
+    return true
+end
+
+local function tail(args)
+    if #args < 1 then
+        gui.drawError("Usage: tail <file> [lines]")
+        return false
+    end
+    
+    local filename = args[1]
+    local lines = tonumber(args[2]) or 10
+    local fullPath = fs.combine(shell.dir(), filename)
+    
+    if not fs.exists(fullPath) then
+        gui.drawError("File not found: " .. filename)
+        return false
+    end
+    
+    local file = fs.open(fullPath, "r")
+    if not file then
+        gui.drawError("Cannot open file: " .. filename)
+        return false
+    end
+    
+    local content = {}
+    local line = file.readLine()
+    while line do
+        table.insert(content, line)
+        if #content > lines then
+            table.remove(content, 1)
+        end
+        line = file.readLine()
+    end
+    file.close()
+    
+    gui.drawInfo(string.format("Last %d lines of %s:", lines, filename))
+    for _, line in ipairs(content) do
+        gui.drawInfo(line)
+    end
+    return true
+end
+
+local function history()
+    local hist = {}
+    for i=1, math.huge do
+        local cmd = _G._G and _G._G.history and _G._G.history.getCommand(i)
+        if not cmd then break end
+        table.insert(hist, cmd)
+    end
+    
+    gui.drawInfo("Command History:")
+    for i, cmd in ipairs(hist) do
+        gui.drawInfo(string.format("%d: %s", i, cmd))
+    end
+    return true
+end
+
 -- Display management commands
 commands["mirror"] = {
     action = function(args)
@@ -515,7 +635,12 @@ function commands.handleCommand(input)
                 gui.drawSuccess("Display mirroring disabled")
             end
             return true
-        end
+        end,
+        mem = mem,
+        ps = ps,
+        find = find,
+        tail = tail,
+        history = history
     }
     
     -- Run command
