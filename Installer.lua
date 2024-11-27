@@ -18,11 +18,12 @@ local config = {
 
 -- Create GitHub raw URL
 local function getGitHubRawURL(filepath)
-    return string.format("https://raw.githubusercontent.com/%s/%s/%s/%s",
+    return string.format("https://raw.githubusercontent.com/%s/%s/%s/%s?cb=%d",
         config.repo_owner,
         config.repo_name,
         config.branch,
-        filepath)
+        filepath,
+        os.epoch("utc")) -- Add timestamp to bust cache
 end
 
 -- Download a file from GitHub

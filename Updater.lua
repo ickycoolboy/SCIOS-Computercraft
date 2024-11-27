@@ -118,11 +118,12 @@ function updater.calculateHash(content)
 end
 
 function updater.getGitHubRawURL(filepath)
-    return string.format("https://raw.githubusercontent.com/%s/%s/%s/%s",
+    return string.format("https://raw.githubusercontent.com/%s/%s/%s/%s?cb=%d",
         updater.repo.owner,
         updater.repo.name,
         updater.repo.branch,
-        filepath)
+        filepath,
+        os.epoch("utc")) -- Add timestamp to bust cache
 end
 
 function updater.downloadFile(url, path)

@@ -23,8 +23,13 @@ function gui.drawScreen()
 end
 
 function gui.printPrompt()
+    -- Show current directory in prompt
+    local currentDir = shell.dir()
+    if currentDir == "" then currentDir = "/" end
+    term.setTextColor(colors.cyan)
+    write(currentDir)
     term.setTextColor(colors.lime)
-    write("SCI-Sentinel> ")
+    write("> ")
     term.setTextColor(colors.white)
 end
 
