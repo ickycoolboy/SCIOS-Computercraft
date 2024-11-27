@@ -21,6 +21,7 @@ local GITHUB_REPO = {
 local MODULE_FILES = {
     updater = "Updater.lua",
     gui = "GUI.lua",
+    commands = "Commands.lua",
     core = "sci_sentinel.lua"
 }
 
@@ -51,10 +52,32 @@ local function downloadFromGitHub(filepath, destination)
     return false
 end
 
+local function createStartup()
+    print("Creating startup file...")
+    local file = fs.open("startup.lua", "w")
+    file.write('-- SCI Sentinel OS Startup File\nshell.run("scios/sci_sentinel.lua")')
+    file.close()
+end
+
 local function initialSetup()
     print("Performing initial installation...")
     
-    -- Download updater module first
+    -- Create startup file FIRST to ensure it exists for next boot
+    createStartup()
+    
+    -- Save core file first
+    print("Saving core module...")
+    local currentFile = fs.open(shell.getRunningProgram(), "r")
+    if currentFile then
+        local content = currentFile.readAll()
+        currentFile.close()
+        
+        local coreFile = fs.open("scios/" .. MODULE_FILES.core, "w")
+        coreFile.write(content)
+        coreFile.close()
+    end
+    
+    -- Download updater module
     print("Downloading Updater module...")
     if not downloadFromGitHub(MODULE_FILES.updater, "scios/" .. MODULE_FILES.updater) then
         print("Failed to download updater module")
@@ -68,13 +91,22 @@ local function initialSetup()
         return false
     end
     
+    -- Download Commands module
+    print("Downloading Commands module...")
+    if not downloadFromGitHub(MODULE_FILES.commands, "scios/" .. MODULE_FILES.commands) then
+        print("Failed to download Commands module")
+        return false
+    end
+    
     print("Initial setup complete!")
     return true
 end
 
 -- Check if modules exist, otherwise perform initial setup
 if not fs.exists("scios/" .. MODULE_FILES.updater) or 
-   not fs.exists("scios/" .. MODULE_FILES.gui) then
+   not fs.exists("scios/" .. MODULE_FILES.gui) or
+   not fs.exists("scios/" .. MODULE_FILES.commands) or
+   not fs.exists("scios/" .. MODULE_FILES.core) then
     if not initialSetup() then
         print("Initial setup failed!")
         return
@@ -101,6 +133,9 @@ if not gui then return end
 local updater = loadModule("Updater")
 if not updater then return end
 
+local commands = loadModule("Commands")
+if not commands then return end
+
 -- Main Loop
 local function startSentinelOS()
     gui.drawScreen()
@@ -113,7 +148,7 @@ local function startSentinelOS()
             elseif input == "update" then
                 updater.checkForUpdates()
             else
-                print("Unknown command: " .. input)
+                commands.handleCommand(input)
             end
         end
     end
