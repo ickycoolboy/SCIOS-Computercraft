@@ -1,0 +1,21 @@
+{
+    "system_files": [
+        "startup.lua",
+        "scios/Sci_sentinel.lua",
+        "scios/Gui.lua",
+        "scios/Commands.lua",
+        "scios/Updater.lua",
+        "scios/versions.db",
+        "scios/filetracker.db"
+    ],
+    "temp_files": [
+        "scios/*.tmp",
+        "scios/*.bak",
+        "scios/*.log"
+    ],
+    "protected_files": [
+        "startup.lua",
+        "scios/Sci_sentinel.lua",
+        "scios/Gui.lua"
+    ]
+}
