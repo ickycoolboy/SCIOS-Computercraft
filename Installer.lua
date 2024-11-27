@@ -229,119 +229,97 @@ local function cleanInstall()
 end
 
 -- Main installation process
-local gui = require("GUI")
-
--- Clear the screen
 term.clear()
-term.setCursorPos(1,1)
+term.setCursorPos(1, 1)
+print("SCI Sentinel OS Installer v" .. version)
+print("===============================")
+print("\nYour friendly neighborhood OS installer")
+print("(Now with 100% more progress bars!)")
 
--- Draw main interface
-gui.drawFancyBox(1, 1, 51, 16, "[ SCI Sentinel Installer ]", colors.gray, colors.white)
+handlePendingUpdate()
 
--- Draw welcome message
-gui.drawHeader(3, 3, "Welcome to SCI Sentinel", colors.yellow)
-term.setCursorPos(3, 5)
-term.setTextColor(colors.white)
-write("This installer will set up SCI Sentinel on your")
-term.setCursorPos(3, 6)
-write("computer. SCI Sentinel provides security and")
-term.setCursorPos(3, 7)
-write("monitoring features for your system.")
-
--- Draw installation options
-gui.drawHeader(3, 9, "Installation Options", colors.lime)
-
--- Create clickable buttons
-local buttons = {
-    gui.drawClickableButton(3, 11, "Install", colors.green, colors.lime),
-    gui.drawClickableButton(15, 11, "Exit", colors.red, colors.orange)
-}
-
--- Handle button clicks
-local choice = gui.handleMouseEvents(buttons)
-
-if choice == "Install" then
-    -- Installation process
-    term.clear()
-    term.setCursorPos(1,1)
-    gui.drawFancyBox(1, 1, 51, 16, "[ Installing SCI Sentinel ]", colors.gray, colors.white)
-    
-    -- Initialize progress tracking
-    local function updateProgress(status, progress)
-        gui.updateProgress(3, 4, 45, "Installing", progress, status)
-    end
-    
-    -- Create directories
-    updateProgress("Creating directories...", 0.1)
-    if not fs.exists("scios") then
-        fs.makeDir("scios")
-    end
-    os.sleep(0.2)
-    
-    -- Download files
-    local files = {
-        "sci_sentinel.lua",
-        "GUI.lua",
-        "Commands.lua",
-        "Updater.lua"
-    }
-    
-    for i, file in ipairs(files) do
-        updateProgress("Downloading: " .. file, 0.2 + (0.5 * (i/#files)))
-        -- Simulate file download/copy
-        os.sleep(0.3)
-        -- Here you would actually download or copy the file
-    end
-    
-    -- Configure startup
-    updateProgress("Configuring startup...", 0.8)
-    local startup = fs.open("startup.lua", "w")
-    if startup then
-        startup.write('shell.run("scios/sci_sentinel.lua")')
-        startup.close()
-    end
-    os.sleep(0.2)
-    
-    -- Complete installation
-    updateProgress("Installation Complete!", 1.0)
-    os.sleep(1)
-    
-    -- Show completion screen
-    term.clear()
-    term.setCursorPos(1,1)
-    gui.drawFancyBox(1, 1, 51, 16, "[ Installation Complete ]", colors.gray, colors.white)
-    
-    gui.drawHeader(3, 4, "Success!", colors.lime)
-    term.setCursorPos(3, 6)
-    term.setTextColor(colors.white)
-    write("SCI Sentinel has been installed successfully.")
-    term.setCursorPos(3, 7)
-    write("The system will start automatically on boot.")
-    
-    gui.drawHeader(3, 9, "What's Next?", colors.yellow)
-    term.setCursorPos(3, 11)
-    write("Would you like to reboot now?")
-    
-    -- Create reboot buttons
-    local rebootButtons = {
-        gui.drawClickableButton(3, 13, "Reboot", colors.green, colors.lime),
-        gui.drawClickableButton(15, 13, "Later", colors.red, colors.orange)
-    }
-    
-    -- Handle reboot choice
-    local rebootChoice = gui.handleMouseEvents(rebootButtons)
-    if rebootChoice == "Reboot" then
-        term.clear()
-        term.setCursorPos(1,1)
-        gui.drawCenteredText(8, "Rebooting...", colors.yellow)
-        os.sleep(1)
-        os.reboot()
-    else
-        term.clear()
-        term.setCursorPos(1,1)
-    end
-else
-    -- Exit installer
-    term.clear()
-    term.setCursorPos(1,1)
+write("\nProceed with installation? (y/n): ")
+local input = read():lower()
+if input ~= "y" and input ~= "yes" then
+    print("\nInstallation cancelled.")
+    print("The digital future will have to wait...")
+    return
 end
+
+term.clear()
+term.setCursorPos(1, 1)
+print("SCI Sentinel OS Installation")
+print("===========================")
+
+-- Check for force flag
+local args = {...}
+local forceInstall = false
+for _, arg in ipairs(args) do
+    if arg == "--force" then
+        forceInstall = true
+        break
+    end
+end
+
+if forceInstall then
+    animateLoading(2000, "Force cleaning old installation...")
+    if not cleanInstall() then
+        print("Failed to clean existing installation")
+        return
+    end
+end
+
+if not fs.exists(config.install_dir) then
+    fs.makeDir(config.install_dir)
+end
+
+local totalFiles = #config.modules + #config.root_files
+local filesInstalled = 0
+
+-- Install modules
+for _, module in ipairs(config.modules) do
+    filesInstalled = filesInstalled + 1
+    local progress = filesInstalled / totalFiles
+    
+    drawProgressBar(2, 15, 40, progress, "Installing: " .. module.name)
+    animateLoading(1000, "Downloading " .. module.name .. " module")
+    
+    local success = downloadFile(
+        getGitHubRawURL(module.file),
+        module.target
+    )
+    
+    if not success and module.required then
+        print("\nFailed to download " .. module.name .. " module")
+        print("Installation failed! (Have you tried turning it off and on again?)")
+        return
+    end
+end
+
+-- Install root files
+for _, file in ipairs(config.root_files) do
+    filesInstalled = filesInstalled + 1
+    local progress = filesInstalled / totalFiles
+    
+    drawProgressBar(2, 15, 40, progress, "Installing: " .. file.name)
+    animateLoading(1000, "Setting up " .. file.name)
+    
+    local success = downloadFile(getGitHubRawURL(file.file), file.target)
+    if not success and file.required then
+        print("\nFailed to download " .. file.name)
+        print("Installation failed! (Error 404: Success not found)")
+        return
+    end
+end
+
+term.clear()
+term.setCursorPos(1, 1)
+print("Installation Complete!")
+print("=====================")
+print("\nYour computer has been upgraded with")
+print("approximately 10,000 Terabytes of awesomeness!")
+print("\nRebooting in 3 seconds...")
+print("(Please ensure your quantum flux capacitor")
+print("is properly aligned)")
+os.sleep(3)
+os.reboot()
