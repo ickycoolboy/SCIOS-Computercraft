@@ -772,75 +772,122 @@ function commands.handleCommand(input)
                 debug("Debug mode enabled")
             end
 
-            debug("Getting screen dimensions")
-            local ok, err = pcall(function()
-                local w, h = term.getSize()
-                debug("Screen size: " .. w .. "x" .. h)
-                
-                debug("Drawing initial interface")
-                term.clear()
-                term.setCursorPos(1,1)
-                
-                debug("Drawing confirmation")
-                term.setTextColor(colors.red)
-                print("WARNING: This will uninstall SCI Sentinel")
-                term.setTextColor(colors.white)
-                print("Type 'yes' to confirm:")
-                
-                debug("Waiting for input")
-                local input = read():lower()
-                debug("Got input: " .. input)
-                
-                if input ~= "yes" then
-                    debug("User cancelled")
-                    print("Uninstall cancelled.")
-                    return true
-                end
+            debug("Drawing initial interface")
+            term.clear()
+            term.setCursorPos(1,1)
+            
+            debug("Drawing confirmation")
+            term.setTextColor(colors.red)
+            print("WARNING: This will uninstall SCI Sentinel")
+            term.setTextColor(colors.white)
+            print("Type 'yes' to confirm:")
+            
+            debug("Waiting for input")
+            local input = read():lower()
+            debug("Got input: " .. input)
+            
+            if input ~= "yes" then
+                debug("User cancelled")
+                print("Uninstall cancelled.")
+                return true
+            end
 
-                debug("User confirmed. Starting uninstall")
-                print("Uninstalling...")
-                
-                -- List of files to remove
-                local files = {
-                    "startup.lua",
-                    "scios/Sci_sentinel.lua",
-                    "scios/Gui.lua",
-                    "scios/Commands.lua",
-                    "scios/Updater.lua",
-                    "scios/versions.db",
-                    "scios/filetracker.db",
-                    "scios/file_hashes.db"
-                }
+            debug("User confirmed. Creating uninstall script")
+            print("Creating uninstall script...")
 
-                -- Remove files
-                for _, file in ipairs(files) do
-                    debug("Attempting to remove: " .. file)
-                    if fs.exists(file) then
-                        if debugMode then
-                            debug("Debug mode - would remove: " .. file)
-                        else
-                            debug("Removing: " .. file)
-                            fs.delete(file)
-                        end
-                    end
-                end
+            -- Create the uninstall script
+            local script = [[
+-- SCI Sentinel Uninstall Script
+local function removeFile(path)
+    if fs.exists(path) then
+        pcall(function() fs.delete(path) end)
+    end
+end
 
-                -- Clean up SCIOS directory
-                debug("Cleaning up SCIOS directory")
-                if fs.exists("scios") and not debugMode then
-                    debug("Removing SCIOS directory")
-                    fs.delete("scios")
-                end
+-- Wait a moment for system to be ready
+os.sleep(0.5)
 
-                debug("Uninstall complete")
-                print("Uninstall complete!")
-                print("Reboot to complete uninstallation.")
-            end)
+-- Remove all SCI Sentinel files
+local files = {
+    "startup.lua",
+    "scios/Sci_sentinel.lua",
+    "scios/Gui.lua",
+    "scios/Commands.lua",
+    "scios/Updater.lua",
+    "scios/versions.db",
+    "scios/filetracker.db",
+    "scios/file_hashes.db",
+    "uninstall_debug.log"
+}
 
-            if not ok then
-                debug("Error occurred: " .. tostring(err))
-                print("An error occurred. Check uninstall_debug.log for details.")
+for _, file in ipairs(files) do
+    removeFile(file)
+end
+
+-- Clean up SCIOS directory
+if fs.exists("scios") then
+    local function removeDir(path)
+        local list = fs.list(path)
+        for _, file in ipairs(list) do
+            local fullPath = fs.combine(path, file)
+            if fs.isDir(fullPath) then
+                removeDir(fullPath)
+            else
+                removeFile(fullPath)
+            end
+        end
+        fs.delete(path)
+    end
+    
+    removeDir("scios")
+end
+
+-- Create completion message
+local f = fs.open("uninstall_complete", "w")
+if f then
+    f.write("SCI Sentinel has been uninstalled.\n")
+    f.close()
+end
+
+-- Clean up this script
+shell.run("delete", "uninstall.lua")
+]]
+
+            debug("Writing uninstall script")
+            local f = fs.open("uninstall.lua", "w")
+            if f then
+                f.write(script)
+                f.close()
+            else
+                debug("Failed to create uninstall script")
+                print("Error: Could not create uninstall script")
                 return false
+            end
+
+            -- Modify startup.lua to run the uninstall script
+            debug("Modifying startup.lua")
+            local startup = [[
+-- SCI Sentinel uninstall in progress
+shell.run("uninstall.lua")
+shell.run("delete", "startup.lua")
+]]
+            
+            local f = fs.open("startup.lua", "w")
+            if f then
+                f.write(startup)
+                f.close()
+            end
+
+            debug("Setup complete")
+            print("Uninstall script created.")
+            print("The system will be uninstalled on next reboot.")
+            print("Would you like to reboot now? (yes/no)")
+            
+            local reboot = read():lower()
+            if reboot == "yes" then
+                os.reboot()
+            else
+                print("Please reboot your computer to complete the uninstallation.")
             end
 
             debug("Function completed successfully")
