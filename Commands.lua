@@ -749,271 +749,101 @@ function commands.handleCommand(input)
             return true
         end,
         uninstall = function(args)
-            -- Save current terminal state
-            local oldTerm = term.current()
-            local oldBg = term.getBackgroundColor()
-            local oldFg = term.getTextColor()
+            -- Debug logging function
+            local function debug(msg)
+                local f = fs.open("uninstall_debug.log", "a")
+                if f then
+                    f.write(os.date("%Y-%m-%d %H:%M:%S") .. ": " .. tostring(msg) .. "\n")
+                    f.close()
+                end
+            end
 
-            -- Ensure we're using the native terminal
-            term.redirect(term.native())
+            debug("Starting uninstall function")
             
-            -- Clear any previous state
-            term.setBackgroundColor(colors.black)
-            term.setTextColor(colors.white)
-            term.clear()
-            term.setCursorPos(1,1)
+            -- Create fresh log
+            if fs.exists("uninstall_debug.log") then
+                fs.delete("uninstall_debug.log")
+            end
 
-            -- Check for debug mode
+            debug("Checking debug mode")
             local debugMode = false
             if args[1] == "-debug" then
                 debugMode = true
-                print("Running in DEBUG mode - No files will be modified")
-                os.sleep(1)
+                debug("Debug mode enabled")
             end
-            
-            -- Get screen dimensions
-            local w, h = term.getSize()
-            local isPocketPC = h <= 13
-            local minWidth = isPocketPC and 26 or 51
-            local minHeight = isPocketPC and 8 or 16
 
-            -- Clear screen and draw main interface
-            term.clear()
-            term.setCursorPos(1,1)
-            
-            -- Draw main box with appropriate size
-            if isPocketPC then
-                gui.drawBox(1, 1, minWidth, minHeight, "[ Uninstaller ]")
+            debug("Getting screen dimensions")
+            local ok, err = pcall(function()
+                local w, h = term.getSize()
+                debug("Screen size: " .. w .. "x" .. h)
                 
-                -- Draw compact warning
-                gui.drawCenteredText(2, "WARNING!", colors.red)
-                gui.drawCenteredText(3, "Remove SCIOS?", colors.orange)
-                if debugMode then
-                    gui.drawCenteredText(4, "(Debug Mode)", colors.lime)
+                debug("Drawing initial interface")
+                term.clear()
+                term.setCursorPos(1,1)
+                
+                debug("Drawing confirmation")
+                term.setTextColor(colors.red)
+                print("WARNING: This will uninstall SCI Sentinel")
+                term.setTextColor(colors.white)
+                print("Type 'yes' to confirm:")
+                
+                debug("Waiting for input")
+                local input = read():lower()
+                debug("Got input: " .. input)
+                
+                if input ~= "yes" then
+                    debug("User cancelled")
+                    print("Uninstall cancelled.")
+                    return true
                 end
+
+                debug("User confirmed. Starting uninstall")
+                print("Uninstalling...")
                 
-                -- Draw buttons
-                local buttons = {
-                    gui.drawButton(3, 6, "Yes", colors.red),
-                    gui.drawButton(minWidth-6, 6, "No", colors.lime)
+                -- List of files to remove
+                local files = {
+                    "startup.lua",
+                    "scios/Sci_sentinel.lua",
+                    "scios/Gui.lua",
+                    "scios/Commands.lua",
+                    "scios/Updater.lua",
+                    "scios/versions.db",
+                    "scios/filetracker.db",
+                    "scios/file_hashes.db"
                 }
-                
-                -- Handle button click
-                local choice = gui.handleButtons(buttons)
-                if choice ~= "Yes" then
-                    term.clear()
-                    term.setCursorPos(1,1)
-                    gui.drawSuccess("Cancelled")
-                    -- Before returning, restore terminal state
-                    term.redirect(oldTerm)
-                    term.setBackgroundColor(oldBg)
-                    term.setTextColor(oldFg)
-                    term.clear()
-                    term.setCursorPos(1,1)
-                    return true
-                end
-            else
-                gui.drawBox(1, 1, minWidth, minHeight, "[ SCI Sentinel Uninstaller ]")
-                
-                -- Draw warning
-                gui.drawCenteredText(4, "WARNING!", colors.red)
-                gui.drawCenteredText(6, "This will completely remove", colors.orange)
-                gui.drawCenteredText(7, "SCI Sentinel from your computer.", colors.orange)
-                if debugMode then
-                    gui.drawCenteredText(8, "(Debug Mode - No files will be modified)", colors.lime)
-                end
-                gui.drawCenteredText(9, "Are you sure you want to proceed?", colors.white)
-                
-                -- Draw buttons
-                local buttons = {
-                    gui.drawButton(15, 12, "Uninstall", colors.red),
-                    gui.drawButton(30, 12, "Cancel", colors.lime)
-                }
-                
-                -- Handle button click
-                local choice = gui.handleButtons(buttons)
-                if choice ~= "Uninstall" then
-                    term.clear()
-                    term.setCursorPos(1,1)
-                    gui.drawSuccess("Uninstall cancelled")
-                    -- Before returning, restore terminal state
-                    term.redirect(oldTerm)
-                    term.setBackgroundColor(oldBg)
-                    term.setTextColor(oldFg)
-                    term.clear()
-                    term.setCursorPos(1,1)
-                    return true
-                end
-            end
-            
-            -- Draw uninstall progress interface
-            term.clear()
-            term.setCursorPos(1,1)
-            
-            if isPocketPC then
-                gui.drawBox(1, 1, minWidth, minHeight, "[ Uninstalling ]")
-            else
-                gui.drawBox(1, 1, minWidth, minHeight, "[ Uninstalling SCI Sentinel ]")
-            end
-            
-            -- Initialize progress tracking
-            local currentProgress = 0
-            local function updateProgress(status, progress)
-                currentProgress = progress
-                gui.updateProgress(3, 4, 45, "Uninstalling", progress, status)
-            end
-            
-            -- Function to simulate or perform actual file operations
-            local function performOperation(operation, debugMode)
-                if debugMode then
-                    os.sleep(0.5) -- Simulate operation time
-                    return true
-                else
-                    return operation()
-                end
-            end
-            
-            -- First, disable startup.lua
-            updateProgress("Disabling startup file...", 0.1)
-            if fs.exists("startup.lua") or debugMode then
-                local success = performOperation(function()
-                    local file = fs.open("startup.lua", "w")
-                    if file then
-                        file.write("-- SCI Sentinel has been uninstalled.\n")
-                        file.write("-- This file will be removed on next boot.\n")
-                        file.write("shell.run('delete startup.lua')\n")
-                        file.close()
-                        return true
+
+                -- Remove files
+                for _, file in ipairs(files) do
+                    debug("Attempting to remove: " .. file)
+                    if fs.exists(file) then
+                        if debugMode then
+                            debug("Debug mode - would remove: " .. file)
+                        else
+                            debug("Removing: " .. file)
+                            fs.delete(file)
+                        end
                     end
-                    return false
-                end, debugMode)
-                
-                if success then
-                    updateProgress("Startup file disabled successfully", 0.25)
-                else
-                    updateProgress("Failed to disable startup file", 0.25)
-                    os.sleep(1)
                 end
-            end
-            
-            -- Remove all other files
-            local function deleteFile(path)
-                if fs.exists(path) or debugMode then
-                    return performOperation(function()
-                        fs.delete(path)
-                        return true
-                    end, debugMode)
+
+                -- Clean up SCIOS directory
+                debug("Cleaning up SCIOS directory")
+                if fs.exists("scios") and not debugMode then
+                    debug("Removing SCIOS directory")
+                    fs.delete("scios")
                 end
-                return true
+
+                debug("Uninstall complete")
+                print("Uninstall complete!")
+                print("Reboot to complete uninstallation.")
+            end)
+
+            if not ok then
+                debug("Error occurred: " .. tostring(err))
+                print("An error occurred. Check uninstall_debug.log for details.")
+                return false
             end
-            
-            -- List of files to remove
-            local files_to_remove = {
-                "scios/Sci_sentinel.lua",
-                "scios/Gui.lua",
-                "scios/Commands.lua",
-                "scios/Updater.lua",
-                "scios/versions.db",
-                "scios/filetracker.db",
-                "scios/file_hashes.db"
-            }
-            
-            -- Remove files with progress updates
-            updateProgress("Removing SCI files...", 0.3)
-            local allFilesRemoved = true
-            for i, file in ipairs(files_to_remove) do
-                if not deleteFile(file) then
-                    allFilesRemoved = false
-                end
-                local fileProgress = 0.3 + (0.4 * (i / #files_to_remove))
-                updateProgress("Removing: " .. file, fileProgress)
-                os.sleep(0.2) -- Small delay to show progress
-            end
-            
-            -- Clean up SCIOS directory
-            updateProgress("Cleaning up SCIOS directory...", 0.8)
-            
-            -- Simple cleanup without complex error checking
-            if fs.exists("scios") and not debugMode then
-                -- Try to delete each file individually
-                local files = fs.list("scios")
-                for i, file in ipairs(files) do
-                    local path = fs.combine("scios", file)
-                    updateProgress(string.format("Removing: %s", path), 0.8 + (0.1 * (i/#files)))
-                    pcall(function() fs.delete(path) end)  -- Use pcall to prevent errors from stopping the process
-                    os.sleep(0.1) -- Small delay to prevent freezing
-                end
-                
-                -- Finally remove the directory itself
-                updateProgress("Removing SCIOS directory...", 0.95)
-                pcall(function() fs.delete("scios") end)
-            elseif debugMode then
-                -- In debug mode, just simulate the delay
-                os.sleep(0.5)
-            end
-            
-            -- Final completion
-            updateProgress("Uninstall Complete!", 1.0)
-            os.sleep(1)
-            
-            -- Show completion screen
-            term.clear()
-            term.setCursorPos(1,1)
-            
-            if isPocketPC then
-                gui.drawBox(1, 1, minWidth, minHeight, "[ Complete ]")
-                
-                if debugMode then
-                    gui.drawCenteredText(2, "Debug Complete", colors.lime)
-                    gui.drawCenteredText(3, "No changes made", colors.white)
-                else
-                    gui.drawCenteredText(2, "Uninstalled!", colors.lime)
-                    gui.drawCenteredText(3, "Reboot needed", colors.white)
-                end
-                
-                gui.drawCenteredText(5, "Reboot now?", colors.yellow)
-            else
-                gui.drawBox(1, 1, minWidth, minHeight, "[ Uninstall Complete ]")
-                
-                if debugMode then
-                    gui.drawCenteredText(4, "Debug Mode: Uninstall Simulation Complete", colors.lime)
-                    gui.drawCenteredText(6, "No files were modified", colors.white)
-                    gui.drawCenteredText(7, "Run without -debug to perform actual uninstall", colors.white)
-                else
-                    gui.drawCenteredText(4, "SCI Sentinel has been uninstalled!", colors.lime)
-                    gui.drawCenteredText(6, "The startup file will be removed", colors.white)
-                    gui.drawCenteredText(7, "when you reboot the computer.", colors.white)
-                end
-                
-                gui.drawCenteredText(9, "Would you like to reboot now?", colors.yellow)
-            end
-            
-            -- Draw reboot buttons
-            local buttons = {
-                gui.drawButton(15, 12, "Reboot", colors.lime),
-                gui.drawButton(30, 12, "Later", colors.red)
-            }
-            
-            -- Handle reboot choice
-            local choice = gui.handleButtons(buttons)
-            if choice == "Reboot" and not debugMode then
-                term.clear()
-                term.setCursorPos(1,1)
-                gui.drawCenteredText(8, "Rebooting...", colors.yellow)
-                os.sleep(1)
-                os.reboot()
-            else
-                -- Clear screen before exiting
-                term.clear()
-                term.setCursorPos(1,1)
-            end
-            
-            -- Before returning, restore terminal state
-            term.redirect(oldTerm)
-            term.setBackgroundColor(oldBg)
-            term.setTextColor(oldFg)
-            term.clear()
-            term.setCursorPos(1,1)
+
+            debug("Function completed successfully")
             return true
         end,
         mirror = function(args)
