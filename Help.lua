@@ -249,6 +249,24 @@ local commands = {
             "",
             "For more information on a specific command, type HELP command-name"
         }
+    },
+    LABEL = {
+        syntax = "LABEL [new-name|clear]",
+        description = "Displays or changes the computer label.",
+        details = {
+            "View or modify the computer's network label.",
+            "",
+            "LABEL         Shows current label",
+            "LABEL name    Sets computer label to 'name'",
+            "LABEL clear   Removes the computer label",
+            "",
+            "The label is used for:",
+            " - Computer identification on networks",
+            " - Rednet communication",
+            " - Finding specific computers",
+            "",
+            "Changes take effect immediately."
+        }
     }
 }
 

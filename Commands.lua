@@ -331,24 +331,46 @@ end
 
 -- System information commands
 local function mem()
-    -- Get available memory from os.getComputerFreeSpace()
-    local freeSpace = os.getFreeSpace("/")
-    local totalSpace = 1000000  -- ComputerCraft typically has 1MB space
+    -- Get available memory from fs.getFreeSpace
+    local freeSpace = fs.getFreeSpace("/")
+    if not freeSpace then
+        gui.drawError("Could not get storage information")
+        return false
+    end
+    
+    local totalSpace = math.pow(2, 20)  -- ComputerCraft typically has 1MB space
     local usedSpace = totalSpace - freeSpace
     
     gui.drawInfo("Storage Information:")
-    gui.drawInfo(string.format("Total Space: %d bytes", totalSpace))
-    gui.drawInfo(string.format("Used Space: %d bytes", usedSpace))
-    gui.drawInfo(string.format("Free Space: %d bytes", freeSpace))
+    gui.drawInfo(string.format("Total Space: %.2f KB", totalSpace/1024))
+    gui.drawInfo(string.format("Used Space: %.2f KB", usedSpace/1024))
+    gui.drawInfo(string.format("Free Space: %.2f KB", freeSpace/1024))
     
-    -- Memory usage (if available)
-    if _G._HOST then
-        local memLimit = tonumber((_G._HOST):match("(%d+)")) or 0
+    return true
+end
+
+local function label(args)
+    if #args == 0 then
+        -- Display current label
+        local currentLabel = os.getComputerLabel()
+        if currentLabel then
+            gui.drawInfo("Current computer label: " .. currentLabel)
+        else
+            gui.drawInfo("Computer has no label")
+        end
         gui.drawInfo("")
-        gui.drawInfo("Memory Information:")
-        gui.drawInfo(string.format("Memory Limit: %d KB", memLimit))
+        gui.drawInfo("To set a new label, use: LABEL <new-name>")
+        gui.drawInfo("To remove the label, use: LABEL clear")
+    elseif args[1]:lower() == "clear" then
+        -- Clear the label
+        os.setComputerLabel(nil)
+        gui.drawSuccess("Computer label cleared")
+    else
+        -- Set new label
+        local newLabel = args[1]
+        os.setComputerLabel(newLabel)
+        gui.drawSuccess("Computer label set to: " .. newLabel)
     end
-    
     return true
 end
 
@@ -730,7 +752,8 @@ function commands.handleCommand(input)
         ps = ps,
         find = find,
         tail = tail,
-        history = history
+        history = history,
+        label = label
     }
     
     -- Run command
