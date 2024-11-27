@@ -1,5 +1,5 @@
 -- SCI Sentinel OS Installer
-local version = "1.1.0" -- Major version bump due to significant changes in file handling and startup management
+local version = "1.2.0" -- Major version bump due to significant changes in file handling and startup management
 
 -- Try to load the GUI module
 local gui = nil
