@@ -772,28 +772,50 @@ function commands.handleCommand(input)
                 debug("Debug mode enabled")
             end
 
-            debug("Drawing initial interface")
+            -- Get screen dimensions and setup UI
+            local w, h = term.getSize()
+            local isPocketPC = h <= 13
+            local minWidth = isPocketPC and 26 or 51
+            local minHeight = isPocketPC and 8 or 16
+
+            -- Draw confirmation screen
             term.clear()
             term.setCursorPos(1,1)
             
-            debug("Drawing confirmation")
-            term.setTextColor(colors.red)
-            print("WARNING: This will uninstall SCI Sentinel")
-            term.setTextColor(colors.white)
-            print("Type 'yes' to confirm:")
-            
-            debug("Waiting for input")
+            if isPocketPC then
+                gui.drawBox(1, 1, minWidth, minHeight, "[ Uninstall ]")
+                gui.drawCenteredText(3, "Remove SCIOS?", colors.red)
+                if debugMode then
+                    gui.drawCenteredText(4, "(Debug Mode)", colors.lime)
+                end
+                gui.drawCenteredText(6, "Type 'yes':", colors.white)
+            else
+                gui.drawBox(1, 1, minWidth, minHeight, "[ SCI Sentinel Uninstaller ]")
+                gui.drawCenteredText(3, "WARNING!", colors.red)
+                gui.drawCenteredText(5, "This will completely remove", colors.orange)
+                gui.drawCenteredText(6, "SCI Sentinel from your computer.", colors.orange)
+                if debugMode then
+                    gui.drawCenteredText(7, "(Debug Mode - No files will be modified)", colors.lime)
+                end
+                gui.drawCenteredText(9, "Type 'yes' to confirm:", colors.white)
+            end
+
+            term.setCursorPos(isPocketPC and 3 or 15, isPocketPC and 7 or 11)
             local input = read():lower()
             debug("Got input: " .. input)
             
             if input ~= "yes" then
                 debug("User cancelled")
-                print("Uninstall cancelled.")
+                if isPocketPC then
+                    gui.drawCenteredText(3, "Cancelled", colors.lime)
+                else
+                    gui.drawCenteredText(7, "Uninstall cancelled", colors.lime)
+                end
+                os.sleep(1)
                 return true
             end
 
             debug("User confirmed. Creating uninstall script")
-            print("Creating uninstall script...")
 
             -- Create the uninstall script
             local script = [[
@@ -829,8 +851,40 @@ local files = {
     "uninstall_debug.log"
 }
 
-for _, file in ipairs(files) do
+-- Draw uninstall progress screen
+term.clear()
+term.setCursorPos(1,1)
+local w, h = term.getSize()
+local isPocketPC = h <= 13
+local title = isPocketPC and "[ Removing ]" or "[ Removing SCI Sentinel ]"
+local width = isPocketPC and 26 or 51
+local height = isPocketPC and 8 or 16
+
+-- Draw box
+term.setBackgroundColor(colors.black)
+term.clear()
+term.setCursorPos(1,1)
+print(string.rep("-", width))
+print("|" .. string.rep(" ", math.floor((width - #title) / 2)) .. title .. string.rep(" ", width - #title - math.floor((width - #title) / 2) - 2) .. "|")
+print(string.rep("-", width))
+
+-- Remove files with progress
+for i, file in ipairs(files) do
+    local progress = i / (#files + 1)  -- +1 for directory removal
+    local barWidth = width - 4
+    local filled = math.floor(barWidth * progress)
+    
+    -- Update progress bar
+    term.setCursorPos(2, isPocketPC and 4 or 5)
+    term.write(string.rep("=", filled) .. string.rep("-", barWidth - filled))
+    
+    -- Show current file
+    term.setCursorPos(2, isPocketPC and 6 or 7)
+    term.write(string.sub(file, 1, width - 4))
+    term.write(string.rep(" ", width - #file - 4))
+    
     removeFile(file)
+    os.sleep(0.1)
 end
 
 -- Clean up SCIOS directory
@@ -852,21 +906,26 @@ if fs.exists("scios") then
         pcall(function() fs.delete(path) end)
     end
     
+    -- Update progress for directory removal
+    term.setCursorPos(2, isPocketPC and 6 or 7)
+    term.write("Removing SCIOS directory" .. string.rep(" ", width - 23))
     removeDir("scios")
 end
 
--- Create completion message
-local f = fs.open("uninstall_complete", "w")
-if f then
-    f.write("SCI Sentinel has been uninstalled.\n")
-    f.close()
-end
+-- Show completion message
+term.clear()
+term.setCursorPos(1,1)
+print(string.rep("-", width))
+print("|" .. string.rep(" ", math.floor((width - 16) / 2)) .. "[ Uninstalled! ]" .. string.rep(" ", width - 16 - math.floor((width - 16) / 2) - 2) .. "|")
+print(string.rep("-", width))
 
--- Clean up this script
-os.sleep(0.5)
 if fs.exists("uninstall.lua") then
     fs.delete("uninstall.lua")
 end
+
+-- Clean up and reboot
+os.sleep(1)
+os.reboot()
 ]]
 
             debug("Writing uninstall script")
@@ -899,15 +958,37 @@ end
             end
 
             debug("Setup complete")
-            print("Uninstall script created.")
-            print("The system will be uninstalled on next reboot.")
-            print("Would you like to reboot now? (yes/no)")
             
+            -- Show reboot prompt
+            if isPocketPC then
+                gui.drawBox(1, 1, minWidth, minHeight, "[ Ready ]")
+                gui.drawCenteredText(3, "Reboot now?", colors.yellow)
+                gui.drawCenteredText(5, "Type 'yes':", colors.white)
+            else
+                gui.drawBox(1, 1, minWidth, minHeight, "[ Ready to Uninstall ]")
+                gui.drawCenteredText(4, "Uninstaller is ready!", colors.lime)
+                gui.drawCenteredText(6, "System will be uninstalled on reboot.", colors.white)
+                gui.drawCenteredText(8, "Would you like to reboot now?", colors.yellow)
+                gui.drawCenteredText(9, "Type 'yes' to reboot:", colors.white)
+            end
+            
+            term.setCursorPos(isPocketPC and 3 or 15, isPocketPC and 7 or 11)
             local reboot = read():lower()
             if reboot == "yes" then
+                if isPocketPC then
+                    gui.drawCenteredText(3, "Rebooting...", colors.lime)
+                else
+                    gui.drawCenteredText(7, "Rebooting to complete uninstallation...", colors.lime)
+                end
+                os.sleep(1)
                 os.reboot()
             else
-                print("Please reboot your computer to complete the uninstallation.")
+                if isPocketPC then
+                    gui.drawCenteredText(3, "Reboot later", colors.lime)
+                else
+                    gui.drawCenteredText(7, "Please reboot to complete uninstallation", colors.lime)
+                end
+                os.sleep(1)
             end
 
             debug("Function completed successfully")
