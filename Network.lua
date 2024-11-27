@@ -5,13 +5,8 @@ local network = {}
 local gui = require("Gui")
 
 -- Network state
-local modems = {}
-local isRednetOpen = false
-local protocols = {
-    PING = "SCI_SENTINEL_PING",
-    DISCOVER = "SCI_SENTINEL_DISCOVER",
-    MESSAGE = "SCI_SENTINEL_MSG"
-}
+local modem = nil
+local isOpen = false
 
 -- Debug function
 local function debug(msg)
@@ -21,241 +16,93 @@ local function debug(msg)
 end
 
 -- Initialize network
-function network.initNetwork()
-    -- Clear existing modems
-    modems = {}
-    
-    -- Find all modems (wired and wireless)
-    local peripheralList = peripheral.getNames()
-    debug("Found peripherals: " .. textutils.serialize(peripheralList))
-    
-    for _, name in ipairs(peripheralList) do
-        local pType = peripheral.getType(name)
-        debug("Checking " .. name .. " (type: " .. pType .. ")")
-        
-        if pType == "modem" then
-            local modem = peripheral.wrap(name)
-            if modem then
-                modems[name] = modem
-                debug("Added modem: " .. name)
-                
-                -- Set wireless modem range to maximum
-                if modem.isWireless and modem.isWireless() then
-                    modem.setStrength(128)  -- Maximum range
-                    debug("Set wireless range for " .. name)
-                end
-                
-                -- Close the modem first to ensure clean state
-                if rednet.isOpen(name) then
-                    rednet.close(name)
-                    debug("Closed existing rednet on " .. name)
-                end
-            else
-                debug("Failed to wrap modem: " .. name)
-            end
-        end
-    end
-    
-    isRednetOpen = false
-    local modemCount = 0
-    for _ in pairs(modems) do modemCount = modemCount + 1 end
-    debug("Found " .. modemCount .. " modems")
-    
-    return modemCount > 0
-end
-
--- Open rednet on all modems
-function network.openNetwork()
-    if not network.initNetwork() then
-        gui.drawError("Error: No modems found")
+function network.init()
+    -- Try to find a wireless modem
+    local side = peripheral.find("modem")
+    if side then
+        modem = side
+        debug("Found modem")
+        return true
+    else
+        debug("No modem found")
         return false
     end
-    
-    local opened = false
-    for name, modem in pairs(modems) do
-        debug("Attempting to open rednet on " .. name)
-        if not rednet.isOpen(name) then
-            local success, err = pcall(function()
-                rednet.open(name)
-            end)
-            if success then
-                opened = true
-                debug("Successfully opened rednet on " .. name)
-                gui.drawInfo("Opened rednet on " .. name)
-            else
-                debug("Failed to open rednet on " .. name .. ": " .. tostring(err))
-                gui.drawError("Error opening rednet on " .. name)
-            end
-        else
-            debug(name .. " was already open")
-            opened = true
-        end
-    end
-    
-    isRednetOpen = opened
-    return opened
 end
 
--- Close rednet on all modems
-function network.closeNetwork()
-    local closed = false
-    for name, _ in pairs(modems) do
-        if rednet.isOpen(name) then
-            rednet.close(name)
-            debug("Closed rednet on " .. name)
-            gui.drawInfo("Closed rednet on " .. name)
-            closed = true
-        else
-            debug(name .. " was already closed")
+-- Open rednet on modem
+function network.openRednet()
+    if not modem then
+        if not network.init() then
+            return false
         end
     end
+
+    debug("Opening rednet...")
+    rednet.open(peripheral.getName(modem))
+    isOpen = true
+    debug("Rednet opened successfully")
+    return true
+end
+
+-- Close rednet on modem
+function network.closeRednet()
+    if modem then
+        debug("Closing rednet...")
+        rednet.close(peripheral.getName(modem))
+        isOpen = false
+        debug("Rednet closed")
+        return true
+    end
+    return false
+end
+
+-- Get network status string
+function network.getStatus()
+    local status = {}
     
-    isRednetOpen = false
-    return closed
+    -- Check modem
+    if modem then
+        table.insert(status, "Modem: Connected")
+        table.insert(status, "Side: " .. peripheral.getName(modem))
+    else
+        table.insert(status, "Modem: Not Found")
+    end
+    
+    -- Check rednet state
+    table.insert(status, "Rednet: " .. (isOpen and "Open" or "Closed"))
+    
+    return table.concat(status, "\n")
 end
 
 -- Scan for nearby computers
-function network.scanNetwork()
-    if not network.openNetwork() then
-        return nil, "No modems available"
+function network.scan()
+    if not isOpen then
+        if not network.openRednet() then
+            return nil, "No modems available"
+        end
     end
     
     local computers = {}
+    rednet.broadcast("DISCOVER", "SCI_SENTINEL")
     
-    -- Broadcast discovery request
-    rednet.broadcast({
-        id = os.getComputerID(),
-        label = os.getComputerLabel() or "Unknown"
-    }, protocols.DISCOVER)
-    
-    -- Wait for responses (with timeout)
     local timeout = os.startTimer(2)
     while true do
-        local event, id, message, protocol = os.pullEvent()
-        if event == "timer" and id == timeout then
+        local event, p1, p2, p3 = os.pullEvent()
+        if event == "timer" and p1 == timeout then
             break
-        elseif event == "rednet_message" and protocol == protocols.DISCOVER then
-            if type(message) == "table" then
-                computers[id] = {
-                    id = id,
-                    label = message.label or ("Computer " .. id),
-                    distance = message.distance or "unknown"
+        elseif event == "rednet_message" then
+            local senderId, message, protocol = p1, p2, p3
+            if protocol == "SCI_SENTINEL" and message == "DISCOVER_RESPONSE" then
+                computers[senderId] = {
+                    id = senderId,
+                    label = os.getComputerLabel(),
+                    distance = "Unknown"
                 }
             end
         end
     end
     
     return computers
-end
-
--- Ping a specific computer
-function network.pingComputer(targetId)
-    if not network.openNetwork() then
-        return nil, "No modems available"
-    end
-    
-    local startTime = os.epoch("local")
-    rednet.send(targetId, "", protocols.PING)
-    
-    -- Wait for response with timeout
-    local timeout = os.startTimer(2)
-    while true do
-        local event, id, message, protocol = os.pullEvent()
-        if event == "timer" and id == timeout then
-            return nil, "Timeout"
-        elseif event == "rednet_message" and id == targetId and protocol == protocols.PING then
-            local endTime = os.epoch("local")
-            return endTime - startTime
-        end
-    end
-end
-
--- Send a message to a specific computer
-function network.sendMessageToComputer(targetId, message)
-    if not network.openNetwork() then
-        return false, "No modems available"
-    end
-    
-    rednet.send(targetId, message, protocols.MESSAGE)
-    return true
-end
-
--- Listen for incoming messages
-function network.listenForMessages(callback)
-    if not network.openNetwork() then
-        return false, "No modems available"
-    end
-    
-    while true do
-        local event, senderId, message, protocol = os.pullEvent("rednet_message")
-        
-        if protocol == protocols.PING then
-            -- Auto-respond to pings
-            rednet.send(senderId, "", protocols.PING)
-        elseif protocol == protocols.DISCOVER then
-            -- Auto-respond to discovery
-            rednet.send(senderId, {
-                id = os.getComputerID(),
-                label = os.getComputerLabel() or "Unknown",
-                distance = "unknown"  -- Could be calculated with wireless modems
-            }, protocols.DISCOVER)
-        elseif protocol == protocols.MESSAGE then
-            -- Handle regular messages
-            if callback then
-                callback(senderId, message, protocol)
-            end
-        end
-    end
-end
-
--- Get list of connected modems
-function network.getConnectedModems()
-    local modemList = {}
-    debug("Getting modem list...")
-    
-    for name, modem in pairs(modems) do
-        local isOpen = rednet.isOpen(name)
-        local isWireless = modem.isWireless and modem.isWireless() or false
-        
-        debug(string.format("Found %s modem on %s (open: %s)", 
-            isWireless and "wireless" or "wired",
-            name,
-            isOpen and "yes" or "no"))
-            
-        table.insert(modemList, {
-            name = name,
-            side = name,  -- The name is usually the side
-            isWireless = isWireless,
-            isOpen = isOpen
-        })
-    end
-    
-    return modemList
-end
-
--- Get network status string
-function network.getNetworkStatus()
-    local status = {}
-    table.insert(status, "=== Network Status ===")
-    table.insert(status, string.format("Computer ID: %d", os.getComputerID()))
-    table.insert(status, string.format("Label: %s", os.getComputerLabel() or "None"))
-    table.insert(status, "")
-    table.insert(status, "Connected Modems:")
-    
-    local modems = network.getConnectedModems()
-    if #modems == 0 then
-        table.insert(status, "  No modems found")
-    else
-        for _, modem in ipairs(modems) do
-            local statusStr = modem.isOpen and "OPEN" or "CLOSED"
-            local typeStr = modem.isWireless and "Wireless" or "Wired"
-            table.insert(status, string.format("  %s modem on %s: %s", 
-                typeStr, modem.side, statusStr))
-        end
-    end
-    table.insert(status, "===================")
-    
-    return table.concat(status, "\n")
 end
 
 return network

@@ -263,7 +263,7 @@ local function net(args)
         network.init()
         
         -- Show network status
-        print(network.getStatus())
+        gui.drawInfo(network.getStatus())
         return true
         
     elseif cmd == "scan" then
@@ -955,4 +955,8 @@ function commands.handleCommand(input)
 end
 
 -- Return the Commands module
-return commands
+return {
+    handleCommand = commands.handleCommand,
+    saveState = commands.saveState,
+    restoreState = commands.restoreState
+}
