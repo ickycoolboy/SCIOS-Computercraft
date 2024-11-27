@@ -186,4 +186,41 @@ function gui.drawCenteredText(y, text, textColor)
     term.setTextColor(colors.white)
 end
 
+-- Draw an animated progress bar
+function gui.drawAnimatedProgressBar(x, y, width, text, startProgress, endProgress, duration)
+    local startTime = os.epoch("utc")
+    local currentProgress = startProgress
+    
+    while currentProgress < endProgress do
+        -- Calculate progress based on time
+        local elapsed = (os.epoch("utc") - startTime) / 1000.0 -- Convert to seconds
+        currentProgress = startProgress + (endProgress - startProgress) * (elapsed / duration)
+        if currentProgress > endProgress then
+            currentProgress = endProgress
+        end
+        
+        -- Draw the progress bar
+        term.setCursorPos(x, y)
+        term.setTextColor(colors.white)
+        write(text .. " [")
+        term.setTextColor(colors.lime)
+        
+        local barWidth = width - #text - 3
+        local filled = math.floor(barWidth * currentProgress)
+        write(string.rep("=", filled))
+        term.setTextColor(colors.gray)
+        write(string.rep("-", barWidth - filled))
+        term.setTextColor(colors.white)
+        write("]")
+        
+        -- Add percentage display
+        local percent = math.floor(currentProgress * 100)
+        term.setCursorPos(x + width + 1, y)
+        write(string.format(" %3d%%", percent))
+        
+        -- Small delay for animation
+        os.sleep(0.05)
+    end
+end
+
 return gui

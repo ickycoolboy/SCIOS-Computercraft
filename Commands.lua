@@ -303,6 +303,13 @@ function commands.handleCommand(input)
             return true
         end,
         uninstall = function(args)
+            -- Check for debug mode
+            local debugMode = false
+            if args[1] == "-debug" then
+                debugMode = true
+                gui.drawInfo("Running in DEBUG mode - No files will be modified")
+            end
+            
             -- Clear screen and draw main interface
             term.clear()
             term.setCursorPos(1,1)
@@ -314,6 +321,9 @@ function commands.handleCommand(input)
             gui.drawCenteredText(4, "WARNING!", colors.red)
             gui.drawCenteredText(6, "This will completely remove", colors.orange)
             gui.drawCenteredText(7, "SCI Sentinel from your computer.", colors.orange)
+            if debugMode then
+                gui.drawCenteredText(8, "(Debug Mode - No files will be modified)", colors.lime)
+            end
             gui.drawCenteredText(9, "Are you sure you want to proceed?", colors.white)
             
             -- Draw buttons
@@ -334,18 +344,31 @@ function commands.handleCommand(input)
             term.setCursorPos(1,1)
             gui.drawBox(1, 1, 51, 16, "[ Uninstalling SCI Sentinel ]")
             
+            -- Function to simulate or perform actual file operations
+            local function performOperation(operation, debugMode)
+                if debugMode then
+                    os.sleep(0.5) -- Simulate operation time
+                    return true
+                else
+                    return operation()
+                end
+            end
+            
             -- First, disable startup.lua
-            if fs.exists("startup.lua") then
-                gui.drawFancyProgressBar(3, 4, 47, "Disabling startup file", 0.25)
-                local success = pcall(function()
+            if fs.exists("startup.lua") or debugMode then
+                gui.drawAnimatedProgressBar(3, 4, 45, "Disabling startup file", 0, 0.25, 1.0)
+                
+                local success = performOperation(function()
                     local file = fs.open("startup.lua", "w")
                     if file then
                         file.write("-- SCI Sentinel has been uninstalled.\n")
                         file.write("-- This file will be removed on next boot.\n")
                         file.write("shell.run('delete startup.lua')\n")
                         file.close()
+                        return true
                     end
-                end)
+                    return false
+                end, debugMode)
                 
                 if success then
                     gui.drawCenteredText(6, "Startup file disabled successfully", colors.lime)
@@ -357,15 +380,15 @@ function commands.handleCommand(input)
             
             -- Remove all other files
             local function deleteFile(path)
-                if fs.exists(path) then
-                    local success = pcall(function()
+                if fs.exists(path) or debugMode then
+                    return performOperation(function()
                         if fs.isDir(path) then
                             fs.delete(path)
                         else
                             fs.delete(path)
                         end
-                    end)
-                    return success and not fs.exists(path)
+                        return not fs.exists(path)
+                    end, debugMode)
                 end
                 return true
             end
@@ -381,35 +404,40 @@ function commands.handleCommand(input)
                 "scios/file_hashes.db"
             }
             
-            -- Remove files with progress
-            gui.drawFancyProgressBar(3, 8, 47, "Removing SCI files", 0.50)
+            -- Remove files with animated progress
+            gui.drawAnimatedProgressBar(3, 8, 45, "Removing SCI files", 0.25, 0.75, 2.0)
             for _, file in ipairs(files_to_remove) do
                 deleteFile(file)
             end
             
             -- Clean up SCIOS directory
-            gui.drawFancyProgressBar(3, 10, 47, "Cleaning up", 0.75)
-            if fs.exists("scios") then
-                pcall(function()
+            gui.drawAnimatedProgressBar(3, 10, 45, "Cleaning up", 0.75, 1.0, 1.0)
+            if fs.exists("scios") or debugMode then
+                performOperation(function()
                     for _, file in ipairs(fs.list("scios")) do
                         local path = fs.combine("scios", file)
                         deleteFile(path)
                     end
                     fs.delete("scios")
-                end)
+                    return true
+                end, debugMode)
             end
-            
-            gui.drawFancyProgressBar(3, 10, 47, "Uninstall Complete!", 1.0)
-            os.sleep(1)
             
             -- Show completion screen
             term.clear()
             term.setCursorPos(1,1)
             gui.drawBox(1, 1, 51, 16, "[ Uninstall Complete ]")
             
-            gui.drawCenteredText(4, "SCI Sentinel has been uninstalled!", colors.lime)
-            gui.drawCenteredText(6, "The startup file will be removed", colors.white)
-            gui.drawCenteredText(7, "when you reboot the computer.", colors.white)
+            if debugMode then
+                gui.drawCenteredText(4, "Debug Mode: Uninstall Simulation Complete", colors.lime)
+                gui.drawCenteredText(6, "No files were modified", colors.white)
+                gui.drawCenteredText(7, "Run without -debug to perform actual uninstall", colors.white)
+            else
+                gui.drawCenteredText(4, "SCI Sentinel has been uninstalled!", colors.lime)
+                gui.drawCenteredText(6, "The startup file will be removed", colors.white)
+                gui.drawCenteredText(7, "when you reboot the computer.", colors.white)
+            end
+            
             gui.drawCenteredText(9, "Would you like to reboot now?", colors.yellow)
             
             -- Draw reboot buttons
@@ -420,7 +448,7 @@ function commands.handleCommand(input)
             
             -- Handle reboot choice
             choice = gui.handleButtons(buttons)
-            if choice == "Reboot" then
+            if choice == "Reboot" and not debugMode then
                 term.clear()
                 term.setCursorPos(1,1)
                 gui.drawCenteredText(8, "Rebooting...", colors.yellow)
