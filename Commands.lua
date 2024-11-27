@@ -165,51 +165,40 @@ function commands.executeCommand(command, gui)
         gui.drawSuccess("  reinstall     - Reinstall SCI Sentinel")
         gui.drawSuccess("  uninstall     - Uninstall SCI Sentinel")
     elseif cmd == "uninstall" then
-        -- Draw uninstaller interface
+        -- Clear screen and draw main interface
         term.clear()
         term.setCursorPos(1,1)
         
-        -- Draw header
-        gui.drawBox(1, 1, 51, 3)
-        term.setCursorPos(3, 2)
-        term.setTextColor(colors.red)
-        term.write("SCI Sentinel Uninstaller")
-        term.setTextColor(colors.white)
-
-        -- Initial warning
-        gui.drawBox(3, 5, 49, 9)
-        term.setCursorPos(5, 6)
-        term.setTextColor(colors.orange)
-        term.write("WARNING: This will completely remove")
-        term.setCursorPos(5, 7)
-        term.write("SCI Sentinel from your computer.")
-        term.setCursorPos(5, 8)
-        term.write("Are you sure you want to proceed?")
-        term.setTextColor(colors.white)
-
-        -- Draw buttons
-        gui.drawButton(10, 11, "Yes", colors.red)
-        gui.drawButton(30, 11, "No", colors.lime)
+        -- Draw main box
+        gui.drawBox(1, 1, 51, 16, "[ SCI Sentinel Uninstaller ]")
         
-        -- Wait for user input
-        local event, button = gui.handleButtons()
-        if button ~= "Yes" then
+        -- Draw warning
+        gui.drawCenteredText(4, "WARNING!", colors.red)
+        gui.drawCenteredText(6, "This will completely remove", colors.orange)
+        gui.drawCenteredText(7, "SCI Sentinel from your computer.", colors.orange)
+        gui.drawCenteredText(9, "Are you sure you want to proceed?", colors.white)
+        
+        -- Draw buttons
+        local buttons = {
+            gui.drawButton(15, 12, "Uninstall", colors.red),
+            gui.drawButton(30, 12, "Cancel", colors.lime)
+        }
+        
+        -- Handle button click
+        local choice = gui.handleButtons(buttons)
+        if choice ~= "Uninstall" then
             gui.drawSuccess("Uninstall cancelled")
             return true
         end
-
-        -- Show progress interface
+        
+        -- Draw uninstall progress interface
         term.clear()
         term.setCursorPos(1,1)
-        gui.drawBox(1, 1, 51, 3)
-        term.setCursorPos(3, 2)
-        term.setTextColor(colors.red)
-        term.write("Uninstalling SCI Sentinel...")
-        term.setTextColor(colors.white)
-
-        -- First, disable startup.lua to prevent reboot into SCI
+        gui.drawBox(1, 1, 51, 16, "[ Uninstalling SCI Sentinel ]")
+        
+        -- First, disable startup.lua
         if fs.exists("startup.lua") then
-            gui.drawProgressBar(3, 5, 45, "Disabling startup file...", 0.2)
+            gui.drawFancyProgressBar(3, 4, 47, "Disabling startup file", 0.25)
             local success = pcall(function()
                 local file = fs.open("startup.lua", "w")
                 if file then
@@ -219,14 +208,15 @@ function commands.executeCommand(command, gui)
                     file.close()
                 end
             end)
+            
             if success then
-                gui.drawProgressBar(3, 5, 45, "Startup file disabled", 0.4)
+                gui.drawCenteredText(6, "Startup file disabled successfully", colors.lime)
             else
-                gui.drawError("Could not disable startup file")
+                gui.drawCenteredText(6, "Failed to disable startup file", colors.red)
                 os.sleep(2)
             end
         end
-
+        
         -- Remove all other files
         local function deleteFile(path)
             if fs.exists(path) then
@@ -241,7 +231,7 @@ function commands.executeCommand(command, gui)
             end
             return true
         end
-
+        
         -- List of files to remove
         local files_to_remove = {
             "scios/Sci_sentinel.lua",
@@ -252,50 +242,51 @@ function commands.executeCommand(command, gui)
             "scios/filetracker.db",
             "scios/file_hashes.db"
         }
-
-        -- Remove files with progress bar
-        gui.drawProgressBar(3, 5, 45, "Removing SCI files...", 0.6)
+        
+        -- Remove files with progress
+        gui.drawFancyProgressBar(3, 8, 47, "Removing SCI files", 0.50)
         for _, file in ipairs(files_to_remove) do
             deleteFile(file)
         end
-
-        -- Try to remove the scios directory
-        gui.drawProgressBar(3, 5, 45, "Cleaning up...", 0.8)
+        
+        -- Clean up SCIOS directory
+        gui.drawFancyProgressBar(3, 10, 47, "Cleaning up", 0.75)
         if fs.exists("scios") then
-            pcall(function() 
+            pcall(function()
                 for _, file in ipairs(fs.list("scios")) do
                     local path = fs.combine("scios", file)
                     deleteFile(path)
                 end
-                fs.delete("scios") 
+                fs.delete("scios")
             end)
         end
-
-        gui.drawProgressBar(3, 5, 45, "Uninstall complete!", 1.0)
+        
+        gui.drawFancyProgressBar(3, 10, 47, "Uninstall Complete!", 1.0)
         os.sleep(1)
-
-        -- Final screen
+        
+        -- Show completion screen
         term.clear()
         term.setCursorPos(1,1)
-        gui.drawBox(1, 1, 51, 3)
-        term.setCursorPos(3, 2)
-        term.setTextColor(colors.lime)
-        term.write("SCI Sentinel Uninstalled Successfully!")
-        term.setTextColor(colors.white)
-
-        gui.drawBox(3, 5, 49, 9)
-        term.setCursorPos(5, 6)
-        term.write("The startup file will be removed on next boot.")
-        term.setCursorPos(5, 8)
-        term.write("Would you like to reboot now?")
-
-        -- Draw reboot buttons
-        gui.drawButton(10, 11, "Yes", colors.lime)
-        gui.drawButton(30, 11, "No", colors.red)
+        gui.drawBox(1, 1, 51, 16, "[ Uninstall Complete ]")
         
-        -- Wait for user input
-        local event, button = gui.handleButtons()
-        if button == "Yes" then
+        gui.drawCenteredText(4, "SCI Sentinel has been uninstalled!", colors.lime)
+        gui.drawCenteredText(6, "The startup file will be removed", colors.white)
+        gui.drawCenteredText(7, "when you reboot the computer.", colors.white)
+        gui.drawCenteredText(9, "Would you like to reboot now?", colors.yellow)
+        
+        -- Draw reboot buttons
+        buttons = {
+            gui.drawButton(15, 12, "Reboot", colors.lime),
+            gui.drawButton(30, 12, "Later", colors.red)
+        }
+        
+        -- Handle reboot choice
+        choice = gui.handleButtons(buttons)
+        if choice == "Reboot" then
+            term.clear()
+            term.setCursorPos(1,1)
+            gui.drawCenteredText(8, "Rebooting...", colors.yellow)
+            os.sleep(1)
             os.reboot()
         end
         

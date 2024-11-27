@@ -102,4 +102,88 @@ function gui.messageBox(title, message)
     gui.drawScreen()
 end
 
+-- Draw a box with borders
+function gui.drawBox(x, y, width, height, title)
+    -- Draw top border
+    term.setCursorPos(x, y)
+    write("+" .. string.rep("-", width-2) .. "+")
+    
+    -- Draw sides
+    for i = 1, height-2 do
+        term.setCursorPos(x, y+i)
+        write("|" .. string.rep(" ", width-2) .. "|")
+    end
+    
+    -- Draw bottom border
+    term.setCursorPos(x, y+height-1)
+    write("+" .. string.rep("-", width-2) .. "+")
+    
+    -- Draw title if provided
+    if title then
+        term.setCursorPos(x + math.floor((width - #title) / 2), y)
+        write(title)
+    end
+end
+
+-- Draw a button
+function gui.drawButton(x, y, text, buttonColor)
+    local oldBg = term.getBackgroundColor()
+    local oldFg = term.getTextColor()
+    
+    term.setCursorPos(x, y)
+    term.setBackgroundColor(buttonColor or colors.blue)
+    term.setTextColor(colors.white)
+    write(" " .. text .. " ")
+    
+    term.setBackgroundColor(oldBg)
+    term.setTextColor(oldFg)
+    
+    return {
+        x = x,
+        y = y,
+        width = #text + 2,
+        text = text
+    }
+end
+
+-- Handle button clicks
+function gui.handleButtons(buttons)
+    while true do
+        local event, button, x, y = os.pullEvent("mouse_click")
+        for _, btn in ipairs(buttons) do
+            if y == btn.y and x >= btn.x and x < btn.x + btn.width then
+                return btn.text
+            end
+        end
+    end
+end
+
+-- Draw a fancy progress bar
+function gui.drawFancyProgressBar(x, y, width, text, progress)
+    local barWidth = width - #text - 3
+    local filled = math.floor(barWidth * progress)
+    
+    term.setCursorPos(x, y)
+    term.setTextColor(colors.white)
+    write(text .. " [")
+    term.setTextColor(colors.lime)
+    write(string.rep("=", filled))
+    term.setTextColor(colors.gray)
+    write(string.rep("-", barWidth - filled))
+    term.setTextColor(colors.white)
+    write("]")
+end
+
+-- Draw a centered text line
+function gui.drawCenteredText(y, text, textColor)
+    local w, _ = term.getSize()
+    local x = math.floor((w - #text) / 2) + 1
+    term.setCursorPos(x, y)
+    if textColor then
+        term.setTextColor(textColor)
+    end
+    write(text)
+    term.setTextColor(colors.white)
+end
+
 return gui
