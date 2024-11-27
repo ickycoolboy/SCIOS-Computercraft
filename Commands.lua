@@ -779,11 +779,11 @@ function commands.handleCommand(input)
                     fs.delete("uninstall_debug.log")
                 end
 
-                debug("Checking debug mode")
+                logMessage("Checking debug mode")
                 local debugMode = false
                 if args[1] == "-debug" then
                     debugMode = true
-                    debug("Debug mode enabled")
+                    logMessage("Debug mode enabled")
                 end
 
                 -- Get screen dimensions and setup UI

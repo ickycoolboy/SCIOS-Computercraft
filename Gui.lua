@@ -226,52 +226,79 @@ function gui.drawBox(x, y, width, height, title)
     }
 end
 
--- Draw a button
-function gui.drawButton(x, y, text, buttonColor)
-    local oldBg = term.getBackgroundColor()
-    local oldFg = term.getTextColor()
+-- Windows 9x style colors
+gui.colors = {
+    background = colors.blue,
+    windowBg = colors.lightGray,
+    text = colors.white,
+    border = colors.white,
+    shadow = colors.black,
+    buttonBg = colors.lightGray,
+    buttonText = colors.black,
+    titleBar = colors.blue,
+    titleText = colors.white,
+    progressBar = colors.lime,
+    progressBg = colors.gray
+}
+
+-- Draw a clickable button and return its bounds
+function gui.drawClickableButton(x, y, text, buttonColor)
+    local width = #text + 4  -- Fixed width based on text length plus padding
+    local height = 1
     
+    -- Button background
+    term.setBackgroundColor(buttonColor or gui.colors.buttonBg)
     term.setCursorPos(x, y)
-    term.setBackgroundColor(buttonColor or colors.blue)
-    term.setTextColor(colors.white)
-    write(" " .. text .. " ")
+    write(string.rep(" ", width))
     
-    term.setBackgroundColor(oldBg)
-    term.setTextColor(oldFg)
+    -- Button text
+    term.setTextColor(colors.white)  -- White text for better contrast
+    term.setCursorPos(x + 2, y)  -- Fixed padding of 2 spaces
+    write(text)
     
+    -- Return button bounds for click detection
     return {
-        x = x,
-        y = y,
-        width = #text + 2,
-        text = text
+        x1 = x,
+        y1 = y,
+        x2 = x + width - 1,
+        y2 = y + height - 1,
+        text = text,
+        width = width,
+        height = height,
+        color = buttonColor or gui.colors.buttonBg
     }
 end
 
--- Handle button clicks
-function gui.handleButtons(buttons)
+-- Handle mouse events for buttons
+function gui.handleMouseEvents(buttons)
     while true do
-        local event, param1, x, y = os.pullEvent()
+        local event, button, x, y = os.pullEvent()
         
         if event == "mouse_click" then
-            -- Handle mouse clicks
+            -- Check each button
             for _, btn in ipairs(buttons) do
-                if y == btn.y and x >= btn.x and x < btn.x + btn.width then
-                    return btn.text
-                end
-            end
-        elseif event == "key" then
-            -- Handle keyboard input
-            if param1 == keys.y then
-                for _, btn in ipairs(buttons) do
-                    if btn.text == "Yes" then
+                if x >= btn.x1 and x <= btn.x2 and
+                   y >= btn.y1 and y <= btn.y2 then
+                    -- Highlight the clicked button
+                    local oldBg = term.getBackgroundColor()
+                    term.setBackgroundColor(btn.color)
+                    term.setCursorPos(btn.x1, btn.y1)
+                    term.setTextColor(colors.white)
+                    write(string.rep(" ", btn.width))
+                    term.setCursorPos(btn.x1 + 2, btn.y1)
+                    write(btn.text)
+                    term.setBackgroundColor(oldBg)
+                    
+                    -- Wait for mouse up
+                    event, _, x, y = os.pullEvent("mouse_up")
+                    -- Check if still over button
+                    if x >= btn.x1 and x <= btn.x2 and
+                       y >= btn.y1 and y <= btn.y2 then
+                        -- Button was released while mouse was still over it
                         return btn.text
                     end
-                end
-            elseif param1 == keys.n then
-                for _, btn in ipairs(buttons) do
-                    if btn.text == "No" then
-                        return btn.text
-                    end
+                    -- Redraw button in normal state
+                    gui.drawClickableButton(btn.x1, btn.y1, btn.text, btn.color)
                 end
             end
         end
@@ -387,59 +414,6 @@ function gui.drawFancyBox(x, y, width, height, title, bgColor, fgColor)
     term.setTextColor(oldFg)
 end
 
--- Draw a clickable button with hover effect
-function gui.drawClickableButton(x, y, text, bgColor, hoverColor)
-    local width = #text + 2
-    local buttonData = {
-        x = x,
-        y = y,
-        width = width,
-        height = 1,
-        text = text,
-        bgColor = bgColor or colors.blue,
-        hoverColor = hoverColor or colors.lightBlue,
-        clicked = false
-    }
-    
-    -- Draw initial button
-    gui.drawButton(x, y, text, buttonData.bgColor)
-    
-    return buttonData
-end
-
--- Handle mouse events for buttons
-function gui.handleMouseEvents(buttons)
-    while true do
-        local event, button, x, y = os.pullEvent()
-        
-        if event == "mouse_click" or event == "mouse_drag" then
-            -- Check each button
-            for _, btn in ipairs(buttons) do
-                if x >= btn.x and x < btn.x + btn.width and
-                   y == btn.y then
-                    -- Button clicked
-                    gui.drawButton(btn.x, btn.y, btn.text, btn.hoverColor)
-                    btn.clicked = true
-                end
-            end
-        elseif event == "mouse_up" then
-            -- Check for clicked buttons
-            for _, btn in ipairs(buttons) do
-                if btn.clicked then
-                    -- Reset button appearance
-                    gui.drawButton(btn.x, btn.y, btn.text, btn.bgColor)
-                    if x >= btn.x and x < btn.x + btn.width and
-                       y == btn.y then
-                        -- Button was released while mouse was still over it
-                        return btn.text
-                    end
-                    btn.clicked = false
-                end
-            end
-        end
-    end
-end
-
 -- Draw a section header
 function gui.drawHeader(x, y, text, color)
     term.setCursorPos(x, y)
@@ -447,21 +421,6 @@ function gui.drawHeader(x, y, text, color)
     write("[ " .. text .. " ]")
     term.setTextColor(colors.white)
 end
-
--- Windows 9x style colors
-gui.colors = {
-    background = colors.blue,
-    windowBg = colors.lightGray,
-    text = colors.white,
-    border = colors.white,
-    shadow = colors.black,
-    buttonBg = colors.lightGray,
-    buttonText = colors.black,
-    titleBar = colors.blue,
-    titleText = colors.white,
-    progressBar = colors.lime,
-    progressBg = colors.gray
-}
 
 -- Draw a Windows 9x style window
 function gui.drawWindow(x, y, width, height, title)
@@ -498,71 +457,6 @@ function gui.drawWindow(x, y, width, height, title)
     write(" " .. title .. " ")
     
     -- Reset colors
-    term.setBackgroundColor(oldBg)
-    term.setTextColor(oldFg)
-end
-
--- Draw a Windows 9x style button
-function gui.drawButton(x, y, width, text, active)
-    local oldBg = term.getBackgroundColor()
-    local oldFg = term.getTextColor()
-    
-    -- Button background
-    term.setBackgroundColor(gui.colors.buttonBg)
-    term.setCursorPos(x, y)
-    write(string.rep(" ", width))
-    
-    -- Button text
-    term.setTextColor(gui.colors.buttonText)
-    term.setCursorPos(x + math.floor((width - #text) / 2), y)
-    write(text)
-    
-    -- Button border
-    if active then
-        term.setTextColor(colors.black)
-        term.setCursorPos(x, y)
-        write("▄")
-        term.setCursorPos(x + width - 1, y)
-        write("▄")
-    end
-    
-    term.setBackgroundColor(oldBg)
-    term.setTextColor(oldFg)
-end
-
--- Draw a Windows 9x style progress bar with animation
-function gui.drawAnimatedProgressBar(x, y, width, text, progress)
-    local oldBg = term.getBackgroundColor()
-    local oldFg = term.getTextColor()
-    
-    -- Progress bar background
-    term.setBackgroundColor(gui.colors.progressBg)
-    term.setCursorPos(x, y)
-    write(string.rep(" ", width))
-    
-    -- Progress fill
-    local fillWidth = math.floor(progress * width)
-    if fillWidth > 0 then
-        term.setBackgroundColor(gui.colors.progressBar)
-        term.setCursorPos(x, y)
-        write(string.rep(" ", fillWidth))
-    end
-    
-    -- Progress text
-    if text then
-        term.setCursorPos(x, y - 1)
-        term.setBackgroundColor(gui.colors.windowBg)
-        term.setTextColor(gui.colors.text)
-        write(text)
-    end
-    
-    -- Percentage
-    local percent = math.floor(progress * 100)
-    term.setCursorPos(x + width + 1, y)
-    term.setBackgroundColor(gui.colors.windowBg)
-    term.setTextColor(gui.colors.text)
-    write(percent .. "%")
-    
     term.setBackgroundColor(oldBg)
     term.setTextColor(oldFg)
 end
