@@ -249,6 +249,31 @@ end
 
 -- Handle button clicks
 function gui.handleButtons(buttons)
+    -- Check if mouse is available
+    if not term.isColor() then
+        -- No mouse support, fall back to keyboard input
+        term.setTextColor(colors.yellow)
+        write("\nPress 'y' for Yes or 'n' for No: ")
+        term.setTextColor(colors.white)
+        while true do
+            local event, key = os.pullEvent("char")
+            if key:lower() == "y" then
+                for _, btn in ipairs(buttons) do
+                    if btn.text == "Yes" then
+                        return btn.text
+                    end
+                end
+            elseif key:lower() == "n" then
+                for _, btn in ipairs(buttons) do
+                    if btn.text == "No" then
+                        return btn.text
+                    end
+                end
+            end
+        end
+    end
+
+    -- Mouse is available, use click handling
     while true do
         local event, button, x, y = os.pullEvent("mouse_click")
         for _, btn in ipairs(buttons) do
