@@ -264,4 +264,109 @@ function gui.drawAnimatedProgressBar(x, y, width, text, startProgress, endProgre
     end
 end
 
+-- Draw a fancy border box with title
+function gui.drawFancyBox(x, y, width, height, title, bgColor, fgColor)
+    bgColor = bgColor or colors.black
+    fgColor = fgColor or colors.white
+    
+    -- Save current colors
+    local oldBg = term.getBackgroundColor()
+    local oldFg = term.getTextColor()
+    
+    -- Set colors
+    term.setBackgroundColor(bgColor)
+    term.setTextColor(fgColor)
+    
+    -- Draw top border with title
+    term.setCursorPos(x, y)
+    write("╔" .. string.rep("═", width-2) .. "╗")
+    if title then
+        term.setCursorPos(x + math.floor((width - #title) / 2) - 1, y)
+        term.setTextColor(colors.yellow)
+        write(" " .. title .. " ")
+        term.setTextColor(fgColor)
+    end
+    
+    -- Draw sides
+    for i = 1, height-2 do
+        term.setCursorPos(x, y + i)
+        write("║")
+        term.setCursorPos(x + width-1, y + i)
+        write("║")
+        -- Fill background
+        term.setCursorPos(x + 1, y + i)
+        term.setBackgroundColor(bgColor)
+        write(string.rep(" ", width-2))
+    end
+    
+    -- Draw bottom border
+    term.setCursorPos(x, y + height-1)
+    write("╚" .. string.rep("═", width-2) .. "╝")
+    
+    -- Restore colors
+    term.setBackgroundColor(oldBg)
+    term.setTextColor(oldFg)
+end
+
+-- Draw a clickable button with hover effect
+function gui.drawClickableButton(x, y, text, bgColor, hoverColor)
+    local width = #text + 2
+    local buttonData = {
+        x = x,
+        y = y,
+        width = width,
+        height = 1,
+        text = text,
+        bgColor = bgColor or colors.blue,
+        hoverColor = hoverColor or colors.lightBlue,
+        clicked = false
+    }
+    
+    -- Draw initial button
+    gui.drawButton(x, y, text, buttonData.bgColor)
+    
+    return buttonData
+end
+
+-- Handle mouse events for buttons
+function gui.handleMouseEvents(buttons)
+    while true do
+        local event, button, x, y = os.pullEvent()
+        
+        if event == "mouse_click" or event == "mouse_drag" then
+            -- Check each button
+            for _, btn in ipairs(buttons) do
+                if x >= btn.x and x < btn.x + btn.width and
+                   y == btn.y then
+                    -- Button clicked
+                    gui.drawButton(btn.x, btn.y, btn.text, btn.hoverColor)
+                    btn.clicked = true
+                end
+            end
+        elseif event == "mouse_up" then
+            -- Check for clicked buttons
+            for _, btn in ipairs(buttons) do
+                if btn.clicked then
+                    -- Reset button appearance
+                    gui.drawButton(btn.x, btn.y, btn.text, btn.bgColor)
+                    if x >= btn.x and x < btn.x + btn.width and
+                       y == btn.y then
+                        -- Button was released while mouse was still over it
+                        return btn.text
+                    end
+                    btn.clicked = false
+                end
+            end
+        end
+    end
+end
+
+-- Draw a section header
+function gui.drawHeader(x, y, text, color)
+    term.setCursorPos(x, y)
+    term.setTextColor(color or colors.yellow)
+    write("[ " .. text .. " ]")
+    term.setTextColor(colors.white)
+end
+
 return gui
