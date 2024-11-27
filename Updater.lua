@@ -2,7 +2,7 @@
 local version = "1.0.2"
 
 -- Load required modules
-local gui = require("Gui")
+-- local gui = require("Gui")
 
 local updater = {}
 
@@ -49,6 +49,14 @@ updater.settings = {
     last_check = 0
 }
 
+function updater.init(guiInstance)
+    if not guiInstance then
+        error("GUI instance required")
+    end
+    updater.gui = guiInstance
+    return updater
+end
+
 function updater.getGitHubRawURL(filepath)
     return string.format("https://raw.githubusercontent.com/%s/%s/%s/%s?cb=%d",
         updater.repo.owner,
@@ -59,7 +67,7 @@ function updater.getGitHubRawURL(filepath)
 end
 
 function updater.downloadFile(url, path)
-    gui.drawInfo("Downloading: " .. path)
+    updater.gui.drawInfo("Downloading: " .. path)
     local response = http.get(url)
     if response then
         local content = response.readAll()
@@ -76,11 +84,11 @@ function updater.downloadFile(url, path)
         if file then
             file.write(content)
             file.close()
-            gui.drawSuccess("Downloaded: " .. path)
+            updater.gui.drawSuccess("Downloaded: " .. path)
             return true
         end
     end
-    gui.drawError("Failed to download: " .. path)
+    updater.gui.drawError("Failed to download: " .. path)
     return false
 end
 
@@ -116,35 +124,35 @@ end
 
 function updater.checkForUpdates()
     local updates_available = false
-    gui.drawInfo("Checking for updates...")
+    updater.gui.drawInfo("Checking for updates...")
     
     for name, info in pairs(updater.modules) do
-        gui.drawInfo("Checking " .. name .. "...")
+        updater.gui.drawInfo("Checking " .. name .. "...")
         local remote_version = updater.getRemoteVersion(info.path)
         
         if remote_version then
             if updater.compareVersions(remote_version, info.version) > 0 then
-                gui.drawSuccess(string.format("Update available for %s: %s -> %s", 
+                updater.gui.drawSuccess(string.format("Update available for %s: %s -> %s", 
                     name, info.version, remote_version))
                 updates_available = true
                 
-                if gui.confirm("Install update for " .. name .. "?") then
+                if updater.gui.confirm("Install update for " .. name .. "?") then
                     local url = updater.getGitHubRawURL(info.path)
                     if updater.downloadFile(url, info.target) then
                         info.version = remote_version
-                        gui.drawSuccess("Successfully updated " .. name)
+                        updater.gui.drawSuccess("Successfully updated " .. name)
                     end
                 end
             else
-                gui.drawSuccess(name .. " is up to date")
+                updater.gui.drawSuccess(name .. " is up to date")
             end
         else
-            gui.drawError("Failed to check " .. name .. " for updates")
+            updater.gui.drawError("Failed to check " .. name .. " for updates")
         end
     end
     
     if not updates_available then
-        gui.drawSuccess("All modules are up to date")
+        updater.gui.drawSuccess("All modules are up to date")
     end
     
     return updates_available

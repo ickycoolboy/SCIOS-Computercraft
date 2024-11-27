@@ -156,6 +156,8 @@ local function initSystem()
 
     local updater = loadModule("Updater", true)
     if not updater then return false end
+    -- Initialize updater with GUI instance
+    updater = updater.init(gui)
 
     local commands = loadModule("Commands", true)
     if not commands then return false end
@@ -169,6 +171,7 @@ local function executeCommand(command, gui, updater, commands)
         return false
     elseif command == "update" then
         protected_call(function()
+            gui.drawInfo("Starting update check...")
             local updates = updater.checkForUpdates()
             if not updates then
                 gui.drawSuccess("No updates available")
