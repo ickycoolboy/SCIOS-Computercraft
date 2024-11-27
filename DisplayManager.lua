@@ -29,6 +29,9 @@ function displayManager.detectMonitors()
                 debug("Successfully wrapped monitor")
                 secondaryMonitor.setTextScale(1)
                 secondaryMonitor.clear()
+                secondaryMonitor.setCursorPos(1,1)
+                secondaryMonitor.setBackgroundColor(colors.black)
+                secondaryMonitor.setTextColor(colors.white)
                 return true
             end
         end
@@ -56,6 +59,9 @@ function displayManager.disableMirroring()
     if secondaryMonitor then
         pcall(function()
             secondaryMonitor.clear()
+            secondaryMonitor.setCursorPos(1,1)
+            secondaryMonitor.setBackgroundColor(colors.black)
+            secondaryMonitor.setTextColor(colors.white)
         end)
     end
 end
@@ -78,13 +84,41 @@ function displayManager.mirrorContent()
     end
 
     local status, err = pcall(function()
-        -- Get current terminal content
-        local text = term.current().getLine(1)
-        if text then
-            secondaryMonitor.clear()
-            secondaryMonitor.setCursorPos(1, 1)
-            secondaryMonitor.write(text)
+        -- Save current terminal state
+        local curX, curY = term.getCursorPos()
+        local curFg = term.getTextColor()
+        local curBg = term.getBackgroundColor()
+        
+        -- Get terminal size
+        local width, height = term.getSize()
+        
+        -- Clear secondary monitor
+        secondaryMonitor.clear()
+        secondaryMonitor.setCursorPos(1,1)
+        
+        -- Copy content line by line
+        for y = 1, height do
+            term.setCursorPos(1, y)
+            -- Use write to capture the current line's content
+            local line = ""
+            for x = 1, width do
+                term.setCursorPos(x, y)
+                local char = term.current().write()
+                if char then
+                    line = line .. char
+                else
+                    line = line .. " "
+                end
+            end
+            -- Write the line to secondary monitor
+            secondaryMonitor.setCursorPos(1, y)
+            secondaryMonitor.write(line)
         end
+        
+        -- Restore terminal state
+        term.setCursorPos(curX, curY)
+        term.setTextColor(curFg)
+        term.setBackgroundColor(curBg)
     end)
 
     if not status then
