@@ -63,7 +63,8 @@ end
 local function checkInstallerUpdate()
     local installerPath = shell.getRunningProgram()
     local url = getGitHubRawURL("Installer.lua")
-    local success, content = downloadFile(url, "installer_new.lua")
+    local tempPath = "installer_update.tmp"
+    local success, content = downloadFile(url, tempPath)
     
     if success then
         -- Check if content is different
@@ -72,15 +73,38 @@ local function checkInstallerUpdate()
         currentFile.close()
         
         if content ~= currentContent then
-            print("Installer update available. Installing...")
-            fs.delete(installerPath)
-            fs.move("installer_new.lua", installerPath)
-            print("Installer updated. Restarting...")
-            os.sleep(1)
-            os.reboot()
+            print("Installer update available.")
+            print("The installer will be updated on next run.")
+            print("Please run the installer again after this installation completes.")
+            
+            -- Create a marker file that will trigger the update on next run
+            local markerFile = fs.open("installer_update_pending", "w")
+            markerFile.write("pending")
+            markerFile.close()
+            
+            return true
         else
-            fs.delete("installer_new.lua")
+            fs.delete(tempPath)
+            return false
         end
+    end
+    return false
+end
+
+-- Check for pending updates from previous run
+local function handlePendingUpdate()
+    if fs.exists("installer_update_pending") and fs.exists("installer_update.tmp") then
+        local installerPath = shell.getRunningProgram()
+        print("Applying pending installer update...")
+        
+        -- Delete the old installer and move the new one in place
+        fs.delete(installerPath)
+        fs.move("installer_update.tmp", installerPath)
+        fs.delete("installer_update_pending")
+        
+        print("Installer updated. Restarting...")
+        os.sleep(1)
+        os.reboot()
     end
 end
 
@@ -103,9 +127,12 @@ end
 -- Main installation process
 print("SCI Sentinel OS Installer v" .. version)
 
--- Check for installer updates first
+-- Handle any pending updates first
+handlePendingUpdate()
+
+-- Check for installer updates
 print("\nChecking for installer updates...")
-checkInstallerUpdate()
+local updateAvailable = checkInstallerUpdate()
 
 -- Ask for confirmation
 listFilesToInstall()
