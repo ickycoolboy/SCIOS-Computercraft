@@ -1,8 +1,10 @@
 -- SCI Sentinel OS Commands Module
 
 -- Load required modules
-local gui = require("gui")
-local shell = require("shell")
+local gui = require("GUI")
+
+-- ComputerCraft APIs are global, no need to require them
+-- shell, fs, and term are available globally
 
 local commands = {}
 
@@ -77,6 +79,7 @@ function commands.executeCommand(command, gui)
         gui.drawSuccess("  clear   - Clear the screen")
         gui.drawSuccess("  exit    - Exit SCI Sentinel")
         gui.drawSuccess("  help    - Show this help message")
+        gui.drawSuccess("  update  - Check for updates")
     else
         gui.drawError("Unknown command: " .. cmd)
     end
