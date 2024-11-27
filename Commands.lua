@@ -720,6 +720,7 @@ function commands.handleCommand(input)
         net = net,
         ping = ping,
         msg = msg,
+        network = net,
         update = function(args)
             -- Initialize updater with GUI
             updater = updater.init(gui)

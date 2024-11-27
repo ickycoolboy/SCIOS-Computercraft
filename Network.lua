@@ -8,9 +8,9 @@ local gui = require("Gui")
 local modems = {}
 local isRednetOpen = false
 local protocols = {
-    PING = "SCINET_PING",
-    DISCOVER = "SCINET_DISCOVER",
-    MESSAGE = "SCINET_MSG"
+    PING = "SCI_SENTINEL_PING",
+    DISCOVER = "SCI_SENTINEL_DISCOVER",
+    MESSAGE = "SCI_SENTINEL_MSG"
 }
 
 -- Debug function
@@ -21,7 +21,7 @@ local function debug(msg)
 end
 
 -- Initialize network
-function network.init()
+function network.initNetwork()
     -- Clear existing modems
     modems = {}
     
@@ -65,8 +65,8 @@ function network.init()
 end
 
 -- Open rednet on all modems
-function network.openRednet()
-    if not network.init() then
+function network.openNetwork()
+    if not network.initNetwork() then
         gui.drawError("Error: No modems found")
         return false
     end
@@ -97,7 +97,7 @@ function network.openRednet()
 end
 
 -- Close rednet on all modems
-function network.closeRednet()
+function network.closeNetwork()
     local closed = false
     for name, _ in pairs(modems) do
         if rednet.isOpen(name) then
@@ -115,8 +115,8 @@ function network.closeRednet()
 end
 
 -- Scan for nearby computers
-function network.scan()
-    if not network.openRednet() then
+function network.scanNetwork()
+    if not network.openNetwork() then
         return nil, "No modems available"
     end
     
@@ -149,8 +149,8 @@ function network.scan()
 end
 
 -- Ping a specific computer
-function network.ping(targetId)
-    if not network.openRednet() then
+function network.pingComputer(targetId)
+    if not network.openNetwork() then
         return nil, "No modems available"
     end
     
@@ -171,8 +171,8 @@ function network.ping(targetId)
 end
 
 -- Send a message to a specific computer
-function network.sendMessage(targetId, message)
-    if not network.openRednet() then
+function network.sendMessageToComputer(targetId, message)
+    if not network.openNetwork() then
         return false, "No modems available"
     end
     
@@ -181,8 +181,8 @@ function network.sendMessage(targetId, message)
 end
 
 -- Listen for incoming messages
-function network.listen(callback)
-    if not network.openRednet() then
+function network.listenForMessages(callback)
+    if not network.openNetwork() then
         return false, "No modems available"
     end
     
@@ -209,7 +209,7 @@ function network.listen(callback)
 end
 
 -- Get list of connected modems
-function network.getModems()
+function network.getConnectedModems()
     local modemList = {}
     debug("Getting modem list...")
     
@@ -234,7 +234,7 @@ function network.getModems()
 end
 
 -- Get network status string
-function network.getStatus()
+function network.getNetworkStatus()
     local status = {}
     table.insert(status, "=== Network Status ===")
     table.insert(status, string.format("Computer ID: %d", os.getComputerID()))
@@ -242,7 +242,7 @@ function network.getStatus()
     table.insert(status, "")
     table.insert(status, "Connected Modems:")
     
-    local modems = network.getModems()
+    local modems = network.getConnectedModems()
     if #modems == 0 then
         table.insert(status, "  No modems found")
     else
