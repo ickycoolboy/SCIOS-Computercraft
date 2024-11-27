@@ -1,6 +1,14 @@
 -- SCI Sentinel OS Startup
 local version = "1.0.1" -- Version bump for case sensitivity fix
 
+-- Set up the module path
+if not fs.exists("scios") then
+    fs.makeDir("scios")
+end
+
+-- Add the scios directory to package path
+package.path = "./?.lua;/scios/?.lua;" .. package.path
+
 -- System file protection
 local protected_files = {
     "scios/Sci_sentinel.lua",

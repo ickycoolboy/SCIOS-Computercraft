@@ -7,7 +7,7 @@ if not fs.exists("scios") then
 end
 
 -- Add the scios directory to package path
-package.path = "/scios/?.lua;" .. package.path
+package.path = "./?.lua;/scios/?.lua;" .. package.path
 
 -- GitHub repository information
 local GITHUB_REPO = {

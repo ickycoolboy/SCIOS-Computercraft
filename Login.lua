@@ -1,5 +1,5 @@
 local login = {}
-local displayManager = require("scios/DisplayManager")
+local displayManager = require("DisplayManager")
 
 -- Default user credentials
 local users = {

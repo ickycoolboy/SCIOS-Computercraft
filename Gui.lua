@@ -4,7 +4,7 @@ local version = "1.0.1"
 local gui = {}
 local background = {}
 -- Add display manager
-local displayManager = require("scios/DisplayManager")
+local displayManager = require("DisplayManager")
 
 -- Initialize display manager
 displayManager.init()
