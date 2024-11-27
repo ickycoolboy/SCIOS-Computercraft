@@ -249,61 +249,36 @@ end
 
 -- Handle button clicks
 function gui.handleButtons(buttons)
-    -- Debug logging
-    local function debug(msg)
-        local f = fs.open("gui_debug.log", "a")
-        if f then
-            f.write(os.date("%Y-%m-%d %H:%M:%S") .. ": " .. tostring(msg) .. "\n")
-            f.close()
-        end
-    end
-
-    debug("Starting handleButtons function")
-    
-    -- Check if mouse is available
-    if not term.current().isColor or not term.current().isColor() then
-        debug("No color support detected, falling back to keyboard input")
-        -- No mouse support, fall back to keyboard input
-        term.setTextColor(colors.yellow)
-        write("\nPress 'y' for Yes or 'n' for No: ")
-        term.setTextColor(colors.white)
-        while true do
-            debug("Waiting for keyboard input")
-            local event, key = os.pullEvent("char")
-            debug("Received key: " .. key)
-            if key:lower() == "y" then
-                for _, btn in ipairs(buttons) do
-                    if btn.text == "Yes" then
-                        debug("Returning Yes")
-                        return btn.text
-                    end
-                end
-            elseif key:lower() == "n" then
-                for _, btn in ipairs(buttons) do
-                    if btn.text == "No" then
-                        debug("Returning No")
-                        return btn.text
-                    end
+    while true do
+        local event, param1, x, y = os.pullEvent()
+        
+        if event == "mouse_click" then
+            -- Handle mouse clicks
+            for _, btn in ipairs(buttons) do
+                if y == btn.y and x >= btn.x and x < btn.x + btn.width then
+                    return btn.text
                 end
             end
-        end
-    end
-
-    debug("Mouse support detected, waiting for clicks")
-    -- Mouse is available, use click handling
-    while true do
-        local event, button, x, y = os.pullEvent("mouse_click")
-        debug("Mouse click at x=" .. x .. ", y=" .. y)
-        for _, btn in ipairs(buttons) do
-            if y == btn.y and x >= btn.x and x < btn.x + btn.width then
-                debug("Button clicked: " .. btn.text)
-                return btn.text
+        elseif event == "key" then
+            -- Handle keyboard input
+            if param1 == keys.y then
+                for _, btn in ipairs(buttons) do
+                    if btn.text == "Yes" then
+                        return btn.text
+                    end
+                end
+            elseif param1 == keys.n then
+                for _, btn in ipairs(buttons) do
+                    if btn.text == "No" then
+                        return btn.text
+                    end
+                end
             end
         end
     end
 end
 
--- Draw a fancy progress bar
+-- Progress bar functionality
 function gui.drawFancyProgressBar(x, y, width, text, progress)
     local barWidth = width - #text - 3
     local filled = math.floor(barWidth * progress)
