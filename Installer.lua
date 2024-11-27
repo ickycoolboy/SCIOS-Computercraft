@@ -1,6 +1,25 @@
 -- SCI Sentinel OS Installer
 local version = "1.0.1"
 
+-- Fun loading messages
+local loading_messages = {
+    "Downloading more RAM...",
+    "Reticulating splines...",
+    "Converting caffeine to code...",
+    "Generating witty dialog...",
+    "Swapping time and space...",
+    "Spinning violently around the y-axis...",
+    "Tokenizing real life...",
+    "Bending the spoon...",
+    "Filtering morale...",
+    "Don't think of purple hippos...",
+    "Solving for X...",
+    "Dividing by zero...",
+    "Debugging the universe...",
+    "Loading your digital future...",
+    "Preparing to turn it off and on again..."
+}
+
 -- Configuration
 local config = {
     repo_owner = "ickycoolboy",
@@ -14,7 +33,7 @@ local config = {
         {name = "Commands", file = "Commands.lua"}
     },
     root_files = {
-        {name = "Startup", file = "startup.lua"}
+        {name = "Startup", file = "startup.lua", required = true}  -- Mark as required
     }
 }
 
@@ -108,6 +127,13 @@ local function handlePendingUpdate()
     end
 end
 
+-- Show a random loading message
+local function showLoadingMessage()
+    local msg = loading_messages[math.random(1, #loading_messages)]
+    print(msg)
+    os.sleep(0.5)
+end
+
 -- List files to be installed
 local function listFilesToInstall()
     print("\nThe following files will be installed:")
@@ -118,14 +144,16 @@ local function listFilesToInstall()
     
     print("\nRoot files:")
     for _, file in ipairs(config.root_files) do
-        print(string.format("  - %s", file.file))
+        print(string.format("  - %s%s", file.file, file.required and " (required)" or ""))
     end
-    print("\nTotal size: Approximately 10,000 Terrabytes *roughly*")
+    print("\nTotal size: Approximately 10,000 Terabytes *roughly*")
+    print("(Warning: May require downloading more RAM)")
     print("\nNote: Existing files will be overwritten.")
 end
 
 -- Main installation process
 print("SCI Sentinel OS Installer v" .. version)
+print("Your friendly neighborhood OS installer")
 
 -- Handle any pending updates first
 handlePendingUpdate()
@@ -139,7 +167,7 @@ listFilesToInstall()
 write("\nDo you want to install SCI Sentinel OS? (y/n): ")
 local input = read():lower()
 if input ~= "y" and input ~= "yes" then
-    print("Installation cancelled.")
+    print("Installation cancelled. The digital future will have to wait...")
     return
 end
 
@@ -152,6 +180,7 @@ end
 
 -- Download and install core modules
 for _, module in ipairs(config.modules) do
+    showLoadingMessage()
     print(string.format("Downloading %s module...", module.name))
     local success = downloadFile(
         getGitHubRawURL(module.file),
@@ -159,26 +188,44 @@ for _, module in ipairs(config.modules) do
     )
     if not success then
         print(string.format("Failed to download %s module", module.name))
-        print("Initial setup failed!")
+        print("Initial setup failed! (Have you tried turning it off and on again?)")
         return
     end
 end
 
 -- Download and install root files
+local startup_installed = false
 for _, file in ipairs(config.root_files) do
+    showLoadingMessage()
     print(string.format("Downloading %s file...", file.name))
     local success = downloadFile(
         getGitHubRawURL(file.file),
-        file.file
+        file.file  -- Root files go in root directory
     )
     if not success then
-        print(string.format("Failed to download %s file", file.name))
-        print("Initial setup failed!")
-        return
+        if file.required then
+            print(string.format("Failed to download required file: %s", file.name))
+            print("Initial setup failed! (Error 404: Success not found)")
+            return
+        else
+            print(string.format("Warning: Optional file %s not installed", file.name))
+        end
+    else
+        if file.file == "startup.lua" then
+            startup_installed = true
+        end
     end
 end
 
+if not startup_installed then
+    print("Critical error: startup.lua not installed!")
+    print("The computer needs this to boot properly.")
+    return
+end
+
 print("\nInstallation complete!")
+print("Your computer has been upgraded with approximately 10,000 Terabytes of awesomeness!")
 print("Rebooting in 3 seconds...")
+print("(Please ensure your quantum flux capacitor is properly aligned)")
 os.sleep(3)
 os.reboot()
