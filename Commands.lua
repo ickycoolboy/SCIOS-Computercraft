@@ -5,6 +5,7 @@ local version = "1.0.1"
 local gui = require("Gui")
 local updater = require("Updater")
 local help = require("Help")
+local network = require("Network")
 
 local commands = {}
 local sentinel_state = {}
@@ -229,6 +230,136 @@ end
 
 local function ver()
     gui.drawInfo("SCI Sentinel [Version 1.0.0]")
+    return true
+end
+
+-- Network commands
+local function net(args)
+    if #args == 0 then
+        gui.drawError("Usage: NET <command>")
+        gui.drawInfo("Available commands:")
+        gui.drawInfo("  NET STATUS    - Show network status")
+        gui.drawInfo("  NET SCAN      - Scan for nearby computers")
+        gui.drawInfo("  NET OPEN      - Open all modems")
+        gui.drawInfo("  NET CLOSE     - Close all modems")
+        return false
+    end
+    
+    local cmd = args[1]:lower()
+    table.remove(args, 1)
+    
+    if cmd == "status" then
+        -- Initialize network if needed
+        network.init()
+        
+        -- Show modem information
+        local modems = network.getModems()
+        if #modems == 0 then
+            gui.drawError("No modems found")
+            return false
+        end
+        
+        gui.drawInfo("Network Status:")
+        gui.drawInfo("")
+        gui.drawInfo("Computer ID: " .. os.getComputerID())
+        gui.drawInfo("Label: " .. (os.getComputerLabel() or "None"))
+        gui.drawInfo("")
+        gui.drawInfo("Modems:")
+        for _, modem in ipairs(modems) do
+            local status = modem.isOpen and "OPEN" or "CLOSED"
+            local type = modem.isWireless and "Wireless" or "Wired"
+            gui.drawInfo(string.format("  %s: %s (%s) - %s", modem.name, type, status, modem.side or ""))
+        end
+        
+    elseif cmd == "scan" then
+        gui.drawInfo("Scanning for nearby computers...")
+        local computers, err = network.scan()
+        if not computers then
+            gui.drawError("Scan failed: " .. (err or "Unknown error"))
+            return false
+        end
+        
+        if next(computers) == nil then
+            gui.drawInfo("No computers found")
+            return true
+        end
+        
+        gui.drawInfo("Found computers:")
+        for id, info in pairs(computers) do
+            gui.drawInfo(string.format("  ID: %d, Label: %s, Distance: %s", 
+                info.id, info.label, info.distance))
+        end
+        
+    elseif cmd == "open" then
+        if network.openRednet() then
+            gui.drawSuccess("Network opened")
+        else
+            gui.drawError("Failed to open network")
+            return false
+        end
+        
+    elseif cmd == "close" then
+        if network.closeRednet() then
+            gui.drawSuccess("Network closed")
+        else
+            gui.drawError("Failed to close network")
+            return false
+        end
+        
+    else
+        gui.drawError("Unknown network command: " .. cmd)
+        return false
+    end
+    
+    return true
+end
+
+local function ping(args)
+    if #args < 1 then
+        gui.drawError("Usage: PING <computer-id>")
+        return false
+    end
+    
+    local targetId = tonumber(args[1])
+    if not targetId then
+        gui.drawError("Invalid computer ID")
+        return false
+    end
+    
+    gui.drawInfo("Pinging computer " .. targetId .. "...")
+    local time, err = network.ping(targetId)
+    if not time then
+        gui.drawError("Ping failed: " .. (err or "Unknown error"))
+        return false
+    end
+    
+    gui.drawSuccess(string.format("Response from %d: time=%dms", targetId, time))
+    return true
+end
+
+local function msg(args)
+    if #args < 2 then
+        gui.drawError("Usage: MSG <computer-id> <message>")
+        return false
+    end
+    
+    local targetId = tonumber(args[1])
+    if not targetId then
+        gui.drawError("Invalid computer ID")
+        return false
+    end
+    
+    -- Combine remaining args into message
+    table.remove(args, 1)
+    local message = table.concat(args, " ")
+    
+    local success, err = network.sendMessage(targetId, message)
+    if not success then
+        gui.drawError("Failed to send message: " .. (err or "Unknown error"))
+        return false
+    end
+    
+    gui.drawSuccess("Message sent to computer " .. targetId)
     return true
 end
 
@@ -583,9 +714,16 @@ function commands.handleCommand(input)
         rd = rd,
         ver = ver,
         help = displayHelp,
-        ["?"] = displayHelp,  -- Allow ? as alias for help
-        
-        -- SCI Sentinel specific commands
+        ["?"] = displayHelp,
+        mem = mem,
+        ps = ps,
+        find = find,
+        tail = tail,
+        history = history,
+        label = label,
+        net = net,
+        ping = ping,
+        msg = msg,
         update = function(args)
             -- Initialize updater with GUI
             updater = updater.init(gui)
@@ -805,13 +943,7 @@ function commands.handleCommand(input)
                 gui.drawSuccess("Display mirroring disabled")
             end
             return true
-        end,
-        mem = mem,
-        ps = ps,
-        find = find,
-        tail = tail,
-        history = history,
-        label = label
+        end
     }
     
     -- Run command

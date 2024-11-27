@@ -267,7 +267,43 @@ local commands = {
             "",
             "Changes take effect immediately."
         }
-    }
+    },
+    NET = {
+        syntax = "NET <command>",
+        description = "Manages network connections and displays network status.",
+        details = {
+            "Available commands:",
+            "  NET STATUS    - Show network status and modem information",
+            "  NET SCAN      - Scan for nearby computers",
+            "  NET OPEN      - Open all modems for networking",
+            "  NET CLOSE     - Close all modems",
+            "",
+            "Examples:",
+            "  NET STATUS    Shows current network status and modem information",
+            "  NET SCAN      Scans for nearby computers and displays their IDs"
+        }
+    },
+    PING = {
+        syntax = "PING <computer-id>",
+        description = "Tests network connectivity to another computer.",
+        details = {
+            "Sends a ping request to the specified computer and measures the response time.",
+            "",
+            "Examples:",
+            "  PING 5        Pings computer with ID 5"
+        }
+    },
+    MSG = {
+        syntax = "MSG <computer-id> <message>",
+        description = "Sends a message to another computer.",
+        details = {
+            "Sends a text message to the specified computer over the network.",
+            "",
+            "Examples:",
+            "  MSG 5 Hello   Sends 'Hello' to computer with ID 5",
+            "  MSG 3 How are you?    Sends 'How are you?' to computer with ID 3"
+        }
+    },
 }
 
 -- Function to get command help
