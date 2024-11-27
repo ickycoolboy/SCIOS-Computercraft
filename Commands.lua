@@ -749,6 +749,11 @@ function commands.handleCommand(input)
             return true
         end,
         uninstall = function(args)
+            -- Save current terminal state
+            local oldTerm = term.current()
+            local oldBg = term.getBackgroundColor()
+            local oldFg = term.getTextColor()
+
             -- Debug logging function
             local function debug(msg)
                 local f = fs.open("uninstall_debug.log", "a")
@@ -778,9 +783,22 @@ function commands.handleCommand(input)
             local minWidth = isPocketPC and 26 or 51
             local minHeight = isPocketPC and 8 or 16
 
+            -- Create a new terminal redirect for our UI
+            local window = window.create(oldTerm, 1, 1, w, h, true)
+            term.redirect(window)
+
             -- First confirmation screen
+            term.setBackgroundColor(colors.black)
             term.clear()
             term.setCursorPos(1,1)
+            
+            local function cleanup()
+                term.redirect(oldTerm)
+                term.setBackgroundColor(oldBg)
+                term.setTextColor(oldFg)
+                term.clear()
+                term.setCursorPos(1,1)
+            end
             
             if isPocketPC then
                 gui.drawBox(1, 1, minWidth, minHeight, "[ Uninstall ]")
@@ -801,6 +819,7 @@ function commands.handleCommand(input)
                 if choice ~= "Yes" then
                     gui.drawCenteredText(3, "Cancelled", colors.lime)
                     os.sleep(1)
+                    cleanup()
                     return true
                 end
             else
@@ -824,11 +843,13 @@ function commands.handleCommand(input)
                 if choice ~= "Yes" then
                     gui.drawCenteredText(7, "Uninstall cancelled", colors.lime)
                     os.sleep(1)
+                    cleanup()
                     return true
                 end
             end
 
             -- Second confirmation screen
+            term.setBackgroundColor(colors.black)
             term.clear()
             term.setCursorPos(1,1)
             
@@ -850,6 +871,7 @@ function commands.handleCommand(input)
                 if choice ~= "Yes" then
                     gui.drawCenteredText(3, "Cancelled", colors.lime)
                     os.sleep(1)
+                    cleanup()
                     return true
                 end
             else
@@ -872,6 +894,7 @@ function commands.handleCommand(input)
                 if choice ~= "Yes" then
                     gui.drawCenteredText(7, "Uninstall cancelled", colors.lime)
                     os.sleep(1)
+                    cleanup()
                     return true
                 end
             end
@@ -1092,6 +1115,7 @@ end
             end
 
             debug("Function completed successfully")
+            cleanup()
             return true
         end,
         mirror = function(args)
