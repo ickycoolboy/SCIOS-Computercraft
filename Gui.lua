@@ -3,11 +3,6 @@ local version = "1.0.1"
 
 local gui = {}
 local background = {}
--- Add display manager
-local displayManager = require("DisplayManager")
-
--- Initialize display manager
-displayManager.init()
 
 function gui.setBackground(bg)
     background = bg
@@ -17,34 +12,14 @@ function gui.getBackground()
     return background
 end
 
-function gui.mirrorCurrentDisplay()
-    -- Remove this function as it's no longer needed
-    -- The dual terminal handles mirroring automatically
-end
-
-function gui.write(text)
-    -- Use display manager's write function if available
-    if displayManager and displayManager.write then
-        displayManager.write(text)
-    else
-        term.write(text)
-    end
-end
-
-function gui.print(text)
-    gui.write(text)
-    gui.write("\n")
-end
-
 function gui.drawScreen()
-    local dualTerm = displayManager.getDualTerm() or term.current()
-    dualTerm.clear()
-    dualTerm.setCursorPos(1,1)
-    dualTerm.setTextColor(colors.yellow)
-    gui.print("#######################################")
-    gui.print("#       Welcome to SCI Sentinel       #")
-    gui.print("#######################################")
-    dualTerm.setTextColor(colors.white)
+    term.clear()
+    term.setCursorPos(1,1)
+    term.setTextColor(colors.yellow)
+    print("#######################################")
+    print("#       Welcome to SCI Sentinel       #")
+    print("#######################################")
+    term.setTextColor(colors.white)
 end
 
 function gui.printPrompt()
@@ -83,24 +58,10 @@ function gui.drawInfo(message)
 end
 
 function gui.confirm(message)
-    local dualTerm = displayManager.getDualTerm() or term.current()
-    dualTerm.setTextColor(colors.yellow)
-    gui.print(message .. " (y/n)")
-    
-    -- Temporarily disable mirroring for input
-    local mirroringWasEnabled = displayManager.isMirroringEnabled()
-    if mirroringWasEnabled then
-        displayManager.disableMirroring()
-    end
-    
+    term.setTextColor(colors.yellow)
+    print(message .. " (y/n)")
     local input = read():lower()
-    
-    -- Re-enable mirroring if it was enabled
-    if mirroringWasEnabled then
-        displayManager.enableMirroring()
-    end
-    
-    dualTerm.setTextColor(colors.white)
+    term.setTextColor(colors.white)
     return input == "y" or input == "yes"
 end
 
