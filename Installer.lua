@@ -30,7 +30,8 @@ local config = {
         {name = "Core", file = "Sci_sentinel.lua", target = "scios/Sci_sentinel.lua", required = true},
         {name = "GUI", file = "Gui.lua", target = "scios/Gui.lua", required = true},
         {name = "Commands", file = "Commands.lua", target = "scios/Commands.lua", required = true},
-        {name = "Updater", file = "Updater.lua", target = "scios/Updater.lua", required = true}
+        {name = "Updater", file = "Updater.lua", target = "scios/Updater.lua", required = true},
+        {name = "Login", file = "Login.lua", target = "scios/Login.lua", required = true}
     },
     root_files = {
         {name = "Startup", file = "Startup.lua", target = "startup.lua", required = true},

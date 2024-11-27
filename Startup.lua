@@ -23,9 +23,26 @@ fs.delete = function(path)
     return original_delete(path)
 end
 
--- Load the main OS file
-if fs.exists("scios/Sci_sentinel.lua") then
-    shell.run("scios/Sci_sentinel.lua")
-else
-    print("SCI Sentinel OS not found. Please run the installer.")
+-- Load the login screen
+local login = require("scios/Login")
+
+-- Show login screen
+while true do
+    if login.showLoginScreen() then
+        -- Login successful, run the main system
+        if fs.exists("scios/Sci_sentinel.lua") then
+            shell.run("scios/Sci_sentinel.lua")
+        else
+            print("SCI Sentinel OS not found. Please run the installer.")
+        end
+        break
+    else
+        -- Login failed
+        term.clear()
+        term.setCursorPos(1,1)
+        term.setTextColor(colors.red)
+        print("Login failed. Please try again.")
+        term.setTextColor(colors.white)
+        os.sleep(2)
+    end
 end
