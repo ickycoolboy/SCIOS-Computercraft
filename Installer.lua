@@ -11,7 +11,7 @@ local repo = {
 -- Required files
 local required_files = {
     {name = "core", path = "Sci_sentinel.lua"},
-    {name = "gui", path = "GUI.lua"},
+    {name = "gui", path = "Gui.lua"},
     {name = "commands", path = "Commands.lua"},
     {name = "updater", path = "Updater.lua"},
     {name = "startup", path = "Startup.lua"}

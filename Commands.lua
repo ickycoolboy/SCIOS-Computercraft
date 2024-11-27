@@ -2,7 +2,7 @@
 local version = "1.0.1"
 
 -- Load required modules
-local gui = require("GUI")
+local gui = require("Gui")
 
 local commands = {}
 local sentinel_state = {}

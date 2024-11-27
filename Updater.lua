@@ -2,7 +2,7 @@
 local version = "1.0.1"
 
 -- Load required modules
-local gui = require("GUI")
+local gui = require("Gui")
 
 local updater = {}
 
@@ -22,7 +22,7 @@ updater.modules = {
     },
     ["gui"] = {
         version = "1.0.0",
-        path = "GUI.lua",
+        path = "Gui.lua",
         hash = nil
     },
     ["commands"] = {
@@ -206,7 +206,7 @@ function updater.initialInstall()
     end
     
     -- Download startup file first
-    if not updater.downloadFile(updater.getGitHubRawURL("startup.lua"), "startup.lua") then
+    if not updater.downloadFile(updater.getGitHubRawURL("Startup.lua"), "Startup.lua") then
         gui.drawError("Failed to install startup file")
         return false
     end
