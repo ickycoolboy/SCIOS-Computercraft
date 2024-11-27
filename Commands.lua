@@ -165,40 +165,6 @@ function commands.executeCommand(command, gui)
         gui.drawSuccess("  reinstall     - Reinstall SCI Sentinel")
         gui.drawSuccess("  uninstall     - Uninstall SCI Sentinel")
     elseif cmd == "uninstall" then
-        -- Load file tracker
-        local tracker_path = "scios/filetracker.db"
-        local filetracker = nil
-        
-        if fs.exists(tracker_path) then
-            local file = fs.open(tracker_path, "r")
-            if file then
-                local content = file.readAll()
-                file.close()
-                filetracker = textutils.unserializeJSON(content)
-            end
-        end
-        
-        if not filetracker then
-            gui.drawWarning("File tracker not found. Using default file list.")
-            filetracker = {
-                system_files = {
-                    "startup.lua",
-                    "scios/Sci_sentinel.lua",
-                    "scios/Gui.lua",
-                    "scios/Commands.lua",
-                    "scios/Updater.lua",
-                    "scios/versions.db",
-                    "scios/filetracker.db"
-                },
-                temp_files = {
-                    "scios/*.tmp",
-                    "scios/*.bak",
-                    "scios/*.log"
-                },
-                protected_files = {}  -- No protected files during uninstall
-            }
-        end
-
         -- Confirm uninstallation
         gui.drawWarning("WARNING: This will completely remove SCI Sentinel from your computer.")
         if not gui.confirm("Are you sure you want to proceed with uninstallation?") then
@@ -206,57 +172,77 @@ function commands.executeCommand(command, gui)
             return true
         end
 
-        -- Delete system files
-        local removed = 0
-        local failed = 0
-        
-        -- First, try to delete startup.lua specifically
+        local files_to_remove = {
+            -- Core system files
+            "startup.lua",
+            "scios/Sci_sentinel.lua",
+            "scios/Gui.lua",
+            "scios/Commands.lua",
+            "scios/Updater.lua",
+            -- Database files
+            "scios/versions.db",
+            "scios/filetracker.db",
+            "scios/file_hashes.db",
+            -- Backup files
+            "scios/*.backup",
+            "scios/*.bak",
+            "scios/*.tmp"
+        }
+
+        -- First, remove startup.lua to prevent reboot into SCI
         if fs.exists("startup.lua") then
-            if fs.delete("startup.lua") then
-                removed = removed + 1
-                gui.drawSuccess("Removed: startup.lua")
-            else
-                failed = failed + 1
-                gui.drawError("Failed to remove: startup.lua")
-            end
+            fs.delete("startup.lua")
+            gui.drawSuccess("Removed startup file")
         end
-        
-        -- Then delete other system files
-        for _, file in ipairs(filetracker.system_files) do
-            if file ~= "startup.lua" and fs.exists(file) then  -- Skip startup.lua as it's already handled
-                if fs.delete(file) then
-                    removed = removed + 1
-                    gui.drawSuccess("Removed: " .. file)
-                else
-                    failed = failed + 1
-                    gui.drawError("Failed to remove: " .. file)
+
+        -- Function to delete files including wildcards
+        local function deleteWithPattern(pattern)
+            if pattern:find("*") then
+                local dir = fs.getDir(pattern)
+                local ext = pattern:match(".*(%..+)$")
+                if fs.exists(dir) then
+                    for _, file in ipairs(fs.list(dir)) do
+                        if file:match(".*" .. ext .. "$") then
+                            local path = fs.combine(dir, file)
+                            fs.delete(path)
+                            gui.drawSuccess("Removed: " .. path)
+                        end
+                    end
+                end
+            else
+                if fs.exists(pattern) then
+                    fs.delete(pattern)
+                    gui.drawSuccess("Removed: " .. pattern)
                 end
             end
         end
 
-        -- Try to remove the scios directory itself
+        -- Remove all files
+        for _, file in ipairs(files_to_remove) do
+            deleteWithPattern(file)
+        end
+
+        -- Finally, try to remove the scios directory
         if fs.exists("scios") then
-            if fs.delete("scios") then
-                removed = removed + 1
-                gui.drawSuccess("Removed: scios directory")
+            local success = pcall(function() fs.delete("scios") end)
+            if success then
+                gui.drawSuccess("Removed SCIOS directory")
             else
-                failed = failed + 1
-                gui.drawError("Failed to remove: scios directory")
+                gui.drawWarning("Could not remove SCIOS directory - it may not be empty")
+                -- Try to list remaining files
+                if fs.list("scios") then
+                    gui.drawWarning("Remaining files in SCIOS directory:")
+                    for _, file in ipairs(fs.list("scios")) do
+                        gui.drawWarning("  - " .. file)
+                    end
+                end
             end
         end
-        
-        -- Final status
-        gui.drawSuccess(string.format("Uninstallation complete: Removed %d files/directories, %d failed", removed, failed))
-        
-        if failed > 0 then
-            gui.drawWarning("Some files could not be removed. You may need to delete them manually.")
-        else
-            gui.drawSuccess("SCI Sentinel has been completely uninstalled.")
-            gui.drawSuccess("The computer will reboot in 3 seconds...")
-            os.sleep(3)
-            os.reboot()
-        end
-        
+
+        gui.drawSuccess("SCI Sentinel has been uninstalled.")
+        gui.drawSuccess("The computer will reboot in 3 seconds...")
+        os.sleep(3)
+        os.reboot()
         return true
     else
         -- Only run recognized commands

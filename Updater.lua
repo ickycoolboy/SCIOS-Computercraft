@@ -55,15 +55,18 @@ function updater.calculateHash(content)
 end
 
 function updater.loadStoredHashes()
+    -- Create scios directory if it doesn't exist
+    if not fs.exists("scios") then
+        fs.makeDir("scios")
+    end
+    
+    local hashes = {}
     if fs.exists(updater.hash_file) then
         local file = fs.open(updater.hash_file, "r")
         if file then
             local content = file.readAll()
             file.close()
-            local hashes = textutils.unserializeJSON(content) or {}
-            for name, info in pairs(updater.modules) do
-                info.hash = hashes[info.target]
-            end
+            hashes = textutils.unserializeJSON(content) or {}
         end
     end
     
@@ -77,6 +80,15 @@ function updater.loadStoredHashes()
                 info.hash = updater.calculateHash(content)
             end
         end
+        -- Store calculated hash
+        hashes[info.target] = info.hash
+    end
+    
+    -- Save updated hashes
+    local file = fs.open(updater.hash_file, "w")
+    if file then
+        file.write(textutils.serializeJSON(hashes))
+        file.close()
     end
 end
 
@@ -250,6 +262,10 @@ function updater.init(guiInstance)
         return nil
     end
     updater.gui = guiInstance
+    
+    -- Initialize hashes on startup
+    updater.loadStoredHashes()
+    
     return updater
 end
 
