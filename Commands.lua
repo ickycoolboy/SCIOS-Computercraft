@@ -1,12 +1,30 @@
 -- SCI Sentinel OS Commands Module
+local version = "1.0.1"
 
 -- Load required modules
 local gui = require("GUI")
 
--- ComputerCraft APIs are global, no need to require them
--- shell, fs, and term are available globally
-
 local commands = {}
+local sentinel_state = {}
+
+function commands.saveState()
+    -- Save current terminal state
+    sentinel_state.term_redirect = term.current()
+    sentinel_state.background = gui.getBackground()
+    sentinel_state.cursor_x, sentinel_state.cursor_y = term.getCursorPos()
+    sentinel_state.text_color = term.getTextColor()
+    sentinel_state.background_color = term.getBackgroundColor()
+end
+
+function commands.restoreState()
+    -- Restore terminal state
+    term.redirect(sentinel_state.term_redirect)
+    term.setCursorPos(sentinel_state.cursor_x, sentinel_state.cursor_y)
+    term.setTextColor(sentinel_state.text_color)
+    term.setBackgroundColor(sentinel_state.background_color)
+    gui.setBackground(sentinel_state.background)
+    gui.drawScreen()
+end
 
 function commands.executeCommand(command, gui)
     if not command or command == "" then
@@ -21,7 +39,43 @@ function commands.executeCommand(command, gui)
     local cmd = args[1]
     table.remove(args, 1)
 
-    if cmd == "ls" or cmd == "dir" then
+    if cmd == "shell" or cmd == "craftos" then
+        commands.saveState()
+        term.clear()
+        term.setCursorPos(1,1)
+        term.setTextColor(colors.yellow)
+        print("CraftOS Shell Mode - Type 'exit' to return to SCI Sentinel")
+        term.setTextColor(colors.white)
+        
+        while true do
+            term.write("> ")
+            local input = read()
+            if input == "exit" then
+                break
+            end
+            
+            -- Execute CraftOS command
+            shell.run(input)
+        end
+        
+        commands.restoreState()
+        return true
+    elseif cmd == "!" then
+        -- Direct CraftOS command execution
+        local craftosCmd = table.concat(args, " ")
+        if craftosCmd ~= "" then
+            shell.run(craftosCmd)
+        end
+        return true
+    elseif cmd == "minimize" then
+        commands.saveState()
+        term.clear()
+        term.setCursorPos(1,1)
+        print("SCI Sentinel minimized. Type 'sentinel' to restore.")
+        shell.run("shell")
+        commands.restoreState()
+        return true
+    elseif cmd == "ls" or cmd == "dir" then
         local path = shell.dir()
         local ok, files = pcall(fs.list, path)
         if ok then
@@ -84,15 +138,23 @@ function commands.executeCommand(command, gui)
         end
     elseif cmd == "help" then
         gui.drawSuccess("Available commands:")
-        gui.drawSuccess("  ls, dir - List directory contents")
-        gui.drawSuccess("  mkdir   - Create a directory")
-        gui.drawSuccess("  rm      - Remove a file or directory")
-        gui.drawSuccess("  clear   - Clear the screen")
-        gui.drawSuccess("  exit    - Exit SCI Sentinel")
-        gui.drawSuccess("  help    - Show this help message")
-        gui.drawSuccess("  update  - Check for updates")
-        gui.drawSuccess("  reinstall - Reinstall SCI Sentinel (requires confirmation)")
+        gui.drawSuccess("  shell, craftos - Enter CraftOS shell mode")
+        gui.drawSuccess("  ! <command>   - Execute single CraftOS command")
+        gui.drawSuccess("  minimize      - Minimize Sentinel to CraftOS")
+        gui.drawSuccess("  ls, dir       - List directory contents")
+        gui.drawSuccess("  mkdir         - Create a directory")
+        gui.drawSuccess("  rm            - Remove a file or directory")
+        gui.drawSuccess("  clear         - Clear the screen")
+        gui.drawSuccess("  exit          - Exit SCI Sentinel")
+        gui.drawSuccess("  help          - Show this help message")
+        gui.drawSuccess("  update        - Check for updates")
+        gui.drawSuccess("  reinstall     - Reinstall SCI Sentinel")
     else
+        -- Try to run as CraftOS command if not recognized
+        if shell.resolveProgram(cmd) then
+            shell.run(command)
+            return true
+        end
         gui.drawError("Unknown command: " .. cmd)
     end
     return true
