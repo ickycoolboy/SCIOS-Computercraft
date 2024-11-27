@@ -1,23 +1,6 @@
 -- SCI Sentinel GUI Module
 local version = "1.0.1"
 
--- Load modules using shell path
-local function loadModule(name)
-    local paths = {
-        "",
-        "scios/",
-        "/"
-    }
-    
-    for _, path in ipairs(paths) do
-        local modulePath = path .. name
-        if fs.exists(modulePath .. ".lua") then
-            return dofile(modulePath .. ".lua")
-        end
-    end
-    error("Could not find module: " .. name)
-end
-
 local gui = {}
 local background = {}
 -- Add display manager
