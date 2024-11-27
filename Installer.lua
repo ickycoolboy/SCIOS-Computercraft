@@ -1,22 +1,143 @@
 -- SCI Sentinel OS Installer
 local version = "1.2.0"
 
--- First, ensure we have the GUI module
-if not fs.exists("Gui.lua") then
-    print("Downloading GUI module...")
-    local response = http.get("https://raw.githubusercontent.com/ickycoolboy/SCIOS-Computercraft/Github-updating-test/Gui.lua")
-    if response then
-        local content = response.readAll()
-        response.close()
-        local file = fs.open("Gui.lua", "w")
-        file.write(content)
-        file.close()
-    else
-        error("Failed to download GUI module. Please check your internet connection.")
+-- Embedded GUI module for installer
+local gui = {
+    colors = {
+        background = colors.blue,
+        windowBg = colors.lightGray,
+        text = colors.white,
+        border = colors.white,
+        shadow = colors.black,
+        buttonBg = colors.lightGray,
+        buttonText = colors.black,
+        titleBar = colors.blue,
+        titleText = colors.white,
+        progressBar = colors.lime,
+        progressBg = colors.gray
+    }
+}
+
+-- Draw a Windows 9x style window
+function gui.drawWindow(x, y, width, height, title)
+    -- Background
+    local oldBg = term.getBackgroundColor()
+    local oldFg = term.getTextColor()
+    
+    -- Draw shadow
+    term.setBackgroundColor(gui.colors.shadow)
+    for i = 1, height do
+        term.setCursorPos(x + width, y + i)
+        write(" ")
     end
+    for i = 1, width do
+        term.setCursorPos(x + i, y + height)
+        write(" ")
+    end
+    
+    -- Draw main window
+    term.setBackgroundColor(gui.colors.windowBg)
+    for i = 1, height-1 do
+        term.setCursorPos(x, y + i - 1)
+        write(string.rep(" ", width-1))
+    end
+    
+    -- Draw title bar
+    term.setBackgroundColor(gui.colors.titleBar)
+    term.setCursorPos(x, y)
+    write(string.rep(" ", width-1))
+    
+    -- Draw title
+    term.setCursorPos(x + 1, y)
+    term.setTextColor(gui.colors.titleText)
+    write(" " .. title .. " ")
+    
+    -- Reset colors
+    term.setBackgroundColor(oldBg)
+    term.setTextColor(oldFg)
 end
 
-local gui = require("Gui")
+-- Draw a Windows 9x style button
+function gui.drawButton(x, y, width, text, active)
+    local oldBg = term.getBackgroundColor()
+    local oldFg = term.getTextColor()
+    
+    -- Button background
+    term.setBackgroundColor(gui.colors.buttonBg)
+    term.setCursorPos(x, y)
+    write(string.rep(" ", width))
+    
+    -- Button text
+    term.setTextColor(gui.colors.buttonText)
+    term.setCursorPos(x + math.floor((width - #text) / 2), y)
+    write(text)
+    
+    -- Button border
+    if active then
+        term.setTextColor(colors.black)
+        term.setCursorPos(x, y)
+        write("▄")
+        term.setCursorPos(x + width - 1, y)
+        write("▄")
+    end
+    
+    term.setBackgroundColor(oldBg)
+    term.setTextColor(oldFg)
+end
+
+-- Draw a Windows 9x style progress bar with animation
+function gui.drawAnimatedProgressBar(x, y, width, text, progress)
+    local oldBg = term.getBackgroundColor()
+    local oldFg = term.getTextColor()
+    
+    -- Progress bar background
+    term.setBackgroundColor(gui.colors.progressBg)
+    term.setCursorPos(x, y)
+    write(string.rep(" ", width))
+    
+    -- Progress fill
+    local fillWidth = math.floor(progress * width)
+    if fillWidth > 0 then
+        term.setBackgroundColor(gui.colors.progressBar)
+        term.setCursorPos(x, y)
+        write(string.rep(" ", fillWidth))
+    end
+    
+    -- Progress text
+    if text then
+        term.setCursorPos(x, y - 1)
+        term.setBackgroundColor(gui.colors.windowBg)
+        term.setTextColor(gui.colors.text)
+        write(text)
+    end
+    
+    -- Percentage
+    local percent = math.floor(progress * 100)
+    term.setCursorPos(x + width + 1, y)
+    term.setBackgroundColor(gui.colors.windowBg)
+    term.setTextColor(gui.colors.text)
+    write(percent .. "%")
+    
+    term.setBackgroundColor(oldBg)
+    term.setTextColor(oldFg)
+end
+
+-- First, ensure we have the GUI module
+-- if not fs.exists("Gui.lua") then
+--     print("Downloading GUI module...")
+--     local response = http.get("https://raw.githubusercontent.com/ickycoolboy/SCIOS-Computercraft/Github-updating-test/Gui.lua")
+--     if response then
+--         local content = response.readAll()
+--         response.close()
+--         local file = fs.open("Gui.lua", "w")
+--         file.write(content)
+--         file.close()
+--     else
+--         error("Failed to download GUI module. Please check your internet connection.")
+--     end
+-- end
+
+-- local gui = require("Gui")
 
 -- Fun loading messages
 local loading_messages = {
