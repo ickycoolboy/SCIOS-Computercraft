@@ -203,6 +203,7 @@ function updater.checkForUpdates(auto_mode)
     
     for name, info in pairs(updater.modules) do
         if info.root then
+            gui.drawInfo(string.format("Checking %s for updates...", info.path))
             local url = updater.getGitHubRawURL(info.path)
             local success, content = updater.downloadFile(url, "temp_" .. info.path)
             
@@ -213,12 +214,19 @@ function updater.checkForUpdates(auto_mode)
                 if current_hash ~= new_hash then
                     updates_available = true
                     info.hash = new_hash
-                    fs.delete(info.path)
-                    fs.move("temp_" .. info.path, info.path)
-                    print(string.format("Updated %s", info.path))
+                    if fs.exists(info.target or info.path) then
+                        fs.delete(info.target or info.path)
+                    end
+                    fs.move("temp_" .. info.path, info.target or info.path)
+                    gui.drawSuccess(string.format("Updated %s", info.path))
                 else
                     fs.delete("temp_" .. info.path)
+                    if not auto_mode then
+                        gui.drawSuccess(string.format("%s is up to date", info.path))
+                    end
                 end
+            else
+                gui.drawError(string.format("Failed to check %s for updates", info.path))
             end
         else
             local remote_version, remote_hash = updater.getRemoteVersion(info.path)

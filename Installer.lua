@@ -203,47 +203,27 @@ for _, module in ipairs(config.modules) do
     end
 end
 
-local startup_installed = false
+-- Download and install root files
 for _, file in ipairs(config.root_files) do
     showLoadingMessage()
     print(string.format("Downloading %s file...", file.name))
     
     if file.target == "startup.lua" then
-        local success = downloadFile(getGitHubRawURL(file.file), "temp_startup.lua")
-        
-        if success then
-            if fs.exists(file.target) then
-                print("Removing old startup file...")
-                fs.delete(file.target)
-                os.sleep(0.5)  
-            end
-            
-            print("Installing new startup file...")
-            if pcall(fs.move, "temp_startup.lua", file.target) then
-                startup_installed = true
-            else
-                print("Failed to move startup file, trying direct write...")
-                local content = "-- SCI Sentinel OS Startup File\nshell.run(\"scios/sci_sentinel.lua\")"
-                if safeWrite(file.target, content) then
-                    startup_installed = true
-                end
-            end
-        else
-            print("Failed to download startup.lua, creating locally...")
+        -- Try to download from GitHub first, fallback to local creation
+        local success = downloadFile(getGitHubRawURL(file.file), file.target)
+        if not success then
+            print("Creating startup file locally...")
             local content = "-- SCI Sentinel OS Startup File\nshell.run(\"scios/sci_sentinel.lua\")"
-            if safeWrite(file.target, content) then
-                startup_installed = true
-            end
+            success = safeWrite(file.target, content)
         end
         
-        if not startup_installed then
+        if not success and file.required then
             print("Failed to create startup file!")
-            if file.required then
-                return
-            end
+            return
         end
     else
-        local target = file.target or file.file  
+        -- Handle other root files normally
+        local target = file.target or file.file
         local success = downloadFile(getGitHubRawURL(file.file), target)
         if not success and file.required then
             print(string.format("Failed to download required file: %s", file.name))
@@ -251,12 +231,6 @@ for _, file in ipairs(config.root_files) do
             return
         end
     end
-end
-
-if not startup_installed then
-    print("Critical error: startup.lua not installed!")
-    print("The computer needs this to boot properly.")
-    return
 end
 
 print("\nInstallation complete!")
