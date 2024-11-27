@@ -12,9 +12,9 @@ package.path = "/scios/?.lua;" .. package.path
 
 -- GitHub repository information
 local GITHUB_REPO = {
-    owner = "YOUR_GITHUB_USERNAME",
-    name = "SCIOS",
-    branch = "main"
+    owner = "ickycoolboy",
+    name = "SCIOS-Computercraft",
+    branch = "Github-updating-test"
 }
 
 local function getGitHubRawURL(filepath)
