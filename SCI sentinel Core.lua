@@ -10,34 +10,45 @@ end
 -- Add the scios directory to package path
 package.path = "/scios/?.lua;" .. package.path
 
--- Small Updater for Initial Installation
-local pastebinURLs = {
-    gui = "t1aaU92t",
-    commands = "J8wHbkPK",
-    updater = "CHU2eqLh",
-    sci_sentinel = "FYqUHbiR",
-    startup = "Xhc3PP8J"
+-- GitHub repository information
+local GITHUB_REPO = {
+    owner = "YOUR_GITHUB_USERNAME",
+    name = "SCIOS",
+    branch = "main"
 }
 
-local function ensureDirectoryExists(dir)
-    if not fs.exists(dir) then
-        fs.makeDir(dir)
-    end
+local function getGitHubRawURL(filepath)
+    return string.format(
+        "https://raw.githubusercontent.com/%s/%s/%s/%s",
+        GITHUB_REPO.owner,
+        GITHUB_REPO.name,
+        GITHUB_REPO.branch,
+        filepath
+    )
 end
 
-local function downloadFromPastebin(pastebinCode, destination)
-    print("Downloading to " .. destination)
-    if fs.exists(destination) then
-        fs.delete(destination)
+local function downloadFromGitHub(filepath, destination)
+    local url = getGitHubRawURL(filepath)
+    print("Downloading from: " .. url)
+    
+    local response = http.get(url)
+    if response then
+        local content = response.readAll()
+        response.close()
+        
+        local file = fs.open(destination, "w")
+        file.write(content)
+        file.close()
+        return true
     end
-    return shell.run("pastebin", "get", pastebinCode, destination)
+    return false
 end
 
 local function checkSelfUpdate()
     print("Checking for core updates...")
     local tempFile = "scios/sci_sentinel_temp.lua"
     
-    if downloadFromPastebin(pastebinURLs.sci_sentinel, tempFile) then
+    if downloadFromGitHub("sci_sentinel.lua", tempFile) then
         -- Compare files
         local current = fs.open("scios/sci_sentinel.lua", "r")
         local new = fs.open(tempFile, "r")
@@ -65,37 +76,24 @@ local function checkSelfUpdate()
     end
 end
 
-local function initialUpdate()
+local function initialSetup()
     print("Performing initial installation...")
-    ensureDirectoryExists("scios")
-    local allSuccess = true
     
-    for moduleName, pastebinURL in pairs(pastebinURLs) do
-        local destination
-        if moduleName == "startup" then
-            destination = "startup.lua"
-        elseif moduleName == "sci_sentinel" then
-            destination = "scios/sci_sentinel.lua"
-        else
-            destination = "scios/" .. moduleName .. ".lua"
-        end
-        
-        print("Downloading " .. moduleName .. " from Pastebin...")
-        if not downloadFromPastebin(pastebinURL, destination) then
-            print("Failed to install " .. moduleName)
-            allSuccess = false
-        else
-            print("Installed " .. moduleName .. " module successfully.")
-        end
+    -- Download updater module first
+    if not downloadFromGitHub("updater.lua", "scios/updater.lua") then
+        print("Failed to download updater module")
+        return false
     end
     
-    if allSuccess then
-        print("Initial installation complete. Rebooting in 3 seconds...")
-        os.sleep(3)
-        os.reboot()
-    else
-        print("Initial installation failed. Please check errors above and try again.")
+    -- Load updater module
+    local success, updater = pcall(require, "updater")
+    if not success then
+        print("Failed to load updater module")
+        return false
     end
+    
+    -- Use updater to install everything else
+    return updater.initialInstall()
 end
 
 -- Check if modules are already installed, otherwise perform initial update
@@ -103,7 +101,7 @@ if not fs.exists("scios/gui.lua") or
    not fs.exists("scios/commands.lua") or 
    not fs.exists("scios/updater.lua") or 
    not fs.exists("scios/sci_sentinel.lua") then
-    initialUpdate()
+    initialSetup()
     return
 end
 
