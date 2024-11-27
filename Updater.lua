@@ -28,31 +28,37 @@ updater.modules = {
     ["core"] = {
         version = "1.0.2",  -- Updated for startup handling improvements
         path = "Sci_sentinel.lua",
+        target = "scios/Sci_sentinel.lua",
         hash = nil
     },
     ["gui"] = {
         version = "1.0.1",  -- No changes
         path = "Gui.lua",
+        target = "scios/Gui.lua",
         hash = nil
     },
     ["commands"] = {
         version = "1.0.1",  -- No changes
         path = "Commands.lua",
+        target = "scios/Commands.lua",
         hash = nil
     },
     ["updater"] = {
         version = "1.0.2",  -- This file's version
         path = "Updater.lua",
+        target = "scios/Updater.lua",
         hash = nil
     },
     ["installer"] = {
         version = "1.1.0",  -- Major version bump for installer
         path = "Installer.lua",
+        target = "Installer.lua",
         hash = nil
     },
     ["startup"] = {
         version = "1.0.1",  -- Properly cased version
         path = "Startup.lua",
+        target = "startup.lua",
         hash = nil,
         root = true
     }
@@ -84,7 +90,7 @@ function updater.loadVersions()
     else
         -- Calculate initial hashes for existing files
         for name, info in pairs(updater.modules) do
-            local path = "scios/" .. info.path
+            local path = info.target
             if fs.exists(path) then
                 local file = fs.open(path, "r")
                 if file then
@@ -202,72 +208,47 @@ function updater.checkForUpdates(auto_mode)
     updater.loadVersions()
     
     for name, info in pairs(updater.modules) do
-        if info.root then
-            gui.drawInfo(string.format("Checking %s for updates...", info.path))
-            local url = updater.getGitHubRawURL(info.path)
-            local success, content = updater.downloadFile(url, "temp_" .. info.path)
+        gui.drawInfo(string.format("Checking %s for updates...", name))
+        
+        -- Get remote version and hash
+        local remote_version, remote_hash = updater.getRemoteVersion(info.path)
+        if remote_version then
+            local version_diff = updater.compareVersions(remote_version, info.version)
+            local hash_diff = (info.hash ~= remote_hash)
             
-            if success then
-                local current_hash = info.hash
-                local new_hash = updater.calculateHash(content)
-                
-                if current_hash ~= new_hash then
-                    updates_available = true
-                    info.hash = new_hash
-                    if fs.exists(info.target or info.path) then
-                        fs.delete(info.target or info.path)
-                    end
-                    fs.move("temp_" .. info.path, info.target or info.path)
-                    gui.drawSuccess(string.format("Updated %s", info.path))
-                else
-                    fs.delete("temp_" .. info.path)
-                    if not auto_mode then
-                        gui.drawSuccess(string.format("%s is up to date", info.path))
+            if version_diff > 0 or (version_diff == 0 and hash_diff) then
+                if not auto_mode then
+                    if version_diff > 0 then
+                        gui.drawSuccess(string.format("Update available for %s: %s -> %s", 
+                            name, info.version, remote_version))
+                    elseif hash_diff then
+                        gui.drawSuccess(string.format("File changes detected for %s", name))
                     end
                 end
-            else
-                gui.drawError(string.format("Failed to check %s for updates", info.path))
+                updates_available = true
+                
+                if auto_mode and updater.settings.auto_install or
+                   not auto_mode and gui.confirm("Install update for " .. name .. "?") then
+                    -- Download the update
+                    local url = updater.getGitHubRawURL(info.path)
+                    local success = updater.downloadFile(url, info.target)
+                    if success then
+                        if not auto_mode then
+                            gui.drawSuccess(string.format("Successfully updated %s", name))
+                        end
+                        -- Update local version and hash
+                        info.version = remote_version
+                        info.hash = remote_hash
+                        updates_installed = true
+                    else
+                        gui.drawError(string.format("Failed to update %s", name))
+                    end
+                end
+            elseif not auto_mode then
+                gui.drawSuccess(string.format("%s is up to date", name))
             end
         else
-            local remote_version, remote_hash = updater.getRemoteVersion(info.path)
-            if remote_version then
-                local version_diff = updater.compareVersions(remote_version, info.version)
-                local hash_diff = (info.hash ~= remote_hash)
-                
-                if version_diff > 0 or (version_diff == 0 and hash_diff) then
-                    if not auto_mode then
-                        if version_diff > 0 then
-                            gui.drawSuccess(string.format("Update available for %s: %s -> %s", 
-                                name, info.version, remote_version))
-                        elseif hash_diff then
-                            gui.drawSuccess(string.format("File changes detected for %s", name))
-                        end
-                    end
-                    updates_available = true
-                    
-                    if auto_mode and updater.settings.auto_install or
-                       not auto_mode and gui.confirm("Install update for " .. name .. "?") then
-                        -- Download the update
-                        local url = updater.getGitHubRawURL(info.path)
-                        local success, new_hash = updater.downloadFile(url, "scios/" .. info.path)
-                        if success then
-                            if not auto_mode then
-                                gui.drawSuccess(string.format("Successfully updated %s", name))
-                            end
-                            -- Update local version and hash
-                            info.version = remote_version
-                            info.hash = new_hash
-                            updates_installed = true
-                        else
-                            gui.drawError(string.format("Failed to update %s", name))
-                        end
-                    end
-                elseif not auto_mode then
-                    gui.drawSuccess(string.format("%s is up to date", name))
-                end
-            else
-                gui.drawError(string.format("Failed to check %s for updates", name))
-            end
+            gui.drawError(string.format("Failed to check %s for updates", name))
         end
     end
     
@@ -279,6 +260,8 @@ function updater.checkForUpdates(auto_mode)
             os.sleep(3)
             os.reboot()
         end
+    elseif not auto_mode then
+        gui.drawSuccess("No updates available.")
     end
     
     return updates_available
