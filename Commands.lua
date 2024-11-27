@@ -800,16 +800,25 @@ function commands.handleCommand(input)
 -- SCI Sentinel Uninstall Script
 local function removeFile(path)
     if fs.exists(path) then
-        pcall(function() fs.delete(path) end)
+        local success, err = pcall(function() fs.delete(path) end)
+        if not success then
+            -- If deletion fails, try to clear the file contents instead
+            pcall(function()
+                local f = fs.open(path, "w")
+                if f then
+                    f.write("")
+                    f.close()
+                end
+            end)
+        end
     end
 end
 
--- Wait a moment for system to be ready
-os.sleep(0.5)
+-- Wait for system to be fully ready
+os.sleep(1)
 
 -- Remove all SCI Sentinel files
 local files = {
-    "startup.lua",
     "scios/Sci_sentinel.lua",
     "scios/Gui.lua",
     "scios/Commands.lua",
@@ -827,7 +836,11 @@ end
 -- Clean up SCIOS directory
 if fs.exists("scios") then
     local function removeDir(path)
-        local list = fs.list(path)
+        if not fs.exists(path) then return end
+        
+        local success, list = pcall(function() return fs.list(path) end)
+        if not success then return end
+        
         for _, file in ipairs(list) do
             local fullPath = fs.combine(path, file)
             if fs.isDir(fullPath) then
@@ -836,7 +849,7 @@ if fs.exists("scios") then
                 removeFile(fullPath)
             end
         end
-        fs.delete(path)
+        pcall(function() fs.delete(path) end)
     end
     
     removeDir("scios")
@@ -850,7 +863,10 @@ if f then
 end
 
 -- Clean up this script
-shell.run("delete", "uninstall.lua")
+os.sleep(0.5)
+if fs.exists("uninstall.lua") then
+    fs.delete("uninstall.lua")
+end
 ]]
 
             debug("Writing uninstall script")
@@ -868,8 +884,12 @@ shell.run("delete", "uninstall.lua")
             debug("Modifying startup.lua")
             local startup = [[
 -- SCI Sentinel uninstall in progress
-shell.run("uninstall.lua")
-shell.run("delete", "startup.lua")
+if fs.exists("uninstall.lua") then
+    shell.run("uninstall.lua")
+end
+if fs.exists("startup.lua") then
+    fs.delete("startup.lua")
+end
 ]]
             
             local f = fs.open("startup.lua", "w")
