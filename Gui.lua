@@ -83,10 +83,24 @@ function gui.drawInfo(message)
 end
 
 function gui.confirm(message)
-    term.setTextColor(colors.yellow)
-    print(message .. " (y/n)")
-    term.printPrompt()
+    local dualTerm = displayManager.getDualTerm() or term.current()
+    dualTerm.setTextColor(colors.yellow)
+    gui.print(message .. " (y/n)")
+    
+    -- Temporarily disable mirroring for input
+    local mirroringWasEnabled = displayManager.isMirroringEnabled()
+    if mirroringWasEnabled then
+        displayManager.disableMirroring()
+    end
+    
     local input = read():lower()
+    
+    -- Re-enable mirroring if it was enabled
+    if mirroringWasEnabled then
+        displayManager.enableMirroring()
+    end
+    
+    dualTerm.setTextColor(colors.white)
     return input == "y" or input == "yes"
 end
 

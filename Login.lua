@@ -1,4 +1,5 @@
 local login = {}
+local displayManager = require("DisplayManager")
 
 -- Default user credentials
 local users = {
@@ -6,11 +7,12 @@ local users = {
 }
 
 function login.showLoginScreen()
-    term.clear()
-    term.setCursorPos(1,1)
+    local dualTerm = displayManager.getDualTerm() or term.current()
+    dualTerm.clear()
+    dualTerm.setCursorPos(1,1)
     
     -- Draw login box
-    local w, h = term.getSize()
+    local w, h = dualTerm.getSize()
     local boxWidth = 30
     local boxHeight = 7
     local startX = math.floor((w - boxWidth) / 2)
@@ -18,35 +20,59 @@ function login.showLoginScreen()
     
     -- Draw box
     for y = startY, startY + boxHeight do
-        term.setCursorPos(startX, y)
+        dualTerm.setCursorPos(startX, y)
         if y == startY or y == startY + boxHeight then
-            write("+" .. string.rep("-", boxWidth-2) .. "+")
+            displayManager.write("+" .. string.rep("-", boxWidth-2) .. "+")
         else
-            write("|" .. string.rep(" ", boxWidth-2) .. "|")
+            displayManager.write("|" .. string.rep(" ", boxWidth-2) .. "|")
         end
     end
     
     -- Draw title
-    term.setCursorPos(startX + 2, startY + 1)
-    term.setTextColor(colors.yellow)
-    write("SCI Sentinel OS Login")
-    term.setTextColor(colors.white)
+    dualTerm.setCursorPos(startX + 2, startY + 1)
+    dualTerm.setTextColor(colors.yellow)
+    displayManager.write("SCI Sentinel OS Login")
+    dualTerm.setTextColor(colors.white)
     
     -- Username input
-    term.setCursorPos(startX + 2, startY + 3)
-    write("Username: ")
-    term.setCursorPos(startX + 11, startY + 3)
+    dualTerm.setCursorPos(startX + 2, startY + 3)
+    displayManager.write("Username: ")
+    dualTerm.setCursorPos(startX + 11, startY + 3)
+    
+    -- Temporarily disable mirroring for input
+    local mirroringWasEnabled = displayManager.isMirroringEnabled()
+    if mirroringWasEnabled then
+        displayManager.disableMirroring()
+    end
+    
     local username = read()
+    
+    -- Re-enable mirroring if it was enabled
+    if mirroringWasEnabled then
+        displayManager.enableMirroring()
+    end
     
     -- Validate credentials
     if users[username] ~= nil then
         if users[username] == "" then
             return true  -- Login successful
         else
-            term.setCursorPos(startX + 2, startY + 4)
-            write("Password: ")
-            term.setCursorPos(startX + 11, startY + 4)
+            dualTerm.setCursorPos(startX + 2, startY + 4)
+            displayManager.write("Password: ")
+            dualTerm.setCursorPos(startX + 11, startY + 4)
+            
+            -- Temporarily disable mirroring for password input
+            if mirroringWasEnabled then
+                displayManager.disableMirroring()
+            end
+            
             local password = read("*")
+            
+            -- Re-enable mirroring if it was enabled
+            if mirroringWasEnabled then
+                displayManager.enableMirroring()
+            end
+            
             return password == users[username]
         end
     end
