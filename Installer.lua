@@ -11,8 +11,7 @@ local config = {
         {name = "Core", file = "Sci_sentinel.lua"},
         {name = "Updater", file = "Updater.lua"},
         {name = "GUI", file = "Gui.lua"},
-        {name = "Commands", file = "Commands.lua"},
-        {name = "Startup", file = "Startup.lua"}
+        {name = "Commands", file = "Commands.lua"}
     },
     root_files = {
         {name = "Startup", file = "startup.lua"}
