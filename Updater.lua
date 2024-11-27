@@ -53,7 +53,8 @@ updater.modules = {
     ["startup"] = {
         version = "1.0.1",
         path = "Startup.lua",
-        hash = nil
+        hash = nil,
+        special = "startup" -- Mark as special file
     }
 }
 
@@ -141,12 +142,18 @@ function updater.downloadFile(url, path)
             fs.makeDir(dir)
         end
         
-        -- Delete existing file if it exists
-        if fs.exists(path) then
-            fs.delete(path)
+        -- Special handling for startup file
+        local targetPath = path
+        if path:match("Startup.lua$") then
+            targetPath = "startup.lua"
         end
         
-        local file = fs.open(path, "w")
+        -- Delete existing file if it exists
+        if fs.exists(targetPath) then
+            fs.delete(targetPath)
+        end
+        
+        local file = fs.open(targetPath, "w")
         if file then
             file.write(content)
             file.close()
