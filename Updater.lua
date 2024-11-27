@@ -1,15 +1,15 @@
 -- SCI Sentinel OS Updater Module
 
 -- Load required modules
-local gui = require("gui")
+local gui = require("GUI")
 
 local updater = {}
 
 -- GitHub repository information
 updater.repo = {
-    owner = "YOUR_GITHUB_USERNAME",
-    name = "SCIOS",
-    branch = "main"
+    owner = "ickycoolboy",
+    name = "SCIOS-Computercraft",
+    branch = "Github-updating-test"
 }
 
 -- Module version information
@@ -20,15 +20,15 @@ updater.modules = {
     },
     ["gui"] = {
         version = "1.0.0",
-        path = "gui.lua"
+        path = "GUI.lua"
     },
     ["commands"] = {
         version = "1.0.0",
-        path = "commands.lua"
+        path = "Commands.lua"
     },
     ["updater"] = {
         version = "1.0.0",
-        path = "updater.lua"
+        path = "Updater.lua"
     }
 }
 
