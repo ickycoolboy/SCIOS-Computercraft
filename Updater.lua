@@ -16,7 +16,7 @@ updater.repo = {
 updater.modules = {
     ["core"] = {
         version = "1.0.0",
-        path = "sci_sentinel.lua"
+        path = "Sci_sentinel.lua"
     },
     ["gui"] = {
         version = "1.0.0",
@@ -29,29 +29,32 @@ updater.modules = {
     ["updater"] = {
         version = "1.0.0",
         path = "Updater.lua"
+    },
+    ["installer"] = {
+        version = "1.0.0",
+        path = "Installer.lua"
+    },
+    ["startup"] = {
+        version = "1.0.0",
+        path = "Startup.lua"
     }
 }
 
 function updater.getGitHubRawURL(filepath)
-    return string.format(
-        "https://raw.githubusercontent.com/%s/%s/%s/%s",
+    return string.format("https://raw.githubusercontent.com/%s/%s/%s/%s",
         updater.repo.owner,
         updater.repo.name,
         updater.repo.branch,
-        filepath
-    )
+        filepath)
 end
 
-function updater.downloadFromGitHub(filepath, destination)
-    local url = updater.getGitHubRawURL(filepath)
-    gui.drawSuccess("Downloading from: " .. url)
-    
+function updater.downloadFile(url, path)
     local response = http.get(url)
     if response then
         local content = response.readAll()
         response.close()
         
-        local file = fs.open(destination, "w")
+        local file = fs.open(path, "w")
         file.write(content)
         file.close()
         return true
@@ -59,55 +62,44 @@ function updater.downloadFromGitHub(filepath, destination)
     return false
 end
 
+function updater.getRemoteVersion(filepath)
+    local url = updater.getGitHubRawURL(filepath)
+    local response = http.get(url)
+    if response then
+        local content = response.readAll()
+        response.close()
+        
+        -- Look for version string in the file
+        local version = string.match(content, "version%s*=%s*[\"']([%d%.]+)[\"']")
+        return version
+    end
+    return nil
+end
+
 function updater.checkForUpdates()
-    gui.drawSuccess("Checking for updates...")
-    local updateFound = false
+    local updates_available = false
     
-    for moduleName, info in pairs(updater.modules) do
-        gui.drawSuccess("Checking " .. moduleName .. " module...")
-        
-        -- Download to temporary file first
-        local tempFile = "scios/temp_" .. info.path
-        local targetFile = "scios/" .. info.path
-        
-        if updater.downloadFromGitHub(info.path, tempFile) then
-            -- Compare files
-            if fs.exists(targetFile) then
-                local current = fs.open(targetFile, "r")
-                local new = fs.open(tempFile, "r")
-                
-                if current and new then
-                    local currentContent = current.readAll()
-                    local newContent = new.readAll()
-                    current.close()
-                    new.close()
-                    
-                    if currentContent ~= newContent then
-                        gui.drawSuccess("Update found for " .. moduleName)
-                        fs.delete(targetFile)
-                        fs.move(tempFile, targetFile)
-                        updateFound = true
-                    else
-                        fs.delete(tempFile)
-                    end
-                end
+    for name, info in pairs(updater.modules) do
+        local remote_version = updater.getRemoteVersion(info.path)
+        if remote_version and remote_version ~= info.version then
+            gui.drawSuccess(string.format("Update available for %s: %s -> %s", name, info.version, remote_version))
+            updates_available = true
+            
+            -- Download the update
+            local url = updater.getGitHubRawURL(info.path)
+            if updater.downloadFile(url, info.path) then
+                gui.drawSuccess(string.format("Successfully updated %s", name))
+                -- Update local version
+                info.version = remote_version
             else
-                -- File doesn't exist, just move the new one
-                fs.move(tempFile, targetFile)
-                updateFound = true
+                gui.drawError(string.format("Failed to update %s", name))
             end
         else
-            gui.drawError("Failed to check for updates for " .. moduleName)
+            gui.drawSuccess(string.format("%s is up to date", name))
         end
     end
     
-    if updateFound then
-        gui.drawSuccess("Updates installed. Rebooting in 3 seconds...")
-        os.sleep(3)
-        os.reboot()
-    else
-        gui.drawSuccess("No updates found.")
-    end
+    return updates_available
 end
 
 -- Initial installation function
@@ -121,7 +113,7 @@ function updater.initialInstall()
     end
     
     -- Download startup file first
-    if not updater.downloadFromGitHub("startup.lua", "startup.lua") then
+    if not updater.downloadFile(updater.getGitHubRawURL("startup.lua"), "startup.lua") then
         gui.drawError("Failed to install startup file")
         return false
     end
@@ -131,7 +123,7 @@ function updater.initialInstall()
         local destination = "scios/" .. info.path
         gui.drawSuccess("Installing " .. moduleName .. " module...")
         
-        if not updater.downloadFromGitHub(info.path, destination) then
+        if not updater.downloadFile(updater.getGitHubRawURL(info.path), destination) then
             gui.drawError("Failed to install " .. moduleName)
             allSuccess = false
         end

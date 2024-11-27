@@ -71,6 +71,17 @@ function commands.executeCommand(command, gui)
         term.clear()
         term.setCursorPos(1, 1)
         gui.drawScreen()
+    elseif cmd == "reinstall" then
+        gui.drawError("WARNING: This will reinstall all SCI Sentinel files.")
+        gui.drawError("Type 'confirm' to proceed or anything else to cancel.")
+        gui.printPrompt()
+        local response = read()
+        if response == "confirm" then
+            gui.drawSuccess("Starting reinstallation...")
+            shell.run("wget", "run", "https://raw.githubusercontent.com/ickycoolboy/SCIOS-Computercraft/Github-updating-test/Installer.lua")
+        else
+            gui.drawSuccess("Reinstallation cancelled.")
+        end
     elseif cmd == "help" then
         gui.drawSuccess("Available commands:")
         gui.drawSuccess("  ls, dir - List directory contents")
@@ -80,6 +91,7 @@ function commands.executeCommand(command, gui)
         gui.drawSuccess("  exit    - Exit SCI Sentinel")
         gui.drawSuccess("  help    - Show this help message")
         gui.drawSuccess("  update  - Check for updates")
+        gui.drawSuccess("  reinstall - Reinstall SCI Sentinel (requires confirmation)")
     else
         gui.drawError("Unknown command: " .. cmd)
     end
