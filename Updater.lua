@@ -202,22 +202,37 @@ function updater.checkForUpdates()
     local updates_installed = false
     updater.gui.drawInfo("Checking for updates...")
     
-    -- First check all files for changes
+    -- First check all files for changes or missing files
     local to_update = {}
     for name, info in pairs(updater.modules) do
         updater.gui.drawInfo("Checking " .. name .. "...")
         local remote_content = updater.getRemoteContent(info.path)
         
         if remote_content then
-            local remote_hash = updater.calculateHash(remote_content)
-            if remote_hash ~= info.hash then
-                updater.gui.drawSuccess(string.format("Update available for %s", name))
+            local needs_update = false
+            local reason = ""
+            
+            -- Check if file exists
+            if not fs.exists(info.target) then
+                needs_update = true
+                reason = "File is missing"
+            else
+                -- Check hash if file exists
+                local remote_hash = updater.calculateHash(remote_content)
+                if remote_hash ~= info.hash then
+                    needs_update = true
+                    reason = "File content differs"
+                end
+            end
+            
+            if needs_update then
+                updater.gui.drawSuccess(string.format("Update needed for %s (%s)", name, reason))
                 updates_available = true
                 table.insert(to_update, {
                     name = name, 
                     info = info, 
                     content = remote_content,
-                    new_hash = remote_hash
+                    new_hash = updater.calculateHash(remote_content)
                 })
             else
                 updater.gui.drawSuccess(name .. " is up to date")
@@ -230,8 +245,17 @@ function updater.checkForUpdates()
     -- If updates are available, ask to install all at once
     if #to_update > 0 and updater.gui.confirm("Install all available updates?") then
         for _, update in ipairs(to_update) do
-            -- Create backup of existing file
-            local backupPath = updater.backupFile(update.info.target)
+            -- Create backup of existing file if it exists
+            local backupPath = nil
+            if fs.exists(update.info.target) then
+                backupPath = updater.backupFile(update.info.target)
+            end
+            
+            -- Create directory if it doesn't exist
+            local dir = fs.getDir(update.info.target)
+            if not fs.exists(dir) then
+                fs.makeDir(dir)
+            end
             
             -- Save new content
             local file = fs.open(update.info.target, "w")
