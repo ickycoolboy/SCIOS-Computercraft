@@ -130,22 +130,19 @@ function updater.getGitHubRawURL(filepath)
         updater.repo.name,
         updater.repo.branch,
         filepath,
-        os.epoch("utc")) -- Add timestamp to bust cache
+        os.epoch("utc")) -- Restore cache-busting timestamp
 end
 
 function updater.downloadFile(url, path)
-    print(string.format("Downloading from: %s", url))
     local response = http.get(url)
     if response then
         local content = response.readAll()
         response.close()
         
-        -- Ensure parent directory exists if not a root file
-        if not fs.getName(path) == path then
-            local dir = fs.getDir(path)
-            if dir and dir ~= "" and not fs.exists(dir) then
-                fs.makeDir(dir)
-            end
+        -- Create parent directory if it doesn't exist
+        local dir = fs.getDir(path)
+        if dir ~= "" and not fs.exists(dir) then
+            fs.makeDir(dir)
         end
         
         -- Delete existing file if it exists
@@ -157,7 +154,7 @@ function updater.downloadFile(url, path)
         if file then
             file.write(content)
             file.close()
-            return true, content
+            return true, updater.calculateHash(content)
         end
     end
     return false
@@ -231,14 +228,14 @@ function updater.checkForUpdates(auto_mode)
                    not auto_mode and gui.confirm("Install update for " .. name .. "?") then
                     -- Download the update
                     local url = updater.getGitHubRawURL(info.path)
-                    local success = updater.downloadFile(url, info.target)
+                    local success, new_hash = updater.downloadFile(url, info.target)
                     if success then
                         if not auto_mode then
                             gui.drawSuccess(string.format("Successfully updated %s", name))
                         end
                         -- Update local version and hash
                         info.version = remote_version
-                        info.hash = remote_hash
+                        info.hash = new_hash
                         updates_installed = true
                     else
                         gui.drawError(string.format("Failed to update %s", name))
@@ -258,7 +255,7 @@ function updater.checkForUpdates(auto_mode)
         if not auto_mode then
             gui.drawSuccess("Updates installed. Rebooting in 3 seconds...")
             os.sleep(3)
-            os.reboot()
+            shell.run("reboot")  -- Use shell.run instead of os.reboot()
         end
     elseif not auto_mode then
         gui.drawSuccess("No updates available.")

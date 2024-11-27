@@ -152,19 +152,16 @@ function commands.executeCommand(command, gui)
         gui.drawSuccess("  uninstall     - Uninstall SCI Sentinel")
     elseif cmd == "uninstall" then
         if gui.confirm("Are you sure you want to uninstall SCI Sentinel? This will remove all system files except the installer.") then
-            -- Remove startup file first to prevent auto-start
-            if fs.exists("startup.lua") then
-                fs.delete("startup.lua")
-            end
-            
-            -- Remove system files
+            -- Remove system files first
             local system_files = {
+                "startup.lua",  
                 "scios/Sci_sentinel.lua",
                 "scios/Gui.lua",
                 "scios/Commands.lua",
                 "scios/Updater.lua",
                 "scios/versions.db"
             }
+            
             local removed = 0
             for _, file in ipairs(system_files) do
                 if fs.exists(file) then
@@ -174,14 +171,18 @@ function commands.executeCommand(command, gui)
             end
             
             -- Try to remove scios directory if empty
-            if fs.exists("scios") and fs.list("scios") ~= nil and #fs.list("scios") == 0 then
-                fs.delete("scios")
+            if fs.exists("scios") then
+                local files = fs.list("scios")
+                if #files == 0 then
+                    fs.delete("scios")
+                    removed = removed + 1
+                end
             end
             
             gui.drawSuccess(string.format("Uninstalled SCI Sentinel (%d files removed)", removed))
             gui.drawSuccess("System will reboot in 3 seconds...")
             os.sleep(3)
-            os.reboot()
+            shell.run("reboot")  
         else
             gui.drawSuccess("Uninstall cancelled")
         end
