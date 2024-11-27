@@ -45,108 +45,230 @@ local function showLoadingMessage()
     os.sleep(0.5)
 end
 
--- Create GitHub raw URL
+-- Create GitHub raw URL with cache busting
 local function getGitHubRawURL(filepath)
     return string.format("https://raw.githubusercontent.com/%s/%s/%s/%s?cb=%d",
         config.repo_owner,
         config.repo_name,
         config.branch,
         filepath,
-        os.epoch("utc")) 
+        os.epoch("utc"))
 end
 
--- Safe file write function for ComputerCraft
-local function safeWrite(path, content)
-    if fs.exists(path) then
-        local tries = 0
-        while tries < 3 do
-            if pcall(fs.delete, path) then
-                break
-            end
-            tries = tries + 1
-            os.sleep(0.5)  
-        end
-    end
-    
-    local tries = 0
-    while tries < 3 do
+-- Download a file
+local function downloadFile(url, path)
+    local response = http.get(url)
+    if response then
+        local content = response.readAll()
+        response.close()
+        
         local file = fs.open(path, "w")
         if file then
             file.write(content)
             file.close()
             return true
         end
-        tries = tries + 1
-        os.sleep(0.5)  
-    end
-    return false
-end
-
--- Download a file from GitHub
-local function downloadFile(url, path)
-    print(string.format("Downloading from: %s", url))
-    local response = http.get(url)
-    if response then
-        local content = response.readAll()
-        response.close()
-        
-        if not fs.getName(path) == path then
-            local dir = fs.getDir(path)
-            if dir and dir ~= "" and not fs.exists(dir) then
-                fs.makeDir(dir)
-            end
-        end
-        
-        if safeWrite(path, content) then
-            return true, content
-        end
     end
     return false
 end
 
 -- Check for installer updates
-local function checkInstallerUpdate()
-    local installerPath = shell.getRunningProgram()
-    local url = getGitHubRawURL("Installer.lua")
-    local tempPath = "installer_update.tmp"
-    local success, content = downloadFile(url, tempPath)
+local function checkForUpdates()
+    showLoadingMessage()
+    print("Checking for updates...")
     
-    if success then
-        local currentFile = fs.open(installerPath, "r")
-        local currentContent = currentFile.readAll()
-        currentFile.close()
-        
-        if content ~= currentContent then
-            print("Installer update available.")
-            print("The installer will be updated on next run.")
-            print("Please run the installer again after this installation completes.")
-            
-            local markerFile = fs.open("installer_update_pending", "w")
-            markerFile.write("pending")
-            markerFile.close()
-            
-            return true
-        else
-            fs.delete(tempPath)
-            return false
+    -- Get installer file info from config
+    local installerFile = nil
+    for _, file in ipairs(config.root_files) do
+        if file.name == "Installer" then
+            installerFile = file
+            break
         end
+    end
+    
+    if not installerFile then return false end
+    
+    -- Download the latest installer
+    local installerURL = getGitHubRawURL(installerFile.file)
+    local tempPath = "installer.tmp"
+    
+    if downloadFile(installerURL, tempPath) then
+        -- Read the version from the downloaded file
+        local file = fs.open(tempPath, "r")
+        if file then
+            local content = file.readAll()
+            file.close()
+            
+            -- Extract version from the downloaded file
+            local newVersion = string.match(content, 'local version = "([^"]+)"')
+            if newVersion and newVersion ~= version then
+                print("New version found: " .. newVersion)
+                showLoadingMessage()
+                print("Updating installer...")
+                
+                -- Backup current installer
+                if fs.exists(installerFile.target) then
+                    fs.delete(installerFile.target .. ".backup")
+                    fs.copy(installerFile.target, installerFile.target .. ".backup")
+                end
+                
+                -- Replace current installer with new version
+                fs.delete(installerFile.target)
+                fs.copy(tempPath, installerFile.target)
+                fs.delete(tempPath)
+                
+                -- Re-run the new installer
+                print("Update complete! Restarting installer...")
+                os.sleep(1)
+                shell.run(installerFile.target)
+                return true
+            else
+                print("No updates found. Running current version: " .. version)
+                os.sleep(1)
+            end
+        end
+        fs.delete(tempPath)
+    else
+        print("Failed to check for updates. Continuing with installation...")
+        os.sleep(1)
     end
     return false
 end
 
--- Check for pending updates from previous run
-local function handlePendingUpdate()
-    if fs.exists("installer_update_pending") and fs.exists("installer_update.tmp") then
-        local installerPath = shell.getRunningProgram()
-        print("Applying pending installer update...")
+-- Handle any pending updates first
+if not checkForUpdates() then
+    -- Main installation process
+    term.clear()
+    term.setCursorPos(1,1)
+
+    -- Draw main interface
+    gui.drawBox(1, 1, 51, 16, "[ SCI Sentinel Installer ]")
+
+    -- Draw welcome message
+    term.setCursorPos(3, 3)
+    term.setTextColor(colors.yellow)
+    write("Welcome to SCI Sentinel")
+    term.setTextColor(colors.white)
+    term.setCursorPos(3, 5)
+    write("This installer will set up SCI Sentinel on your")
+    term.setCursorPos(3, 6)
+    write("computer. SCI Sentinel provides security and")
+    term.setCursorPos(3, 7)
+    write("monitoring features for your system.")
+
+    -- Draw installation options
+    term.setCursorPos(3, 9)
+    term.setTextColor(colors.lime)
+    write("Installation Options")
+    term.setTextColor(colors.white)
+
+    -- Create buttons
+    local installButton = gui.drawButton(3, 11, "Install", colors.green)
+    local exitButton = gui.drawButton(15, 11, "Exit", colors.red)
+
+    -- Handle button input
+    while true do
+        local event, button, x, y = os.pullEvent("mouse_click")
         
-        fs.delete(installerPath)
-        fs.move("installer_update.tmp", installerPath)
-        fs.delete("installer_update_pending")
-        
-        print("Installer updated. Restarting...")
-        os.sleep(1)
-        os.reboot()
+        -- Check Install button
+        if y == installButton.y and x >= installButton.x and x < installButton.x + installButton.width then
+            -- Start installation
+            term.clear()
+            term.setCursorPos(1,1)
+            gui.drawBox(1, 1, 51, 16, "[ Installing SCI Sentinel ]")
+            
+            -- Create directories
+            term.setCursorPos(3, 4)
+            write("Creating directories...")
+            if not fs.exists("scios") then
+                fs.makeDir("scios")
+            end
+            os.sleep(0.2)
+            
+            -- Copy files
+            local files = {
+                {"sci_sentinel.lua", "scios/sci_sentinel.lua"},
+                {"GUI.lua", "scios/GUI.lua"},
+                {"Commands.lua", "scios/Commands.lua"},
+                {"Updater.lua", "scios/Updater.lua"}
+            }
+            
+            for i, file in ipairs(files) do
+                term.setCursorPos(3, 5)
+                write(string.format("Downloading: %s", file[1]))
+                -- Download file from GitHub with cache busting
+                local success = downloadFile(getGitHubRawURL(file[1]), file[2])
+                if not success then
+                    -- If download fails, try to use local copy as fallback
+                    if fs.exists(file[1]) then
+                        fs.copy(file[1], file[2])
+                        write(" (using local copy)")
+                    else
+                        write(" (failed)")
+                    end
+                end
+                os.sleep(0.3)
+            end
+            
+            -- Configure startup
+            term.setCursorPos(3, 6)
+            write("Configuring startup...")
+            local startup = fs.open("startup.lua", "w")
+            if startup then
+                startup.write('shell.run("scios/sci_sentinel.lua")')
+                startup.close()
+            end
+            os.sleep(0.2)
+            
+            -- Show completion screen
+            term.clear()
+            term.setCursorPos(1,1)
+            gui.drawBox(1, 1, 51, 16, "[ Installation Complete ]")
+            
+            term.setCursorPos(3, 4)
+            term.setTextColor(colors.lime)
+            write("Success!")
+            term.setTextColor(colors.white)
+            term.setCursorPos(3, 6)
+            write("SCI Sentinel has been installed successfully.")
+            term.setCursorPos(3, 7)
+            write("The system will start automatically on boot.")
+            
+            term.setCursorPos(3, 9)
+            term.setTextColor(colors.yellow)
+            write("What's Next?")
+            term.setTextColor(colors.white)
+            term.setCursorPos(3, 11)
+            write("Would you like to reboot now?")
+            
+            -- Create reboot buttons
+            local rebootButton = gui.drawButton(3, 13, "Reboot", colors.green)
+            local laterButton = gui.drawButton(15, 13, "Later", colors.red)
+            
+            -- Handle reboot choice
+            while true do
+                local event, button, x, y = os.pullEvent("mouse_click")
+                if y == rebootButton.y then
+                    if x >= rebootButton.x and x < rebootButton.x + rebootButton.width then
+                        term.clear()
+                        term.setCursorPos(1,1)
+                        gui.drawCenteredText(8, "Rebooting...", colors.yellow)
+                        os.sleep(1)
+                        os.reboot()
+                    elseif x >= laterButton.x and x < laterButton.x + laterButton.width then
+                        term.clear()
+                        term.setCursorPos(1,1)
+                        return
+                    end
+                end
+            end
+            
+        -- Check Exit button
+        elseif y == exitButton.y and x >= exitButton.x and x < exitButton.x + exitButton.width then
+            term.clear()
+            term.setCursorPos(1,1)
+            return
+        end
     end
 end
 
@@ -282,128 +404,32 @@ end
 -- Initialize GUI
 gui = initGUI()
 
--- Main installation process
-term.clear()
-term.setCursorPos(1,1)
+-- Installer version and update URL
+local github_base = "https://raw.githubusercontent.com/SkyTheCodeMaster/scios/main"
 
--- Draw main interface
-gui.drawBox(1, 1, 51, 16, "[ SCI Sentinel Installer ]")
+-- Function to get current timestamp
+local function getTimestamp()
+    return os.epoch("utc")
+end
 
--- Draw welcome message
-term.setCursorPos(3, 3)
-term.setTextColor(colors.yellow)
-write("Welcome to SCI Sentinel")
-term.setTextColor(colors.white)
-term.setCursorPos(3, 5)
-write("This installer will set up SCI Sentinel on your")
-term.setCursorPos(3, 6)
-write("computer. SCI Sentinel provides security and")
-term.setCursorPos(3, 7)
-write("monitoring features for your system.")
+-- Function to get GitHub raw URL with cache busting
+local function getGitHubRawURL(file)
+    return string.format("%s/%s?token=%d", github_base, file, getTimestamp())
+end
 
--- Draw installation options
-term.setCursorPos(3, 9)
-term.setTextColor(colors.lime)
-write("Installation Options")
-term.setTextColor(colors.white)
-
--- Create buttons
-local installButton = gui.drawButton(3, 11, "Install", colors.green)
-local exitButton = gui.drawButton(15, 11, "Exit", colors.red)
-
--- Handle button input
-while true do
-    local event, button, x, y = os.pullEvent("mouse_click")
-    
-    -- Check Install button
-    if y == installButton.y and x >= installButton.x and x < installButton.x + installButton.width then
-        -- Start installation
-        term.clear()
-        term.setCursorPos(1,1)
-        gui.drawBox(1, 1, 51, 16, "[ Installing SCI Sentinel ]")
+-- Function to download a file with cache busting
+local function downloadFile(url, path)
+    local response = http.get(url)
+    if response then
+        local content = response.readAll()
+        response.close()
         
-        -- Create directories
-        term.setCursorPos(3, 4)
-        write("Creating directories...")
-        if not fs.exists("scios") then
-            fs.makeDir("scios")
+        local file = fs.open(path, "w")
+        if file then
+            file.write(content)
+            file.close()
+            return true
         end
-        os.sleep(0.2)
-        
-        -- Copy files
-        local files = {
-            {"GUI.lua", "scios/GUI.lua"},
-            {"Commands.lua", "scios/Commands.lua"},
-            {"sci_sentinel.lua", "scios/sci_sentinel.lua"},
-            {"Updater.lua", "scios/Updater.lua"}
-        }
-        
-        for i, file in ipairs(files) do
-            term.setCursorPos(3, 5)
-            write(string.format("Installing: %s", file[1]))
-            if fs.exists(file[1]) then
-                fs.copy(file[1], file[2])
-            end
-            os.sleep(0.3)
-        end
-        
-        -- Configure startup
-        term.setCursorPos(3, 6)
-        write("Configuring startup...")
-        local startup = fs.open("startup.lua", "w")
-        if startup then
-            startup.write('shell.run("scios/sci_sentinel.lua")')
-            startup.close()
-        end
-        os.sleep(0.2)
-        
-        -- Show completion screen
-        term.clear()
-        term.setCursorPos(1,1)
-        gui.drawBox(1, 1, 51, 16, "[ Installation Complete ]")
-        
-        term.setCursorPos(3, 4)
-        term.setTextColor(colors.lime)
-        write("Success!")
-        term.setTextColor(colors.white)
-        term.setCursorPos(3, 6)
-        write("SCI Sentinel has been installed successfully.")
-        term.setCursorPos(3, 7)
-        write("The system will start automatically on boot.")
-        
-        term.setCursorPos(3, 9)
-        term.setTextColor(colors.yellow)
-        write("What's Next?")
-        term.setTextColor(colors.white)
-        term.setCursorPos(3, 11)
-        write("Would you like to reboot now?")
-        
-        -- Create reboot buttons
-        local rebootButton = gui.drawButton(3, 13, "Reboot", colors.green)
-        local laterButton = gui.drawButton(15, 13, "Later", colors.red)
-        
-        -- Handle reboot choice
-        while true do
-            local event, button, x, y = os.pullEvent("mouse_click")
-            if y == rebootButton.y then
-                if x >= rebootButton.x and x < rebootButton.x + rebootButton.width then
-                    term.clear()
-                    term.setCursorPos(1,1)
-                    gui.drawCenteredText(8, "Rebooting...", colors.yellow)
-                    os.sleep(1)
-                    os.reboot()
-                elseif x >= laterButton.x and x < laterButton.x + laterButton.width then
-                    term.clear()
-                    term.setCursorPos(1,1)
-                    return
-                end
-            end
-        end
-        
-    -- Check Exit button
-    elseif y == exitButton.y and x >= exitButton.x and x < exitButton.x + exitButton.width then
-        term.clear()
-        term.setCursorPos(1,1)
-        return
     end
+    return false
 end
