@@ -27,11 +27,26 @@ function displayManager.detectMonitors()
             secondaryMonitor = peripheral.wrap(side)
             if secondaryMonitor then
                 debug("Successfully wrapped monitor")
-                secondaryMonitor.setTextScale(1)
+                -- Match the main terminal's text scale
+                local w, h = term.getSize()
+                secondaryMonitor.setTextScale(0.5)
+                while true do
+                    local mw, mh = secondaryMonitor.getSize()
+                    if mw >= w and mh >= h then
+                        break
+                    end
+                    local scale = secondaryMonitor.getTextScale()
+                    if scale >= 5 then
+                        break
+                    end
+                    secondaryMonitor.setTextScale(scale + 0.5)
+                end
+                
                 secondaryMonitor.clear()
                 secondaryMonitor.setCursorPos(1,1)
                 secondaryMonitor.setBackgroundColor(colors.black)
                 secondaryMonitor.setTextColor(colors.white)
+                debug("Monitor initialized with scale: " .. secondaryMonitor.getTextScale())
                 return true
             end
         end
@@ -84,38 +99,36 @@ function displayManager.mirrorContent()
     end
 
     local status, err = pcall(function()
+        -- Get terminal size
+        local width, height = term.getSize()
+        
         -- Save current terminal state
         local curX, curY = term.getCursorPos()
         local curFg = term.getTextColor()
         local curBg = term.getBackgroundColor()
         
-        -- Get terminal size
-        local width, height = term.getSize()
-        
         -- Clear secondary monitor
         secondaryMonitor.clear()
-        secondaryMonitor.setCursorPos(1,1)
         
-        -- Copy content line by line
+        -- Copy terminal content
         for y = 1, height do
-            term.setCursorPos(1, y)
-            -- Use write to capture the current line's content
-            local line = ""
             for x = 1, width do
+                -- Get character at position
                 term.setCursorPos(x, y)
-                local char = term.current().write()
-                if char then
-                    line = line .. char
-                else
-                    line = line .. " "
-                end
+                local fg = term.getTextColor()
+                local bg = term.getBackgroundColor()
+                
+                -- Set position and colors on secondary monitor
+                secondaryMonitor.setCursorPos(x, y)
+                secondaryMonitor.setTextColor(fg)
+                secondaryMonitor.setBackgroundColor(bg)
+                
+                -- Write the character
+                secondaryMonitor.write(" ")
             end
-            -- Write the line to secondary monitor
-            secondaryMonitor.setCursorPos(1, y)
-            secondaryMonitor.write(line)
         end
         
-        -- Restore terminal state
+        -- Restore cursor and colors
         term.setCursorPos(curX, curY)
         term.setTextColor(curFg)
         term.setBackgroundColor(curBg)
@@ -123,7 +136,6 @@ function displayManager.mirrorContent()
 
     if not status then
         debug("Error mirroring content: " .. tostring(err))
-        -- Disable mirroring on error
         displayManager.disableMirroring()
     end
 end
