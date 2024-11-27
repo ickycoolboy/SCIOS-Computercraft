@@ -27,13 +27,14 @@ local config = {
     branch = "Github-updating-test",
     install_dir = "scios",
     modules = {
-        {name = "Core", file = "Sci_sentinel.lua"},
-        {name = "Updater", file = "Updater.lua"},
-        {name = "GUI", file = "Gui.lua"},
-        {name = "Commands", file = "Commands.lua"}
+        {name = "Core", file = "Sci_sentinel.lua", target = "scios/Sci_sentinel.lua", required = true},
+        {name = "GUI", file = "Gui.lua", target = "scios/Gui.lua", required = true},
+        {name = "Commands", file = "Commands.lua", target = "scios/Commands.lua", required = true},
+        {name = "Updater", file = "Updater.lua", target = "scios/Updater.lua", required = true}
     },
     root_files = {
-        {name = "Startup", file = "Startup.lua", target = "startup.lua", required = true}  
+        {name = "Startup", file = "Startup.lua", target = "startup.lua", required = true},
+        {name = "Installer", file = "Installer.lua", target = "Installer.lua", required = false}
     }
 }
 
@@ -166,6 +167,37 @@ local function listFilesToInstall()
     print("\nNote: Existing files will be overwritten.")
 end
 
+-- Force delete a file regardless of protection
+local function forceDelete(path)
+    if fs.exists(path) then
+        fs.delete(path)
+    end
+end
+
+-- Clean install function
+local function cleanInstall()
+    print("Performing clean installation...")
+    
+    -- Force remove all existing files
+    forceDelete("startup.lua")
+    forceDelete("scios/Sci_sentinel.lua")
+    forceDelete("scios/Gui.lua")
+    forceDelete("scios/Commands.lua")
+    forceDelete("scios/Updater.lua")
+    forceDelete("scios/versions.db")
+    
+    if fs.exists("scios") and #fs.list("scios") == 0 then
+        fs.delete("scios")
+    end
+    
+    -- Create fresh scios directory
+    if not fs.exists("scios") then
+        fs.makeDir("scios")
+    end
+    
+    return true
+end
+
 -- Main installation process
 print("SCI Sentinel OS Installer v" .. version)
 print("Your friendly neighborhood OS installer")
@@ -183,6 +215,24 @@ if input ~= "y" and input ~= "yes" then
     return
 end
 
+-- Check for force flag
+local args = {...}
+local forceInstall = false
+for _, arg in ipairs(args) do
+    if arg == "--force" then
+        forceInstall = true
+        break
+    end
+end
+
+if forceInstall then
+    print("Force installation mode enabled")
+    if not cleanInstall() then
+        print("Failed to clean existing installation")
+        return
+    end
+end
+
 print("\nPerforming installation...")
 
 if not fs.exists(config.install_dir) then
@@ -194,7 +244,7 @@ for _, module in ipairs(config.modules) do
     print(string.format("Downloading %s module...", module.name))
     local success = downloadFile(
         getGitHubRawURL(module.file),
-        config.install_dir .. "/" .. module.file
+        module.target
     )
     if not success then
         print(string.format("Failed to download %s module", module.name))
