@@ -21,10 +21,16 @@ function network.init()
     local side = peripheral.find("modem")
     if side then
         modem = side
-        debug("Found modem")
+        if _G.DEBUG then gui.drawInfo("[DEBUG] Found modem") end
+        
+        -- Start message handler in parallel
+        parallel.waitForAny(function()
+            network.startMessageHandler()
+        end)
+        
         return true
     else
-        debug("No modem found")
+        if _G.DEBUG then gui.drawInfo("[DEBUG] No modem found") end
         return false
     end
 end
@@ -83,26 +89,112 @@ function network.scan()
     end
     
     local computers = {}
-    rednet.broadcast("DISCOVER", "SCI_SENTINEL")
+    if _G.DEBUG then gui.drawInfo("[DEBUG] Broadcasting discovery message...") end
     
-    local timeout = os.startTimer(2)
+    -- Set up discovery protocol
+    local PROTOCOL = "SCI_SENTINEL"
+    local DISCOVER_MSG = {
+        type = "DISCOVER",
+        id = os.getComputerID(),
+        label = os.getComputerLabel() or "Unknown"
+    }
+    
+    -- Broadcast discovery
+    rednet.broadcast(textutils.serialize(DISCOVER_MSG), PROTOCOL)
+    if _G.DEBUG then gui.drawInfo("[DEBUG] Discovery broadcast sent") end
+    
+    -- Listen for responses
+    local timeout = os.startTimer(5) -- Increased timeout to 5 seconds
+    
     while true do
+        if _G.DEBUG then gui.drawInfo("[DEBUG] Waiting for discovery responses...") end
         local event, p1, p2, p3 = os.pullEvent()
+        
         if event == "timer" and p1 == timeout then
+            if _G.DEBUG then gui.drawInfo("[DEBUG] Scan timeout reached") end
             break
+            
         elseif event == "rednet_message" then
             local senderId, message, protocol = p1, p2, p3
-            if protocol == "SCI_SENTINEL" and message == "DISCOVER_RESPONSE" then
-                computers[senderId] = {
-                    id = senderId,
-                    label = os.getComputerLabel(),
-                    distance = "Unknown"
-                }
+            if _G.DEBUG then 
+                gui.drawInfo(string.format("[DEBUG] Received message from %d: %s (%s)", 
+                    senderId, tostring(message), tostring(protocol)))
+            end
+            
+            if protocol == PROTOCOL then
+                -- Try to deserialize the message
+                local success, data = pcall(textutils.unserialize, message)
+                if success and type(data) == "table" then
+                    if _G.DEBUG then gui.drawInfo("[DEBUG] Parsed message: " .. textutils.serialize(data)) end
+                    
+                    if data.type == "DISCOVER" then
+                        -- Send response back
+                        local response = {
+                            type = "DISCOVER_RESPONSE",
+                            id = os.getComputerID(),
+                            label = os.getComputerLabel() or "Unknown"
+                        }
+                        if _G.DEBUG then gui.drawInfo("[DEBUG] Sending response to " .. senderId) end
+                        rednet.send(senderId, textutils.serialize(response), PROTOCOL)
+                        
+                    elseif data.type == "DISCOVER_RESPONSE" then
+                        -- Add computer to list
+                        computers[senderId] = {
+                            id = senderId,
+                            label = data.label or ("Computer " .. senderId),
+                            distance = "Unknown"
+                        }
+                        if _G.DEBUG then gui.drawInfo("[DEBUG] Added computer " .. senderId .. " to list") end
+                    end
+                else
+                    if _G.DEBUG then gui.drawInfo("[DEBUG] Failed to parse message: " .. tostring(message)) end
+                end
             end
         end
     end
     
+    if _G.DEBUG then 
+        gui.drawInfo("[DEBUG] Scan complete. Found " .. tostring(next(computers) and table.getn(computers) or 0) .. " computers")
+    end
+    
     return computers
+end
+
+-- Add message handler for discovery requests
+function network.handleMessages()
+    if not isOpen then
+        if not network.openRednet() then
+            return false
+        end
+    end
+    
+    local PROTOCOL = "SCI_SENTINEL"
+    
+    while true do
+        local event, senderId, message, protocol = os.pullEvent("rednet_message")
+        if protocol == PROTOCOL then
+            -- Try to deserialize the message
+            local success, data = pcall(textutils.unserialize, message)
+            if success and type(data) == "table" then
+                if data.type == "DISCOVER" then
+                    -- Respond to discovery
+                    local response = {
+                        type = "DISCOVER_RESPONSE",
+                        id = os.getComputerID(),
+                        label = os.getComputerLabel() or "Unknown"
+                    }
+                    if _G.DEBUG then gui.drawInfo("[DEBUG] Responding to discovery from " .. senderId) end
+                    rednet.send(senderId, textutils.serialize(response), PROTOCOL)
+                end
+            end
+        end
+    end
+end
+
+-- Start message handler in parallel
+function network.startMessageHandler()
+    if _G.DEBUG then gui.drawInfo("[DEBUG] Starting message handler") end
+    parallel.waitForAny(network.handleMessages)
 end
 
 return network
