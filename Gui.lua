@@ -28,26 +28,11 @@ function gui.getScreenDimensions()
 end
 
 function gui.drawScreen()
-    local screen = gui.getScreenDimensions()
-    term.clear()
-    term.setCursorPos(1,1)
-    term.setBackgroundColor(theme.getColor("background"))
-    term.setTextColor(theme.getColor("headerText"))
-    
-    if screen.isPocketPC then
-        -- Compact header for pocket PC
-        term.setBackgroundColor(theme.getColor("header"))
-        print(string.rep("#", screen.width))
-        print("#" .. string.rep(" ", math.floor((screen.width - 19) / 2)) .. "SCI Sentinel" .. string.rep(" ", screen.width - 19 - math.floor((screen.width - 19) / 2)) .. "#")
-    else
-        -- Full header for normal PC
-        term.setBackgroundColor(theme.getColor("header"))
-        print(string.rep("#", screen.width))
-        print("#" .. string.rep(" ", math.floor((screen.width - 23) / 2)) .. "Welcome to SCI Sentinel" .. string.rep(" ", screen.width - 23 - math.floor((screen.width - 23) / 2)) .. "#")
-        print(string.rep("#", screen.width))
-    end
-    term.setTextColor(theme.getColor("text"))
-    term.setBackgroundColor(theme.getColor("background"))
+    theme.drawInterface()
+end
+
+function gui.clear()
+    theme.clear()
 end
 
 function gui.printPrompt()
@@ -215,7 +200,6 @@ function gui.drawBox(x, y, width, height, title)
     -- Draw sides
     for i = 1, height-2 do
         term.setCursorPos(x, y + i)
-        term.setBackgroundColor(theme.getColor("boxBg"))
         write("|")
         term.setCursorPos(x + width-1, y + i)
         write("|")

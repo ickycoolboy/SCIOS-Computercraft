@@ -6,6 +6,7 @@ local gui = require("Gui")
 local updater = require("Updater")
 local help = require("Help")
 local network = require("Network")
+local theme = require("Theme")  -- Add theme module
 
 local commands = {}
 local sentinel_state = {}
@@ -95,7 +96,7 @@ end
 local function cls()
     term.clear()
     term.setCursorPos(1,1)
-    gui.drawScreen()
+    theme.drawInterface()
     return true
 end
 

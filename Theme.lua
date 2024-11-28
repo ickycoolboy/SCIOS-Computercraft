@@ -33,56 +33,105 @@ local defaultColors = {
     progressBg = colors.gray,  -- Add explicit progress background color
     progressBar = colors.purple,  -- Add explicit progress bar color
     border = colors.gray,  -- Add explicit border color
-    dimText = colors.gray  -- Add explicit dim text color
+    dimText = colors.gray,  -- Add explicit dim text color
+    shellBg = colors.black,  -- Add shell background color
+    shellText = colors.white -- Add shell text color
 }
+
+-- Get native terminal
+local native = term.native()
+local shellWindow = nil
+
+-- Create a themed shell window
+local function createShellWindow()
+    local w, h = term.getSize()
+    if shellWindow then
+        shellWindow.setBackgroundColor(defaultColors.shellBg)
+        shellWindow.setTextColor(defaultColors.shellText)
+        return shellWindow
+    end
+    
+    -- Create a window for the shell that takes up the full terminal
+    shellWindow = window.create(term.current(), 1, 1, w, h, true)
+    shellWindow.setBackgroundColor(defaultColors.shellBg)
+    shellWindow.setTextColor(defaultColors.shellText)
+    return shellWindow
+end
 
 -- Get color from theme
 function theme.getColor(name)
     return defaultColors[name] or colors.white
 end
 
--- Draw a simple window
-function theme.drawBox(x, y, width, height, title)
-    -- Draw title bar
-    term.setBackgroundColor(colors.purple)
-    term.setTextColor(colors.white)
+-- Initialize theme
+function theme.init()
+    -- Get both native and current terminal
+    local current = term.current()
     
-    -- Fill entire title bar
-    for i = 0, height - 1 do
-        term.setCursorPos(x, y + i)
-        if i == 0 then
-            term.setBackgroundColor(colors.purple)
-        else
-            term.setBackgroundColor(colors.black)
-        end
-        term.write(string.rep(" ", width))
+    -- Reset native terminal first
+    native.setBackgroundColor(defaultColors.background)
+    native.setTextColor(defaultColors.text)
+    native.clear()
+    
+    -- Reset current terminal if different from native
+    if current ~= native then
+        current.setBackgroundColor(defaultColors.background)
+        current.setTextColor(defaultColors.text)
+        current.clear()
     end
     
-    -- Write title if provided
+    -- Create and set up shell window
+    local shell = createShellWindow()
+    term.redirect(shell)
+    shell.clear()
+    shell.setCursorPos(1, 1)
+end
+
+-- Draw a simple window
+function theme.drawBox(x, y, width, height, title)
+    local current = term.current()
+    
+    -- Fill window area
+    current.setBackgroundColor(defaultColors.windowBg)
+    for i = y, y + height - 1 do
+        current.setCursorPos(x, i)
+        current.write(string.rep(" ", width))
+    end
+
+    -- Draw title bar if provided
     if title then
-        local titleX = x + math.floor((width - #title) / 2)
-        term.setCursorPos(titleX, y)
-        term.setBackgroundColor(colors.purple)
-        term.setTextColor(colors.white)
-        term.write(title)
+        current.setBackgroundColor(defaultColors.titleBar)
+        current.setTextColor(defaultColors.titleText)
+        current.setCursorPos(x, y)
+        current.write(string.rep(" ", width))
+        current.setCursorPos(x + 1, y)
+        current.write(title)
     end
 end
 
--- Initialize theme
-function theme.init()
-    if not term.isColor() then
-        -- Fallback to monochrome if needed
-        defaultColors.titleBar = colors.gray
-        defaultColors.titleText = colors.white
-        defaultColors.windowBg = colors.black
-        defaultColors.text = colors.white
-        defaultColors.background = colors.black
+-- Draw full-width title bar
+function theme.drawTitleBar(title)
+    local current = term.current()
+    local w, h = current.getSize()
+    
+    -- Clear the first line completely
+    current.setBackgroundColor(defaultColors.titleBar)
+    current.setTextColor(defaultColors.titleText)
+    current.setCursorPos(1, 1)
+    current.write(string.rep(" ", w))
+    
+    -- Write title
+    if title then
+        current.setCursorPos(2, 1)
+        current.write(title)
     end
     
-    -- Clear screen with theme colors
-    term.setBackgroundColor(colors.black)
-    term.setTextColor(colors.white)
-    term.clear()
+    -- Fill rest with background
+    current.setBackgroundColor(defaultColors.background)
+    for i = 2, h do
+        current.setCursorPos(1, i)
+        current.write(string.rep(" ", w))
+    end
 end
 
 -- Apply theme to a window
@@ -530,6 +579,67 @@ function theme.drawTooltip(x, y, text)
     
     term.setBackgroundColor(oldBg)
     term.setTextColor(oldFg)
+end
+
+-- Draw the main interface
+function theme.drawInterface()
+    local w, h = term.getSize()
+    local current = term.current()
+    
+    -- Clear entire screen
+    current.setBackgroundColor(defaultColors.background)
+    current.clear()
+    
+    -- Draw minimal purple header
+    current.setBackgroundColor(defaultColors.titleBar)
+    current.setTextColor(defaultColors.titleText)
+    current.setCursorPos(1, 1)
+    current.write(string.rep(" ", w))
+    current.setCursorPos(2, 1)
+    current.write("SCI Sentinel")
+    
+    -- Reset colors and fill rest of screen
+    current.setBackgroundColor(defaultColors.background)
+    current.setTextColor(defaultColors.text)
+    for i = 2, h do
+        current.setCursorPos(1, i)
+        current.write(string.rep(" ", w))
+    end
+    
+    -- Set cursor to proper position after header
+    current.setCursorPos(1, 2)
+end
+
+-- Clear screen while maintaining theme
+function theme.clear()
+    local current = term.current()
+    theme.drawInterface()
+    current.setCursorPos(1, 2) -- Position cursor below header
+end
+
+-- Initialize theme
+function theme.init()
+    -- Get both native and current terminal
+    local current = term.current()
+    
+    -- Reset native terminal first
+    native.setBackgroundColor(defaultColors.background)
+    native.setTextColor(defaultColors.text)
+    native.clear()
+    
+    -- Reset current terminal if different from native
+    if current ~= native then
+        current.setBackgroundColor(defaultColors.background)
+        current.setTextColor(defaultColors.text)
+        current.clear()
+    end
+    
+    -- Create and set up shell window
+    local shell = createShellWindow()
+    term.redirect(shell)
+    
+    -- Draw initial interface
+    theme.drawInterface()
 end
 
 -- Resolution controls
