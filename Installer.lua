@@ -12,7 +12,7 @@ local function updateScreenDimensions()
     screen.width, screen.height = term.getSize()
 end
 
--- Enhanced GUI module
+-- Enhanced GUI module with theme support
 local gui = {
     colors = {
         background = colors.blue,
@@ -32,7 +32,40 @@ local gui = {
     animations = {
         loadingFrames = {"|", "/", "-", "\\"},
         progressChars = {"░", "▒", "▓", "█"}
-    }
+    },
+    themes = {
+        default = {
+            background = colors.blue,
+            windowBg = colors.lightGray,
+            text = colors.white,
+            border = colors.white,
+            shadow = colors.black,
+            buttonBg = colors.lightGray,
+            buttonText = colors.black,
+            titleBar = colors.blue,
+            titleText = colors.white,
+            progressBar = colors.lime,
+            progressBg = colors.gray,
+            highlight = colors.yellow,
+            error = colors.red
+        },
+        dark = {
+            background = colors.black,
+            windowBg = colors.gray,
+            text = colors.white,
+            border = colors.white,
+            shadow = colors.black,
+            buttonBg = colors.gray,
+            buttonText = colors.white,
+            titleBar = colors.black,
+            titleText = colors.white,
+            progressBar = colors.lime,
+            progressBg = colors.gray,
+            highlight = colors.yellow,
+            error = colors.red
+        }
+    },
+    currentTheme = "default"
 }
 
 -- ASCII Art for the title screen
@@ -372,7 +405,8 @@ local config = {
         {name = "Login", file = "Login.lua", target = "scios/Login.lua", required = true},
         {name = "DisplayManager", file = "DisplayManager.lua", target = "scios/DisplayManager.lua", required = true},
         {name = "Network", file = "Network.lua", target = "scios/Network.lua", required = true},
-        {name = "Help", file = "Help.lua", target = "scios/Help.lua", required = true}
+        {name = "Help", file = "Help.lua", target = "scios/Help.lua", required = true},
+        {name = "Theme", file = "Theme.lua", target = "scios/Theme.lua", required = true}
     },
     root_files = {
         {name = "Startup", file = "Startup.lua", target = "startup.lua", required = true},
@@ -503,37 +537,72 @@ local function downloadFile(url, path)
 end
 
 -- Check for installer updates
-local function checkInstallerUpdate()
+function checkInstallerUpdate()
+    term.setBackgroundColor(colors.black)
+    term.clear()
+    term.setCursorPos(1, 1)
+    print("Checking for installer updates...")
+    
     local installerPath = shell.getRunningProgram()
     local url = getGitHubRawURL("Installer.lua")
     local tempPath = "installer_update.tmp"
+    
+    -- Try to download the latest version
     local success, content = downloadFile(url, tempPath)
     
     if success then
         local currentFile = fs.open(installerPath, "r")
+        if not currentFile then
+            print("Error: Could not read current installer file.")
+            return false
+        end
+        
         local currentContent = currentFile.readAll()
         currentFile.close()
         
         if content ~= currentContent then
-            print("Installer update available.")
-            print("The installer will be updated on next run.")
-            print("Please run the installer again after this installation completes.")
+            print("New installer version found!")
+            print("The installer will be updated now.")
+            os.sleep(1)
             
-            local markerFile = fs.open("installer_update_pending", "w")
-            markerFile.write("pending")
-            markerFile.close()
+            -- Create backup of current installer
+            if fs.exists(installerPath .. ".backup") then
+                fs.delete(installerPath .. ".backup")
+            end
+            fs.copy(installerPath, installerPath .. ".backup")
             
+            -- Apply update
+            fs.delete(installerPath)
+            fs.move(tempPath, installerPath)
+            
+            print("Update applied successfully!")
+            print("Restarting installer...")
+            os.sleep(1)
+            
+            -- Restart the installer
+            os.run({}, installerPath)
             return true
         else
+            print("Installer is up to date!")
             fs.delete(tempPath)
+            os.sleep(1)
             return false
         end
+    else
+        print("Could not check for updates. Continuing with current version.")
+        os.sleep(1)
+        return false
     end
-    return false
 end
 
--- Check for pending updates from previous run
-local function handlePendingUpdate()
+-- Main entry point
+local function main()
+    -- Always check for updates first
+    if checkInstallerUpdate() then
+        return  -- Exit if we updated (the new version will be running)
+    end
+    
+    -- Handle any pending updates from previous runs
     if fs.exists("installer_update_pending") and fs.exists("installer_update.tmp") then
         local installerPath = shell.getRunningProgram()
         print("Applying pending installer update...")
@@ -545,36 +614,10 @@ local function handlePendingUpdate()
         print("Installer updated. Restarting...")
         os.sleep(1)
         os.reboot()
+        return
     end
-end
-
--- Fun loading messages
-local loadingMessages = {
-    "Initializing quantum flux capacitors...",
-    "Calibrating neural networks...",
-    "Downloading more RAM...",
-    "Preparing the coffee maker...",
-    "Teaching computers to dream...",
-    "Reticulating splines...",
-    "Generating witty dialog...",
-    "Adding unnecessary animations...",
-    "Solving P vs NP...",
-    "Dividing by zero..."
-}
-
--- Show a random loading message
-function showLoadingMessage()
-    local msg = loadingMessages[math.random(1, #loadingMessages)]
-    term.setCursorPos(4, screen.height - 6)
-    term.setBackgroundColor(gui.colors.windowBg)
-    term.setTextColor(gui.colors.text)
-    write(string.rep(" ", screen.width - 8))  -- Clear line
-    term.setCursorPos(4, screen.height - 6)
-    write(msg)
-end
-
--- Main installation process
-local function install()
+    
+    -- Proceed with installation
     updateScreenDimensions()  -- Update dimensions at start
     initScreen()
     drawTitleScreen()
@@ -669,6 +712,5 @@ local function install()
     end
 end
 
--- Main entry point
-handlePendingUpdate()
-install()
+-- Start the program
+main()

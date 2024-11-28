@@ -1,5 +1,6 @@
 -- SCI Sentinel GUI Module
 local version = "1.0.1"
+local theme = require("Theme")
 
 local gui = {}
 local background = {}
@@ -30,61 +31,65 @@ function gui.drawScreen()
     local screen = gui.getScreenDimensions()
     term.clear()
     term.setCursorPos(1,1)
-    term.setTextColor(colors.yellow)
+    term.setBackgroundColor(theme.getColor("background"))
+    term.setTextColor(theme.getColor("headerText"))
     
     if screen.isPocketPC then
         -- Compact header for pocket PC
+        term.setBackgroundColor(theme.getColor("header"))
         print(string.rep("#", screen.width))
         print("#" .. string.rep(" ", math.floor((screen.width - 19) / 2)) .. "SCI Sentinel" .. string.rep(" ", screen.width - 19 - math.floor((screen.width - 19) / 2)) .. "#")
     else
         -- Full header for normal PC
+        term.setBackgroundColor(theme.getColor("header"))
         print(string.rep("#", screen.width))
         print("#" .. string.rep(" ", math.floor((screen.width - 23) / 2)) .. "Welcome to SCI Sentinel" .. string.rep(" ", screen.width - 23 - math.floor((screen.width - 23) / 2)) .. "#")
         print(string.rep("#", screen.width))
     end
-    term.setTextColor(colors.white)
+    term.setTextColor(theme.getColor("text"))
+    term.setBackgroundColor(theme.getColor("background"))
 end
 
 function gui.printPrompt()
     -- Show current directory in prompt
     local currentDir = shell.dir()
     if currentDir == "" then currentDir = "/" end
-    term.setTextColor(colors.cyan)
+    term.setTextColor(theme.getColor("promptText"))
     write(currentDir)
-    term.setTextColor(colors.lime)
+    term.setTextColor(theme.getColor("promptSymbol"))
     write("> ")
-    term.setTextColor(colors.white)
+    term.setTextColor(theme.getColor("text"))
 end
 
 function gui.drawSuccess(message)
-    term.setTextColor(colors.lime)
+    term.setTextColor(theme.getColor("successText"))
     print(message)
-    term.setTextColor(colors.white)
+    term.setTextColor(theme.getColor("text"))
 end
 
 function gui.drawError(message)
-    term.setTextColor(colors.red)
+    term.setTextColor(theme.getColor("errorText"))
     print("Error: " .. message)
-    term.setTextColor(colors.white)
+    term.setTextColor(theme.getColor("text"))
 end
 
 function gui.drawWarning(message)
-    term.setTextColor(colors.yellow)
+    term.setTextColor(theme.getColor("warningText"))
     print("Warning: " .. message)
-    term.setTextColor(colors.white)
+    term.setTextColor(theme.getColor("text"))
 end
 
 function gui.drawInfo(message)
-    term.setTextColor(colors.white)
+    term.setTextColor(theme.getColor("infoText"))
     print(message)
-    term.setTextColor(colors.white)
+    term.setTextColor(theme.getColor("text"))
 end
 
 function gui.confirm(message)
-    term.setTextColor(colors.yellow)
+    term.setTextColor(theme.getColor("confirmText"))
     print(message .. " (y/n)")
     local input = read():lower()
-    term.setTextColor(colors.white)
+    term.setTextColor(theme.getColor("text"))
     return input == "y" or input == "yes"
 end
 
@@ -100,9 +105,9 @@ end
 function gui.drawProgressBar(x, y, width, text, progress, showPercent)
     -- Draw the progress bar
     term.setCursorPos(x, y)
-    term.setTextColor(colors.white)
+    term.setTextColor(theme.getColor("text"))
     write(text .. " [")
-    term.setTextColor(colors.lime)
+    term.setTextColor(theme.getColor("progressBar"))
     
     local barWidth = width - #text - 3
     if showPercent then
@@ -110,9 +115,9 @@ function gui.drawProgressBar(x, y, width, text, progress, showPercent)
     end
     local filled = math.floor(barWidth * progress)
     write(string.rep("=", filled))
-    term.setTextColor(colors.gray)
+    term.setTextColor(theme.getColor("progressBg"))
     write(string.rep("-", barWidth - filled))
-    term.setTextColor(colors.white)
+    term.setTextColor(theme.getColor("text"))
     write("]")
     
     -- Add percentage display if requested
@@ -127,7 +132,7 @@ function gui.updateProgress(x, y, width, text, progress, status)
     gui.drawProgressBar(x, y, width, text, progress, true)
     if status then
         term.setCursorPos(x, y + 1)
-        term.setTextColor(colors.white)
+        term.setTextColor(theme.getColor("text"))
         write(status)
         -- Clear the rest of the line
         local remaining = width - #status
@@ -149,7 +154,7 @@ function gui.messageBox(title, message)
     local startY = math.floor((screen.height - 7) / 2)
     
     -- Draw box
-    term.setBackgroundColor(colors.gray)
+    term.setBackgroundColor(theme.getColor("messageBoxBg"))
     term.clear()
     
     -- Draw borders and content
@@ -197,28 +202,32 @@ function gui.drawBox(x, y, width, height, title)
     
     -- Draw top border
     term.setCursorPos(x, y)
+    term.setBackgroundColor(theme.getColor("boxBg"))
     write("+" .. string.rep("-", width-2) .. "+")
     
     -- Draw title if provided
     if title then
         term.setCursorPos(x + 2, y)
+        term.setTextColor(theme.getColor("boxTitle"))
         write(" " .. title .. " ")
     end
     
     -- Draw sides
     for i = 1, height-2 do
         term.setCursorPos(x, y + i)
+        term.setBackgroundColor(theme.getColor("boxBg"))
         write("|")
         term.setCursorPos(x + width-1, y + i)
         write("|")
         -- Fill background
         term.setCursorPos(x + 1, y + i)
-        term.setBackgroundColor(colors.gray)
+        term.setBackgroundColor(theme.getColor("boxBg"))
         write(string.rep(" ", width-2))
     end
     
     -- Draw bottom border
     term.setCursorPos(x, y + height-1)
+    term.setBackgroundColor(theme.getColor("boxBg"))
     write("+" .. string.rep("-", width-2) .. "+")
     
     -- Return the content area dimensions for convenience
@@ -232,17 +241,17 @@ end
 
 -- Windows 9x style colors
 gui.colors = {
-    background = colors.blue,
-    windowBg = colors.lightGray,
-    text = colors.white,
-    border = colors.white,
-    shadow = colors.black,
-    buttonBg = colors.lightGray,
-    buttonText = colors.black,
-    titleBar = colors.blue,
-    titleText = colors.white,
-    progressBar = colors.lime,
-    progressBg = colors.gray
+    background = theme.getColor("background"),
+    windowBg = theme.getColor("windowBg"),
+    text = theme.getColor("text"),
+    border = theme.getColor("border"),
+    shadow = theme.getColor("shadow"),
+    buttonBg = theme.getColor("buttonBg"),
+    buttonText = theme.getColor("buttonText"),
+    titleBar = theme.getColor("titleBar"),
+    titleText = theme.getColor("titleText"),
+    progressBar = theme.getColor("progressBar"),
+    progressBg = theme.getColor("progressBg")
 }
 
 -- Draw a clickable button and return its bounds
@@ -252,10 +261,10 @@ function gui.drawClickableButton(x, y, text, buttonColor)
     term.setBackgroundColor(buttonColor)
     write(string.rep(" ", width))
     term.setCursorPos(x + 2, y)
-    term.setTextColor(colors.white)
+    term.setTextColor(theme.getColor("buttonText"))
     write(text)
-    term.setBackgroundColor(colors.black)
-    term.setTextColor(colors.white)
+    term.setBackgroundColor(theme.getColor("background"))
+    term.setTextColor(theme.getColor("text"))
     
     -- Return button information
     return {
@@ -280,7 +289,7 @@ function gui.handleMouseEvents(buttons)
             -- Flash button
             local oldBg = term.getBackgroundColor()
             term.setCursorPos(btn.x1, btn.y1)
-            term.setBackgroundColor(colors.white)
+            term.setBackgroundColor(theme.getColor("buttonFlash"))
             term.setTextColor(btn.color)
             write(string.rep(" ", btn.width))
             term.setCursorPos(btn.x1 + 2, btn.y1)
@@ -292,14 +301,14 @@ function gui.handleMouseEvents(buttons)
             -- Restore button
             term.setCursorPos(btn.x1, btn.y1)
             term.setBackgroundColor(btn.color)
-            term.setTextColor(colors.white)
+            term.setTextColor(theme.getColor("buttonText"))
             write(string.rep(" ", btn.width))
             term.setCursorPos(btn.x1 + 2, btn.y1)
             write(btn.text)
             
             -- Reset colors
             term.setBackgroundColor(oldBg)
-            term.setTextColor(colors.white)
+            term.setTextColor(theme.getColor("text"))
             
             return btn.text
         end
@@ -314,13 +323,13 @@ function gui.drawFancyProgressBar(x, y, width, text, progress)
     local filled = math.floor(barWidth * progress)
     
     term.setCursorPos(x, y)
-    term.setTextColor(colors.white)
+    term.setTextColor(theme.getColor("text"))
     write(text .. " [")
-    term.setTextColor(colors.lime)
+    term.setTextColor(theme.getColor("progressBar"))
     write(string.rep("=", filled))
-    term.setTextColor(colors.gray)
+    term.setTextColor(theme.getColor("progressBg"))
     write(string.rep("-", barWidth - filled))
-    term.setTextColor(colors.white)
+    term.setTextColor(theme.getColor("text"))
     write("]")
 end
 
@@ -331,9 +340,11 @@ function gui.drawCenteredText(y, text, textColor)
     term.setCursorPos(x, y)
     if textColor then
         term.setTextColor(textColor)
+    else
+        term.setTextColor(theme.getColor("text"))
     end
     write(text)
-    term.setTextColor(colors.white)
+    term.setTextColor(theme.getColor("text"))
 end
 
 -- Draw an animated progress bar
@@ -351,16 +362,16 @@ function gui.drawAnimatedProgressBar(x, y, width, text, startProgress, endProgre
         
         -- Draw the progress bar
         term.setCursorPos(x, y)
-        term.setTextColor(colors.white)
+        term.setTextColor(theme.getColor("text"))
         write(text .. " [")
-        term.setTextColor(colors.lime)
+        term.setTextColor(theme.getColor("progressBar"))
         
         local barWidth = width - #text - 3
         local filled = math.floor(barWidth * currentProgress)
         write(string.rep("=", filled))
-        term.setTextColor(colors.gray)
+        term.setTextColor(theme.getColor("progressBg"))
         write(string.rep("-", barWidth - filled))
-        term.setTextColor(colors.white)
+        term.setTextColor(theme.getColor("text"))
         write("]")
         
         -- Add percentage display
@@ -375,8 +386,8 @@ end
 
 -- Draw a fancy border box with title
 function gui.drawFancyBox(x, y, width, height, title, bgColor, fgColor)
-    bgColor = bgColor or colors.black
-    fgColor = fgColor or colors.white
+    bgColor = bgColor or theme.getColor("background")
+    fgColor = fgColor or theme.getColor("text")
     
     -- Save current colors
     local oldBg = term.getBackgroundColor()
@@ -391,7 +402,7 @@ function gui.drawFancyBox(x, y, width, height, title, bgColor, fgColor)
     write("╔" .. string.rep("═", width-2) .. "╗")
     if title then
         term.setCursorPos(x + math.floor((width - #title) / 2) - 1, y)
-        term.setTextColor(colors.yellow)
+        term.setTextColor(theme.getColor("titleText"))
         write(" " .. title .. " ")
         term.setTextColor(fgColor)
     end
@@ -420,9 +431,9 @@ end
 -- Draw a section header
 function gui.drawHeader(x, y, text, color)
     term.setCursorPos(x, y)
-    term.setTextColor(color or colors.yellow)
+    term.setTextColor(color or theme.getColor("headerText"))
     write("[ " .. text .. " ]")
-    term.setTextColor(colors.white)
+    term.setTextColor(theme.getColor("text"))
 end
 
 -- Draw a Windows 9x style window
@@ -432,7 +443,7 @@ function gui.drawWindow(x, y, width, height, title)
     local oldFg = term.getTextColor()
     
     -- Draw shadow
-    term.setBackgroundColor(gui.colors.shadow)
+    term.setBackgroundColor(theme.getColor("shadow"))
     for i = 1, height do
         term.setCursorPos(x + width, y + i)
         write(" ")
@@ -443,20 +454,20 @@ function gui.drawWindow(x, y, width, height, title)
     end
     
     -- Draw main window
-    term.setBackgroundColor(gui.colors.windowBg)
+    term.setBackgroundColor(theme.getColor("windowBg"))
     for i = 1, height-1 do
         term.setCursorPos(x, y + i - 1)
         write(string.rep(" ", width-1))
     end
     
     -- Draw title bar
-    term.setBackgroundColor(gui.colors.titleBar)
+    term.setBackgroundColor(theme.getColor("titleBar"))
     term.setCursorPos(x, y)
     write(string.rep(" ", width-1))
     
     -- Draw title
     term.setCursorPos(x + 1, y)
-    term.setTextColor(gui.colors.titleText)
+    term.setTextColor(theme.getColor("titleText"))
     write(" " .. title .. " ")
     
     -- Reset colors

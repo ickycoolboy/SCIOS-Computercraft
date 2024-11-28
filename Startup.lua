@@ -9,12 +9,16 @@ end
 -- Add the scios directory to package path
 package.path = "./?.lua;/scios/?.lua;" .. package.path
 
+-- Initialize theme system
+local theme = require("Theme")
+
 -- System file protection
 local protected_files = {
     "scios/Sci_sentinel.lua",
     "scios/Gui.lua",
     "scios/Commands.lua",
     "scios/Updater.lua",
+    "scios/Theme.lua",
     "startup.lua",
     "scios/versions.db"
 }

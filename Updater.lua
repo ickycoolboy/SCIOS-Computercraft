@@ -59,6 +59,11 @@ updater.modules = {
         path = "Network.lua",
         target = "scios/Network.lua",
         hash = nil
+    },
+    ["theme"] = {
+        path = "Theme.lua",
+        target = "scios/Theme.lua",
+        hash = nil
     }
 }
 
