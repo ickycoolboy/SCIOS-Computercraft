@@ -618,6 +618,24 @@ function checkInstallerUpdate()
     end
 end
 
+-- Loading message animation
+local loadingFrame = 1
+local function showLoadingMessage(message)
+    message = message or "Installing..."
+    local x = math.floor((screen.width - #message - 2) / 2)
+    local y = math.floor(screen.height / 2)
+    
+    term.setCursorPos(x, y)
+    term.setBackgroundColor(gui.colors.windowBg)
+    term.setTextColor(gui.colors.text)
+    write(message .. " " .. gui.animations.loadingFrames[loadingFrame])
+    
+    loadingFrame = loadingFrame + 1
+    if loadingFrame > #gui.animations.loadingFrames then
+        loadingFrame = 1
+    end
+end
+
 -- Main entry point
 local function main()
     -- Always check for updates first
@@ -685,7 +703,7 @@ local function main()
             local filesInstalled = 0
             
             for _, module in ipairs(config.modules) do
-                showLoadingMessage()
+                showLoadingMessage("Installing " .. module.name .. "...")
                 installationProgress = filesInstalled / totalFiles
                 drawInstallationWizard()  -- Redraw to update progress
                 -- Download and install module
@@ -699,7 +717,7 @@ local function main()
             end
             
             for _, file in ipairs(config.root_files) do
-                showLoadingMessage()
+                showLoadingMessage("Installing " .. file.name .. "...")
                 installationProgress = filesInstalled / totalFiles
                 drawInstallationWizard()  -- Redraw to update progress
                 -- Download and install file
