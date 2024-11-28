@@ -2,27 +2,77 @@
 local theme = require("Theme")
 local gui = require("Gui")
 
-local function drawColorPicker(x, y, width, height, title, selectedColor)
-    -- Draw window
-    term.setBackgroundColor(colors.black)
-    term.setTextColor(colors.white)
+local function drawBox(x, y, width, height, title)
+    -- Draw double-line border characters
+    local chars = {
+        topLeft = "\x95",    -- ╔
+        topRight = "\x89",   -- ╗
+        bottomLeft = "\x8A", -- ╚
+        bottomRight = "\x8B",-- ╝
+        horizontal = "\x97", -- ═
+        vertical = "\x95"    -- ║
+    }
     
-    -- Draw border
-    for i = y, y + height - 1 do
-        term.setCursorPos(x, i)
-        write("|")
-        term.setCursorPos(x + width - 1, i)
-        write("|")
+    term.setBackgroundColor(colors.black)
+    term.setTextColor(colors.purple)
+    
+    -- Draw corners
+    term.setCursorPos(x, y)
+    write(chars.topLeft)
+    term.setCursorPos(x + width - 1, y)
+    write(chars.topRight)
+    term.setCursorPos(x, y + height - 1)
+    write(chars.bottomLeft)
+    term.setCursorPos(x + width - 1, y + height - 1)
+    write(chars.bottomRight)
+    
+    -- Draw horizontal borders
+    for i = x + 1, x + width - 2 do
+        term.setCursorPos(i, y)
+        write(chars.horizontal)
+        term.setCursorPos(i, y + height - 1)
+        write(chars.horizontal)
     end
     
-    term.setCursorPos(x, y)
-    write("+" .. string.rep("-", width - 2) .. "+")
-    term.setCursorPos(x, y + height - 1)
-    write("+" .. string.rep("-", width - 2) .. "+")
+    -- Draw vertical borders
+    for i = y + 1, y + height - 2 do
+        term.setCursorPos(x, i)
+        write(chars.vertical)
+        term.setCursorPos(x + width - 1, i)
+        write(chars.vertical)
+    end
     
-    -- Draw title
-    term.setCursorPos(x + 2, y)
-    write(" " .. title .. " ")
+    -- Draw title if provided
+    if title then
+        term.setCursorPos(x + math.floor((width - #title) / 2) - 1, y)
+        write(" " .. title .. " ")
+    end
+end
+
+local function drawButton(x, y, text, isSelected)
+    local width = #text + 2
+    term.setCursorPos(x, y)
+    
+    if isSelected then
+        term.setBackgroundColor(colors.purple)
+        term.setTextColor(colors.white)
+    else
+        term.setBackgroundColor(colors.black)
+        term.setTextColor(colors.purple)
+    end
+    
+    write("[" .. text .. "]")
+    
+    return {
+        x = x,
+        y = y,
+        width = width,
+        height = 1
+    }
+end
+
+local function drawColorPicker(x, y, width, height, title, selectedColor)
+    drawBox(x, y, width, height, title)
     
     -- Draw color options
     local colorButtons = {}
@@ -32,10 +82,18 @@ local function drawColorPicker(x, y, width, height, title, selectedColor)
             local bx = x + 2 + (col * 8)
             local by = y + 2 + row
             
-            -- Draw color button
+            -- Draw color box with border
             term.setCursorPos(bx, by)
             term.setBackgroundColor(color)
             write("      ")
+            term.setBackgroundColor(colors.black)
+            term.setTextColor(colors.purple)
+            write("\x95") -- Right border
+            
+            if row == 0 then
+                term.setCursorPos(bx, by - 1)
+                write("\x97\x97\x97\x97\x97\x97\x97") -- Top border
+            end
             
             -- Add to clickable areas
             table.insert(colorButtons, {
@@ -54,24 +112,28 @@ local function drawColorPicker(x, y, width, height, title, selectedColor)
         end
     end
     
-    -- Reset colors
-    term.setBackgroundColor(colors.black)
-    term.setTextColor(colors.white)
-    
     return colorButtons
 end
 
 local function drawThemeEditor()
     local w, h = term.getSize()
     
-    -- Clear screen
+    -- Clear screen with retro pattern
     term.setBackgroundColor(colors.black)
     term.clear()
-    
-    -- Draw title
-    term.setCursorPos(2, 1)
     term.setTextColor(colors.purple)
-    write("SCI Sentinel Theme Editor")
+    for y = 1, h do
+        for x = 1, w, 2 do
+            term.setCursorPos(x, y)
+            write("\x8F") -- Dot character
+        end
+    end
+    
+    -- Draw main interface box
+    drawBox(1, 1, w, h, " SCI Sentinel Theme Editor ")
+    
+    -- Draw inner content box
+    drawBox(3, 3, w-4, h-6, " Color Settings ")
     
     -- Get current theme colors
     local currentColors = theme.getColors()
@@ -80,16 +142,17 @@ local function drawThemeEditor()
     -- Draw color options
     local buttons = {}
     for i, name in ipairs(colorNames) do
-        local y = 3 + (i * 2)
-        term.setCursorPos(2, y)
+        local y = 5 + (i * 2)
+        term.setCursorPos(5, y)
         term.setTextColor(colors.white)
         write(name .. ": ")
         term.setBackgroundColor(currentColors[name])
         write("     ")
+        term.setBackgroundColor(colors.black)
         
         -- Add to clickable areas
         table.insert(buttons, {
-            x = 2,
+            x = 5,
             y = y,
             width = #name + 7,
             height = 1,
@@ -98,48 +161,17 @@ local function drawThemeEditor()
         })
     end
     
-    -- Draw buttons
+    -- Draw buttons at bottom
     local buttonY = h - 3
-    term.setBackgroundColor(colors.black)
-    term.setTextColor(colors.white)
+    local saveBtn = drawButton(5, buttonY, "Save", false)
+    table.insert(buttons, {x = saveBtn.x, y = buttonY, width = saveBtn.width, height = 1, type = "save"})
     
-    -- Save button
-    term.setCursorPos(2, buttonY)
-    term.setBackgroundColor(colors.green)
-    write(" Save ")
-    table.insert(buttons, {
-        x = 2,
-        y = buttonY,
-        width = 6,
-        height = 1,
-        type = "save"
-    })
+    local resetBtn = drawButton(15, buttonY, "Reset", false)
+    table.insert(buttons, {x = resetBtn.x, y = buttonY, width = resetBtn.width, height = 1, type = "reset"})
     
-    -- Reset button
-    term.setCursorPos(10, buttonY)
-    term.setBackgroundColor(colors.red)
-    write(" Reset ")
-    table.insert(buttons, {
-        x = 10,
-        y = buttonY,
-        width = 7,
-        height = 1,
-        type = "reset"
-    })
+    local exitBtn = drawButton(25, buttonY, "Exit", false)
+    table.insert(buttons, {x = exitBtn.x, y = buttonY, width = exitBtn.width, height = 1, type = "exit"})
     
-    -- Exit button
-    term.setCursorPos(19, buttonY)
-    term.setBackgroundColor(colors.gray)
-    write(" Exit ")
-    table.insert(buttons, {
-        x = 19,
-        y = buttonY,
-        width = 6,
-        height = 1,
-        type = "exit"
-    })
-    
-    term.setBackgroundColor(colors.black)
     return buttons
 end
 

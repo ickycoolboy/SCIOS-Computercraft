@@ -739,6 +739,12 @@ function commands.handleCommand(input)
             os.reboot()
             return true
         end,
+        restart = function(args)
+            gui.drawInfo("Restarting SCI Sentinel OS...")
+            os.sleep(1)
+            shell.run("startup")
+            return true
+        end,
         update = function(args)
             -- Initialize updater with GUI
             updater = updater.init(gui)

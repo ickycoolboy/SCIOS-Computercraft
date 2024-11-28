@@ -15,8 +15,27 @@ for _, arg in ipairs(args) do
 end
 
 -- Check for required APIs
-if not term or not fs or not http then
-    printError("This program requires the term, fs, and http APIs")
+if not term or not fs then
+    printError("This program requires the term and fs APIs")
+    return
+end
+
+-- Check HTTP API specifically with clear message
+if not http then
+    term.setTextColor(colors.red)
+    print("Error: HTTP API is disabled!")
+    print("")
+    term.setTextColor(colors.white)
+    print("To fix this:")
+    print("1. Open server config file (server.properties)")
+    print("2. Set 'http_enable=true'")
+    print("3. Restart the server")
+    print("")
+    print("Or if you're in singleplayer:")
+    print("1. Click 'Mod Options' or 'Config'")
+    print("2. Find ComputerCraft settings")
+    print("3. Enable HTTP API")
+    print("4. Restart the game")
     return
 end
 
@@ -532,14 +551,62 @@ function showError(message, suggestion)
     os.sleep(3)
 end
 
--- Create GitHub raw URL
+-- Get GitHub raw URL
 local function getGitHubRawURL(filepath)
-    return string.format("https://raw.githubusercontent.com/%s/%s/%s/%s?cb=%d",
+    return string.format(
+        "https://raw.githubusercontent.com/%s/%s/%s/%s",
         config.repo_owner,
         config.repo_name,
         config.branch,
-        filepath,
-        os.epoch("utc")) 
+        filepath
+    )
+end
+
+-- Download a file from GitHub
+local function downloadFile(url, path)
+    print(string.format("Downloading from: %s", url))
+    
+    -- Try direct HTTP request first
+    local ok, response = pcall(function()
+        return http.get(url, nil, true)
+    end)
+    
+    if not ok then
+        print("HTTP request failed: " .. tostring(response))
+        return false
+    end
+    
+    if not response then
+        print("Failed to get response from: " .. url)
+        return false
+    end
+    
+    -- Read the content
+    local content = response.readAll()
+    response.close()
+    
+    -- Create directory if needed
+    local dir = fs.getDir(path)
+    if dir and dir ~= "" and not fs.exists(dir) then
+        fs.makeDir(dir)
+    end
+    
+    -- Write file with error handling
+    local ok, err = pcall(function()
+        local file = fs.open(path, "w")
+        if not file then
+            error("Could not open file for writing: " .. path)
+        end
+        file.write(content)
+        file.close()
+    end)
+    
+    if not ok then
+        print("Failed to write file: " .. tostring(err))
+        return false
+    end
+    
+    return true, content
 end
 
 -- Safe file write function for ComputerCraft
@@ -569,114 +636,6 @@ local function safeWrite(path, content)
     return false
 end
 
--- Download a file from GitHub
-local function downloadFile(url, path)
-    print(string.format("Downloading from: %s", url))
-    local response = http.get(url)
-    if response then
-        local content = response.readAll()
-        response.close()
-        
-        if not fs.getName(path) == path then
-            local dir = fs.getDir(path)
-            if dir and dir ~= "" and not fs.exists(dir) then
-                fs.makeDir(dir)
-            end
-        end
-        
-        if safeWrite(path, content) then
-            return true, content
-        end
-    end
-    return false
-end
-
--- Check for installer updates
-function checkInstallerUpdate()
-    term.setBackgroundColor(colors.black)
-    term.clear()
-    term.setCursorPos(1, 1)
-    print("Checking for installer updates...")
-    
-    local url = getGitHubRawURL("Installer.lua")
-    
-    -- Create temp directory if it doesn't exist
-    if not fs.exists("scios/temp") then
-        fs.makeDir("scios/temp")
-    end
-    
-    local tempPath = "scios/temp/installer_update.tmp"
-    
-    -- Clean up any existing temp files
-    if fs.exists(tempPath) then
-        fs.delete(tempPath)
-    end
-    
-    -- Try to download the latest version
-    local success, content = downloadFile(url, tempPath)
-    
-    if success then
-        local currentFile = fs.open(installerPath, "r")
-        if not currentFile then
-            print("Error: Could not read current installer file.")
-            fs.delete(tempPath)
-            return false
-        end
-        
-        local currentContent = currentFile.readAll()
-        currentFile.close()
-        
-        if content ~= currentContent then
-            print("New installer version found!")
-            print("The installer will be updated now.")
-            os.sleep(1)
-            
-            -- Create backup in temp directory
-            local backupPath = "scios/temp/installer.backup"
-            if fs.exists(backupPath) then
-                fs.delete(backupPath)
-            end
-            fs.copy(installerPath, backupPath)
-            
-            -- Apply update
-            if fs.exists(installerPath) then
-                fs.delete(installerPath)
-            end
-            fs.move(tempPath, installerPath)
-            
-            -- Clean up
-            if fs.exists(backupPath) then
-                fs.delete(backupPath)
-            end
-            
-            print("Update applied successfully!")
-            print("Restarting installer...")
-            os.sleep(1)
-            
-            -- Restart the installer
-            if shell then
-                os.run({}, installerPath)
-            else
-                -- Fallback to just running the file
-                dofile(installerPath)
-            end
-            return true
-        else
-            print("Installer is up to date!")
-            fs.delete(tempPath)
-            os.sleep(1)
-            return false
-        end
-    else
-        print("Could not check for updates. Continuing with current version.")
-        if fs.exists(tempPath) then
-            fs.delete(tempPath)
-        end
-        os.sleep(1)
-        return false
-    end
-end
-
 -- Loading message animation
 local loadingFrame = 1
 local function showLoadingMessage(message)
@@ -693,6 +652,101 @@ local function showLoadingMessage(message)
     if loadingFrame > #gui.animations.loadingFrames then
         loadingFrame = 1
     end
+end
+
+-- Check for installer updates
+function checkInstallerUpdate()
+    term.setBackgroundColor(colors.black)
+    term.clear()
+    term.setCursorPos(1, 1)
+    print("Checking for installer updates...")
+    
+    -- Test HTTP API
+    if not http.checkURL("https://raw.githubusercontent.com") then
+        print("Warning: Cannot access GitHub. Check your internet connection.")
+        os.sleep(2)
+        return false
+    end
+    
+    local url = getGitHubRawURL("Installer.lua")
+    print("Fetching from: " .. url)
+    
+    -- Create temp directory if it doesn't exist
+    if not fs.exists("scios/temp") then
+        fs.makeDir("scios/temp")
+    end
+    
+    local tempPath = "scios/temp/installer_update.tmp"
+    
+    -- Clean up any existing temp files
+    if fs.exists(tempPath) then
+        fs.delete(tempPath)
+    end
+    
+    -- Try to download the latest version
+    local success, content = downloadFile(url, tempPath)
+    
+    if not success then
+        print("Update check failed. Using current version.")
+        if fs.exists(tempPath) then
+            fs.delete(tempPath)
+        end
+        os.sleep(2)
+        return false
+    end
+    
+    -- Compare versions
+    local currentFile = fs.open(installerPath, "r")
+    if not currentFile then
+        print("Error: Could not read current installer.")
+        fs.delete(tempPath)
+        os.sleep(2)
+        return false
+    end
+    
+    local currentContent = currentFile.readAll()
+    currentFile.close()
+    
+    if content ~= currentContent then
+        print("New version found! Updating...")
+        
+        -- Backup current version
+        local backupPath = "scios/temp/installer.backup"
+        if fs.exists(backupPath) then
+            fs.delete(backupPath)
+        end
+        fs.copy(installerPath, backupPath)
+        
+        -- Apply update
+        local ok, err = pcall(function()
+            if fs.exists(installerPath) then
+                fs.delete(installerPath)
+            end
+            fs.move(tempPath, installerPath)
+        end)
+        
+        if not ok then
+            print("Update failed: " .. tostring(err))
+            -- Restore backup
+            if fs.exists(backupPath) then
+                fs.copy(backupPath, installerPath)
+            end
+            os.sleep(2)
+            return false
+        end
+        
+        print("Update successful! Restarting...")
+        os.sleep(1)
+        
+        -- Restart installer
+        os.run({}, installerPath)
+        return true
+    end
+    
+    print("Already up to date!")
+    fs.delete(tempPath)
+    os.sleep(1)
+    return false
 end
 
 -- Main entry point
