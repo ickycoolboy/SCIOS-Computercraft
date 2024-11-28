@@ -1,5 +1,5 @@
 -- SCI Sentinel OS Updater Module
-local version = "1.0.2"
+local version = "1.34"
 
 -- Load required modules
 -- local gui = require("Gui")
@@ -63,6 +63,16 @@ updater.modules = {
     ["theme"] = {
         path = "Theme.lua",
         target = "scios/Theme.lua",
+        hash = nil
+    },
+    ["themeeditor"] = {
+        path = "ThemeEditor.lua",
+        target = "scios/ThemeEditor.lua",
+        hash = nil
+    },
+    ["gaming"] = {
+        path = "Gaming.lua",
+        target = "scios/Gaming.lua",
         hash = nil
     }
 }

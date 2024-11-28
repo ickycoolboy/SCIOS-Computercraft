@@ -1,5 +1,5 @@
 -- SCI Sentinel OS Installer
-local version = "1.2.0"
+local version = "1.34"
 
 -- Parse command line arguments
 local args = {...}
@@ -445,12 +445,28 @@ local config = {
         {name = "DisplayManager", file = "DisplayManager.lua", target = "scios/DisplayManager.lua", required = true},
         {name = "Network", file = "Network.lua", target = "scios/Network.lua", required = true},
         {name = "Help", file = "Help.lua", target = "scios/Help.lua", required = true},
-        {name = "Theme", file = "Theme.lua", target = "scios/Theme.lua", required = true}
+        {name = "Theme", file = "Theme.lua", target = "scios/Theme.lua", required = true},
+        {name = "ThemeEditor", file = "ThemeEditor.lua", target = "scios/ThemeEditor.lua", required = true},
+        {name = "Gaming", file = "Gaming.lua", target = "scios/Gaming.lua", required = true}
     },
     root_files = {
         {name = "Startup", file = "Startup.lua", target = "startup.lua", required = true},
         {name = "Installer", file = "Installer.lua", target = "Installer.lua", required = false}
     }
+}
+
+-- Required files for installation
+local requiredFiles = {
+    ["startup.lua"] = "startup.lua",
+    ["Sci_sentinel.lua"] = "scios/Sci_sentinel.lua",
+    ["Gui.lua"] = "scios/Gui.lua",
+    ["Commands.lua"] = "scios/Commands.lua",
+    ["Updater.lua"] = "scios/Updater.lua",
+    ["Theme.lua"] = "scios/Theme.lua",
+    ["ThemeEditor.lua"] = "scios/ThemeEditor.lua",
+    ["Gaming.lua"] = "scios/Gaming.lua",
+    ["DisplayManager.lua"] = "scios/DisplayManager.lua",
+    ["Login.lua"] = "scios/Login.lua"
 }
 
 -- Initialize screen
