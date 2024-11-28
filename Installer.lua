@@ -1,6 +1,45 @@
 -- SCI Sentinel OS Installer
 local version = "1.2.0"
 
+-- Parse command line arguments
+local args = {...}
+local options = {
+    noUpdate = false  -- Default to auto-update enabled
+}
+
+-- Process arguments
+for _, arg in ipairs(args) do
+    if arg == "--no-update" or arg == "-n" then
+        options.noUpdate = true
+    end
+end
+
+-- Check for required APIs
+if not term or not fs or not http then
+    printError("This program requires the term, fs, and http APIs")
+    return
+end
+
+-- Get shell API and program path
+local shell = shell
+if not shell then
+    if _G.shell then
+        shell = _G.shell
+    else
+        printError("This program requires the shell API")
+        return
+    end
+end
+
+-- Get the installer's path
+local installerPath
+if shell then
+    installerPath = shell.getRunningProgram()
+else
+    -- Fallback to arg[0] if available
+    installerPath = (arg and arg[0]) or "installer.lua"
+end
+
 -- Initialize screen dimensions immediately
 local screen = {
     width = term.getSize(),
@@ -543,7 +582,6 @@ function checkInstallerUpdate()
     term.setCursorPos(1, 1)
     print("Checking for installer updates...")
     
-    local installerPath = shell.getRunningProgram()
     local url = getGitHubRawURL("Installer.lua")
     
     -- Create temp directory if it doesn't exist
@@ -600,7 +638,12 @@ function checkInstallerUpdate()
             os.sleep(1)
             
             -- Restart the installer
-            os.run({}, installerPath)
+            if shell then
+                os.run({}, installerPath)
+            else
+                -- Fallback to just running the file
+                dofile(installerPath)
+            end
             return true
         else
             print("Installer is up to date!")
@@ -638,9 +681,11 @@ end
 
 -- Main entry point
 local function main()
-    -- Always check for updates first
-    if checkInstallerUpdate() then
-        return  -- Exit if we updated (the new version will be running)
+    -- Check for updates unless disabled
+    if not options.noUpdate then
+        if checkInstallerUpdate() then
+            return  -- Exit if we updated (the new version will be running)
+        end
     end
     
     -- Handle any pending updates from previous runs
@@ -753,5 +798,16 @@ local function main()
     end
 end
 
--- Start the program
+-- Display help if requested
+if #args > 0 and (args[1] == "--help" or args[1] == "-h") then
+    print("SCI Sentinel OS Installer v" .. version)
+    print("Usage: installer [options]")
+    print("")
+    print("Options:")
+    print("  --no-update, -n    Disable auto-updating")
+    print("  --help, -h         Show this help message")
+    return
+end
+
+-- Run the installer
 main()
