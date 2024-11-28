@@ -1,5 +1,5 @@
 -- SCI Sentinel OS Commands Module
-local version = "1.0.1"
+local version = "1.34"
 
 -- Load required modules
 local gui = require("Gui")
@@ -230,7 +230,7 @@ local function rd(args)
 end
 
 local function ver()
-    gui.drawInfo("SCI Sentinel [Version 1.0.0]")
+    gui.drawInfo("SCI Sentinel [Version 1.34]")
     return true
 end
 
@@ -722,6 +722,23 @@ function commands.handleCommand(input)
         ping = ping,
         msg = msg,
         network = net,
+        theme = function(args)
+            local themeEditor = require("ThemeEditor")
+            themeEditor.run()
+            return true
+        end,
+        shutdown = function(args)
+            gui.drawInfo("Shutting down...")
+            os.sleep(1)
+            os.shutdown()
+            return true
+        end,
+        reboot = function(args)
+            gui.drawInfo("Rebooting...")
+            os.sleep(1)
+            os.reboot()
+            return true
+        end,
         update = function(args)
             -- Initialize updater with GUI
             updater = updater.init(gui)

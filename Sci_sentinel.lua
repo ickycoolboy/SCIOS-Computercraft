@@ -1,5 +1,5 @@
 -- SCI Sentinel OS: A Modular Operating System for Advanced Computer with Update Capability
-local version = "1.0.2" -- Minor version bump for startup handling improvements
+local version = "1.34" -- Minor version bump for startup handling improvements
 
 -- Set up the module path
 if not fs.exists("scios") then

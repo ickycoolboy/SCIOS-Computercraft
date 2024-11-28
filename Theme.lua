@@ -1,42 +1,91 @@
 -- SCI Sentinel Theme Module
 local theme = {}
 
--- Direct color definitions
+-- Default color definitions
 local defaultColors = {
     titleBar = colors.purple,
     titleText = colors.white,
     windowBg = colors.black,
-    text = colors.white,
-    systemText = colors.white,
-    systemBg = colors.black,
-    systemAccent = colors.purple,
-    success = colors.lime,
-    warning = colors.yellow,
-    error = colors.red,
-    info = colors.lightBlue,
-    menuBg = colors.black,
-    menuText = colors.white,
-    menuSelect = colors.purple,
-    menuSelectText = colors.white,
-    contentBg = nil,
-    contentText = nil,
-    buttonBg = colors.purple,
-    buttonText = colors.white,
-    buttonHover = colors.magenta,
-    scrollBg = colors.gray,
-    scrollHandle = colors.purple,
-    tabActive = colors.purple,
-    tabInactive = colors.gray,
-    tabTextActive = colors.white,
-    tabTextInactive = colors.lightGray,
-    background = colors.black,  -- Add explicit background color
-    progressBg = colors.gray,  -- Add explicit progress background color
-    progressBar = colors.purple,  -- Add explicit progress bar color
-    border = colors.gray,  -- Add explicit border color
-    dimText = colors.gray,  -- Add explicit dim text color
-    shellBg = colors.black,  -- Add shell background color
-    shellText = colors.white -- Add shell text color
+    text = colors.purple,  -- Default text is now purple
+    background = colors.black,
+    shellBg = colors.black,
+    shellText = colors.purple  -- Shell text also purple
 }
+
+-- Current theme colors (can be modified by user)
+local currentColors = {}
+
+-- Load saved theme
+local function loadTheme()
+    if fs.exists("/scios/theme.cfg") then
+        local file = fs.open("/scios/theme.cfg", "r")
+        if file then
+            local data = textutils.unserialize(file.readAll())
+            file.close()
+            if data then
+                for k, v in pairs(data) do
+                    currentColors[k] = v
+                end
+                return
+            end
+        end
+    end
+    -- If no saved theme or error, use defaults
+    for k, v in pairs(defaultColors) do
+        currentColors[k] = v
+    end
+end
+
+-- Save current theme
+function theme.saveTheme()
+    local file = fs.open("/scios/theme.cfg", "w")
+    if file then
+        file.write(textutils.serialize(currentColors))
+        file.close()
+        return true
+    end
+    return false
+end
+
+-- Set a specific color
+function theme.setColor(name, color)
+    if defaultColors[name] ~= nil then
+        currentColors[name] = color
+        return true
+    end
+    return false
+end
+
+-- Get color from theme
+function theme.getColor(name)
+    return currentColors[name] or defaultColors[name] or colors.white
+end
+
+-- Reset to defaults
+function theme.resetToDefaults()
+    for k, v in pairs(defaultColors) do
+        currentColors[k] = v
+    end
+    theme.saveTheme()
+end
+
+-- Get all theme colors
+function theme.getColors()
+    local result = {}
+    for k, v in pairs(currentColors) do
+        result[k] = v
+    end
+    return result
+end
+
+-- Get available color names
+function theme.getColorNames()
+    local names = {}
+    for k, _ in pairs(defaultColors) do
+        table.insert(names, k)
+    end
+    return names
+end
 
 -- Get native terminal
 local native = term.native()
@@ -46,21 +95,16 @@ local shellWindow = nil
 local function createShellWindow()
     local w, h = term.getSize()
     if shellWindow then
-        shellWindow.setBackgroundColor(defaultColors.shellBg)
-        shellWindow.setTextColor(defaultColors.shellText)
+        shellWindow.setBackgroundColor(theme.getColor("shellBg"))
+        shellWindow.setTextColor(theme.getColor("shellText"))
         return shellWindow
     end
     
     -- Create a window for the shell that takes up the full terminal
     shellWindow = window.create(term.current(), 1, 1, w, h, true)
-    shellWindow.setBackgroundColor(defaultColors.shellBg)
-    shellWindow.setTextColor(defaultColors.shellText)
+    shellWindow.setBackgroundColor(theme.getColor("shellBg"))
+    shellWindow.setTextColor(theme.getColor("shellText"))
     return shellWindow
-end
-
--- Get color from theme
-function theme.getColor(name)
-    return defaultColors[name] or colors.white
 end
 
 -- Initialize theme
@@ -69,14 +113,14 @@ function theme.init()
     local current = term.current()
     
     -- Reset native terminal first
-    native.setBackgroundColor(defaultColors.background)
-    native.setTextColor(defaultColors.text)
+    native.setBackgroundColor(theme.getColor("background"))
+    native.setTextColor(theme.getColor("text"))
     native.clear()
     
     -- Reset current terminal if different from native
     if current ~= native then
-        current.setBackgroundColor(defaultColors.background)
-        current.setTextColor(defaultColors.text)
+        current.setBackgroundColor(theme.getColor("background"))
+        current.setTextColor(theme.getColor("text"))
         current.clear()
     end
     
@@ -92,7 +136,7 @@ function theme.drawBox(x, y, width, height, title)
     local current = term.current()
     
     -- Fill window area
-    current.setBackgroundColor(defaultColors.windowBg)
+    current.setBackgroundColor(theme.getColor("windowBg"))
     for i = y, y + height - 1 do
         current.setCursorPos(x, i)
         current.write(string.rep(" ", width))
@@ -100,8 +144,8 @@ function theme.drawBox(x, y, width, height, title)
 
     -- Draw title bar if provided
     if title then
-        current.setBackgroundColor(defaultColors.titleBar)
-        current.setTextColor(defaultColors.titleText)
+        current.setBackgroundColor(theme.getColor("titleBar"))
+        current.setTextColor(theme.getColor("titleText"))
         current.setCursorPos(x, y)
         current.write(string.rep(" ", width))
         current.setCursorPos(x + 1, y)
@@ -115,8 +159,8 @@ function theme.drawTitleBar(title)
     local w, h = current.getSize()
     
     -- Clear the first line completely
-    current.setBackgroundColor(defaultColors.titleBar)
-    current.setTextColor(defaultColors.titleText)
+    current.setBackgroundColor(theme.getColor("titleBar"))
+    current.setTextColor(theme.getColor("titleText"))
     current.setCursorPos(1, 1)
     current.write(string.rep(" ", w))
     
@@ -127,7 +171,7 @@ function theme.drawTitleBar(title)
     end
     
     -- Fill rest with background
-    current.setBackgroundColor(defaultColors.background)
+    current.setBackgroundColor(theme.getColor("background"))
     for i = 2, h do
         current.setCursorPos(1, i)
         current.write(string.rep(" ", w))
@@ -137,8 +181,8 @@ end
 -- Apply theme to a window
 function theme.applyWindow(window)
     if window then
-        window.setBackgroundColor(defaultColors.background)
-        window.setTextColor(defaultColors.text)
+        window.setBackgroundColor(theme.getColor("background"))
+        window.setTextColor(theme.getColor("text"))
         window.clear()
     end
 end
@@ -587,20 +631,20 @@ function theme.drawInterface()
     local current = term.current()
     
     -- Clear entire screen
-    current.setBackgroundColor(defaultColors.background)
+    current.setBackgroundColor(theme.getColor("background"))
     current.clear()
     
     -- Draw minimal purple header
-    current.setBackgroundColor(defaultColors.titleBar)
-    current.setTextColor(defaultColors.titleText)
+    current.setBackgroundColor(theme.getColor("titleBar"))
+    current.setTextColor(theme.getColor("titleText"))
     current.setCursorPos(1, 1)
     current.write(string.rep(" ", w))
     current.setCursorPos(2, 1)
     current.write("SCI Sentinel")
     
     -- Reset colors and fill rest of screen
-    current.setBackgroundColor(defaultColors.background)
-    current.setTextColor(defaultColors.text)
+    current.setBackgroundColor(theme.getColor("background"))
+    current.setTextColor(theme.getColor("text"))
     for i = 2, h do
         current.setCursorPos(1, i)
         current.write(string.rep(" ", w))
@@ -623,14 +667,14 @@ function theme.init()
     local current = term.current()
     
     -- Reset native terminal first
-    native.setBackgroundColor(defaultColors.background)
-    native.setTextColor(defaultColors.text)
+    native.setBackgroundColor(theme.getColor("background"))
+    native.setTextColor(theme.getColor("text"))
     native.clear()
     
     -- Reset current terminal if different from native
     if current ~= native then
-        current.setBackgroundColor(defaultColors.background)
-        current.setTextColor(defaultColors.text)
+        current.setBackgroundColor(theme.getColor("background"))
+        current.setTextColor(theme.getColor("text"))
         current.clear()
     end
     
@@ -676,5 +720,8 @@ initScreen()
 
 -- Initialize theme
 theme.init()
+
+-- Load saved theme
+loadTheme()
 
 return theme

@@ -1,5 +1,5 @@
 -- SCI Sentinel OS Startup
-local version = "1.0.1"
+local version = "1.34"
 
 -- Set up the module path
 if not fs.exists("scios") then

@@ -1,5 +1,5 @@
 -- SCI Sentinel GUI Module
-local version = "1.0.1"
+local version = "1.34"
 local theme = require("Theme")
 
 local gui = {}
