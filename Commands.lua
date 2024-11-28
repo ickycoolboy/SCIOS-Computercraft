@@ -1001,104 +1001,87 @@ function commands.handleCommand(input)
                 term.clear()
                 term.setCursorPos(1,1)
                 
-                -- Create backup if requested
-                if _G.uninstaller.settings.createBackup then
-                    gui.drawFancyBox(5, 5, 40, 8, "Creating Backup", colors.black, colors.blue)
-                    local backupDir = "scios/backup"
-                    if not fs.exists(backupDir) then
-                        fs.makeDir(backupDir)
-                    end
-                    
-                    -- Create timestamped backup directory
-                    local timestamp = os.date("%y%m%d_%H%M")
-                    local backupPath = backupDir .. "/backup_" .. timestamp
-                    fs.makeDir(backupPath)
-                    
-                    -- Copy files to backup
-                    local files = {
-                        {path = "/scios/Commands.lua", desc = "Commands Module"},
-                        {path = "/scios/GUI.lua", desc = "GUI Module"},
-                        {path = "/scios/Network.lua", desc = "Network Module"},
-                        {path = "/scios/sci_sentinel.lua", desc = "Main Program"},
-                        {path = "/scios/installer.lua", desc = "Installer"}
-                    }
-                    
-                    for i, file in ipairs(files) do
-                        local progress = i / #files
-                        gui.drawCenteredText(7, "Backing up: " .. file.desc, colors.white)
-                        gui.drawProgressBar(7, 9, 30, "Progress", progress)
-                        
-                        if fs.exists(file.path) then
-                            -- Get destination path
-                            local destPath = backupPath .. "/" .. fs.getName(file.path)
-                            -- Copy file
-                            local source = fs.open(file.path, "r")
-                            if source then
-                                local content = source.readAll()
-                                source.close()
-                                
-                                local dest = fs.open(destPath, "w")
-                                if dest then
-                                    dest.write(content)
-                                    dest.close()
-                                    logMessage("Backed up file: " .. file.path .. " to " .. destPath)
-                                else
-                                    logError("Failed to open destination file: " .. destPath)
-                                end
-                            else
-                                logError("Failed to open source file: " .. file.path)
-                            end
+                -- Create cleanup script that will run on next boot
+                local cleanupScript = [[
+                -- Simple retry function
+                local function tryDelete(path, attempts)
+                    for i = 1, attempts do
+                        if fs.exists(path) then
+                            fs.delete(path)
+                            os.sleep(0.5)  -- Give system time to process
+                        else
+                            return true
                         end
-                        os.sleep(0.1)  -- Small delay to show progress
                     end
+                    return not fs.exists(path)
                 end
-                
-                -- Draw uninstall progress screen
-                gui.drawFancyBox(5, 5, 40, 8, "Uninstalling", colors.black, colors.red)
-                
+
                 -- List of files to remove
                 local files = {
-                    {path = "/scios/Commands.lua", desc = "Commands Module"},
-                    {path = "/scios/GUI.lua", desc = "GUI Module"},
-                    {path = "/scios/Network.lua", desc = "Network Module"},
-                    {path = "/scios/sci_sentinel.lua", desc = "Main Program"},
-                    {path = "/scios/installer.lua", desc = "Installer"}
+                    "/startup.lua",
+                    "/scios/Commands.lua",
+                    "/scios/GUI.lua",
+                    "/scios/Network.lua",
+                    "/scios/sci_sentinel.lua",
+                    "/scios/Sci_sentinel.lua",
+                    "/scios/installer.lua",
+                    "/scios/Login.lua",
+                    "/scios/DisplayManager.lua",
+                    "/scios/Updater.lua",
+                    "/scios/versions.db",
+                    "/scios/Help.lua",
+                    "/scios/file_hashes.db"
                 }
-                
-                -- Remove files
-                for i, file in ipairs(files) do
-                    local progress = i / #files
-                    gui.drawCenteredText(7, "Removing: " .. file.desc, colors.white)
-                    gui.drawProgressBar(7, 9, 30, "Progress", progress)
-                    
-                    if not _G.uninstaller.settings.debugMode and fs.exists(file.path) then
-                        fs.delete(file.path)
-                        logMessage("Removed file: " .. file.path)
-                    else
-                        logMessage("Debug mode: Would remove file: " .. file.path)
-                    end
-                    os.sleep(0.1)  -- Small delay to show progress
-                end
-                
-                -- Final cleanup
-                if not _G.uninstaller.settings.debugMode then
-                    -- Remove empty directories
-                    if fs.exists("/scios") and fs.isDir("/scios") then
-                        local items = fs.list("/scios")
-                        if #items == 0 then
-                            fs.delete("/scios")
-                            logMessage("Removed empty directory: /scios")
-                        end
-                    end
-                end
-                
-                -- Show completion message
+
+                -- Clear screen
                 term.setBackgroundColor(colors.black)
                 term.clear()
                 term.setCursorPos(1,1)
-                gui.drawFancyBox(5, 5, 40, 8, "Uninstall Complete", colors.black, colors.lime)
-                gui.drawCenteredText(7, "SCI Sentinel has been uninstalled", colors.white)
+                print("Removing SCI Sentinel files...")
+
+                -- Remove all files
+                for _, path in ipairs(files) do
+                    if path ~= "/startup.lua" then  -- Leave startup.lua for last
+                        tryDelete(path, 3)
+                    end
+                end
+
+                -- Remove scios directory if empty
+                if fs.exists("/scios") then
+                    local items = fs.list("/scios")
+                    if #items == 0 then
+                        fs.delete("/scios")
+                    end
+                end
+
+                -- Final message
+                term.clear()
+                term.setCursorPos(1,1)
+                print("Cleanup complete")
+                print("Rebooting in 3 seconds...")
+                os.sleep(3)
+
+                -- Remove startup.lua and reboot
+                tryDelete("/startup.lua", 3)
+                os.reboot()
+                ]]
+
+                -- Step 1: Replace startup.lua with cleanup script
+                if fs.exists("/startup.lua") then
+                    fs.delete("/startup.lua")
+                end
+                local file = fs.open("/startup.lua", "w")
+                file.write(cleanupScript)
+                file.close()
+
+                -- Show message and reboot
+                term.setBackgroundColor(colors.black)
+                term.clear()
+                term.setCursorPos(1,1)
+                print("Uninstall prepared")
+                print("System will reboot to remove files...")
                 os.sleep(2)
+                os.reboot()
             end)
             
             if not success then
