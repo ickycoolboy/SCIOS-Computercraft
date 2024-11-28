@@ -2,7 +2,8 @@ local login = {}
 
 -- Default user credentials
 local users = {
-    ["Ickycoolboy"] = ""  -- Empty string means no password required
+    ["Ickycoolboy"] = "",
+    ["The Dertopian"] = ""
 }
 
 function login.showLoginScreen()

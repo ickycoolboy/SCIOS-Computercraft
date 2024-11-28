@@ -213,7 +213,7 @@ function gui.drawBox(x, y, width, height, title)
         write("|")
         -- Fill background
         term.setCursorPos(x + 1, y + i)
-        term.setBackgroundColor(colors.black)
+        term.setBackgroundColor(colors.gray)
         write(string.rep(" ", width-2))
     end
     
@@ -246,141 +246,82 @@ gui.colors = {
 }
 
 -- Draw a clickable button and return its bounds
-function gui.drawClickableButton(x, y, text, buttonColor, isHovered)
-    local width = #text + 4  -- Fixed width based on text length plus padding
-    local height = 1
-    
-    -- Button background
-    local bgColor = buttonColor or gui.colors.buttonBg
-    if isHovered then
-        -- Lighten the color when hovered
-        if bgColor == colors.red then
-            bgColor = colors.pink
-        elseif bgColor == colors.lime then
-            bgColor = colors.yellow
-        else
-            bgColor = colors.lightGray
-        end
-    end
-    
-    term.setBackgroundColor(bgColor)
+function gui.drawClickableButton(x, y, text, buttonColor)
+    local width = #text + 4
     term.setCursorPos(x, y)
+    term.setBackgroundColor(buttonColor)
     write(string.rep(" ", width))
+    term.setCursorPos(x + 2, y)
+    term.setTextColor(colors.white)
+    write(text)
+    term.setBackgroundColor(colors.black)
+    term.setTextColor(colors.white)
     
-    -- Button text
-    term.setTextColor(colors.white)  -- White text for better contrast
-    term.setCursorPos(x + 2, y)  -- Fixed padding of 2 spaces
-    
-    -- Add icons to Yes/No buttons
-    if text == "Yes" then
-        write("✓ " .. text)
-    elseif text == "No" then
-        write("✗ " .. text)
-    else
-        write(text)
-    end
-    
-    -- Return button bounds for click detection
+    -- Return button information
     return {
+        text = text,
         x1 = x,
         y1 = y,
         x2 = x + width - 1,
-        y2 = y + height - 1,
-        text = text,
+        y2 = y,
         width = width,
-        height = height,
-        color = buttonColor or gui.colors.buttonBg
+        color = buttonColor
     }
 end
 
 -- Handle mouse events for buttons
 function gui.handleMouseEvents(buttons)
-    local function isOverButton(btn, mx, my)
-        return mx >= btn.x1 and mx <= btn.x2 and
-               my >= btn.y1 and my <= btn.y2
+    -- Get initial click
+    local event, button, x, y = os.pullEvent("mouse_click")
+    
+    -- Find clicked button
+    for _, btn in ipairs(buttons) do
+        if x >= btn.x1 and x <= btn.x2 and y == btn.y1 then
+            -- Flash button
+            local oldBg = term.getBackgroundColor()
+            term.setCursorPos(btn.x1, btn.y1)
+            term.setBackgroundColor(colors.white)
+            term.setTextColor(btn.color)
+            write(string.rep(" ", btn.width))
+            term.setCursorPos(btn.x1 + 2, btn.y1)
+            write(btn.text)
+            
+            -- Small delay
+            os.sleep(0.05)
+            
+            -- Restore button
+            term.setCursorPos(btn.x1, btn.y1)
+            term.setBackgroundColor(btn.color)
+            term.setTextColor(colors.white)
+            write(string.rep(" ", btn.width))
+            term.setCursorPos(btn.x1 + 2, btn.y1)
+            write(btn.text)
+            
+            -- Reset colors
+            term.setBackgroundColor(oldBg)
+            term.setTextColor(colors.white)
+            
+            return btn.text
+        end
     end
     
-    while true do
-        local event, button, x, y = os.pullEvent()
-        
-        -- Handle hover effects
-        if event == "mouse_move" or event == "mouse_click" then
-            for _, btn in ipairs(buttons) do
-                local isHovered = isOverButton(btn, x, y)
-                gui.drawClickableButton(btn.x1, btn.y1, btn.text, btn.color, isHovered)
-            end
-        end
-        
-        if event == "mouse_click" then
-            -- Check each button
-            for _, btn in ipairs(buttons) do
-                if isOverButton(btn, x, y) then
-                    -- Highlight the clicked button
-                    local oldBg = term.getBackgroundColor()
-                    term.setBackgroundColor(btn.color)
-                    term.setCursorPos(btn.x1, btn.y1)
-                    term.setTextColor(colors.white)
-                    write(string.rep(" ", btn.width))
-                    term.setCursorPos(btn.x1 + 2, btn.y1)
-                    if btn.text == "Yes" then
-                        write("✓ " .. btn.text)
-                    elseif btn.text == "No" then
-                        write("✗ " .. btn.text)
-                    else
-                        write(btn.text)
-                    end
-                    term.setBackgroundColor(oldBg)
-                    
-                    -- Wait for mouse up
-                    event, _, x, y = os.pullEvent("mouse_up")
-                    -- Check if still over button
-                    if isOverButton(btn, x, y) then
-                        -- Button was released while mouse was still over it
-                        return btn.text
-                    end
-                    -- Redraw button in normal state
-                    gui.drawClickableButton(btn.x1, btn.y1, btn.text, btn.color, false)
-                end
-            end
-        end
-    end
+    return nil
 end
 
--- Draw an animated progress bar
-function gui.drawAnimatedProgressBar(x, y, width, text, progress)
-    local oldBg = term.getBackgroundColor()
-    local oldFg = term.getTextColor()
+-- Progress bar functionality
+function gui.drawFancyProgressBar(x, y, width, text, progress)
+    local barWidth = width - #text - 3
+    local filled = math.floor(barWidth * progress)
     
-    -- Progress bar frame
-    term.setBackgroundColor(colors.gray)
     term.setCursorPos(x, y)
-    write("┌" .. string.rep("─", width - 2) .. "┐")
-    term.setCursorPos(x, y + 1)
-    write("│" .. string.rep(" ", width - 2) .. "│")
-    term.setCursorPos(x, y + 2)
-    write("└" .. string.rep("─", width - 2) .. "┘")
-    
-    -- Progress fill
-    local fillWidth = math.floor(progress * (width - 2))
-    if fillWidth > 0 then
-        term.setCursorPos(x + 1, y + 1)
-        term.setBackgroundColor(colors.lime)
-        write(string.rep("█", fillWidth))
-    end
-    
-    -- Progress text
-    if text then
-        local percent = math.floor(progress * 100)
-        local displayText = text .. " (" .. percent .. "%)"
-        local textX = x + math.floor((width - #displayText) / 2)
-        term.setCursorPos(textX, y)
-        term.setBackgroundColor(colors.black)
-        term.setTextColor(colors.white)
-        write(displayText)
-    end
-    
-    term.setBackgroundColor(oldBg)
-    term.setTextColor(oldFg)
+    term.setTextColor(colors.white)
+    write(text .. " [")
+    term.setTextColor(colors.lime)
+    write(string.rep("=", filled))
+    term.setTextColor(colors.gray)
+    write(string.rep("-", barWidth - filled))
+    term.setTextColor(colors.white)
+    write("]")
 end
 
 -- Draw a centered text line
@@ -393,6 +334,43 @@ function gui.drawCenteredText(y, text, textColor)
     end
     write(text)
     term.setTextColor(colors.white)
+end
+
+-- Draw an animated progress bar
+function gui.drawAnimatedProgressBar(x, y, width, text, startProgress, endProgress, duration)
+    local startTime = os.epoch("utc")
+    local currentProgress = startProgress
+    
+    while currentProgress < endProgress do
+        -- Calculate progress based on time
+        local elapsed = (os.epoch("utc") - startTime) / 1000.0 -- Convert to seconds
+        currentProgress = startProgress + (endProgress - startProgress) * (elapsed / duration)
+        if currentProgress > endProgress then
+            currentProgress = endProgress
+        end
+        
+        -- Draw the progress bar
+        term.setCursorPos(x, y)
+        term.setTextColor(colors.white)
+        write(text .. " [")
+        term.setTextColor(colors.lime)
+        
+        local barWidth = width - #text - 3
+        local filled = math.floor(barWidth * currentProgress)
+        write(string.rep("=", filled))
+        term.setTextColor(colors.gray)
+        write(string.rep("-", barWidth - filled))
+        term.setTextColor(colors.white)
+        write("]")
+        
+        -- Add percentage display
+        local percent = math.floor(currentProgress * 100)
+        term.setCursorPos(x + width + 1, y)
+        write(string.format(" %3d%%", percent))
+        
+        -- Small delay for animation
+        os.sleep(0.05)
+    end
 end
 
 -- Draw a fancy border box with title

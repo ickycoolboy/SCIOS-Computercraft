@@ -762,390 +762,356 @@ function commands.handleCommand(input)
                 logMessage("ERROR: " .. tostring(err))
             end
 
-            logMessage("Starting uninstallation process")
+            -- Create uninstaller state if it doesn't exist
+            if not _G.uninstaller then
+                _G.uninstaller = {
+                    currentScreen = "main",
+                    settings = {
+                        createBackup = true,
+                        keepUserData = true,
+                        keepConfig = false,
+                        keepLogs = true,
+                        debugMode = false
+                    },
+                    stats = {
+                        computerID = os.getComputerID(),
+                        label = os.getComputerLabel() or "Unnamed",
+                        installDate = fs.exists("/scios/install.log") and fs.open("/scios/install.log", "r").readLine() or "Unknown",
+                        lastUsed = os.date(),
+                        diskUsage = "Calculating...",
+                        availableSpace = "Calculating..."
+                    }
+                }
+            end
 
-            -- Error handling wrapper
-            local success, err = pcall(function()
-                -- Save current terminal state
-                local oldTerm = term.current()
-                local oldBg = term.getBackgroundColor()
-                local oldFg = term.getTextColor()
-
-                logMessage("Terminal state saved")
-
-                -- Uninstallation logic
-                -- Create fresh log
-                if fs.exists("uninstall_debug.log") then
-                    fs.delete("uninstall_debug.log")
+            -- Calculate disk usage
+            local function updateDiskStats()
+                local total = 0
+                local files = {
+                    "/scios/Commands.lua",
+                    "/scios/GUI.lua",
+                    "/scios/Network.lua",
+                    "/scios/installer.lua",
+                    "/scios/sci_sentinel.lua"
+                }
+                for _, file in ipairs(files) do
+                    if fs.exists(file) then
+                        local f = fs.open(file, "r")
+                        if f then
+                            total = total + #f.readAll()
+                            f.close()
+                        end
+                    end
                 end
+                _G.uninstaller.stats.diskUsage = string.format("%.2f KB", total / 1024)
+                _G.uninstaller.stats.availableSpace = string.format("%.2f KB", fs.getFreeSpace("/") / 1024)
+            end
+            updateDiskStats()
 
-                logMessage("Checking debug mode")
-                local debugMode = false
-                if args[1] == "-debug" then
-                    debugMode = true
-                    logMessage("Debug mode enabled")
-                end
-
-                -- Get screen dimensions and setup UI
-                local w, h = term.getSize()
-                local isPocketPC = h <= 13
-                local minWidth = isPocketPC and 26 or 51
-                local minHeight = isPocketPC and 8 or 16
-
-                -- Create a new terminal redirect for our UI
-                local window = window.create(oldTerm, 1, 1, w, h, true)
-                term.redirect(window)
-
-                -- First confirmation screen
-                term.setBackgroundColor(colors.black)
-                term.clear()
-                term.setCursorPos(1,1)
+            -- Screen definitions
+            local screens = {
+                main = {
+                    draw = function()
+                        term.setBackgroundColor(colors.black)
+                        term.clear()
+                        gui.drawScreen()
+                        
+                        gui.drawFancyBox(5, 5, 40, 12, "SCI Sentinel Uninstaller", colors.black, colors.yellow)
+                        gui.drawCenteredText(7, "Select an option:", colors.white)
+                        
+                        return {
+                            gui.drawClickableButton(10, 9, "Settings", colors.blue),
+                            gui.drawClickableButton(25, 9, "Statistics", colors.cyan),
+                            gui.drawClickableButton(10, 11, "Uninstall", colors.red),
+                            gui.drawClickableButton(25, 11, "Cancel", colors.gray)
+                        }
+                    end,
+                    handle = function(choice)
+                        if choice == "Settings" then return "settings"
+                        elseif choice == "Statistics" then return "stats"
+                        elseif choice == "Uninstall" then return "confirm"
+                        elseif choice == "Cancel" then return "exit"
+                        end
+                        return "main"
+                    end
+                },
                 
-                local function cleanup()
-                    term.redirect(oldTerm)
-                    term.setBackgroundColor(oldBg)
-                    term.setTextColor(oldFg)
+                settings = {
+                    draw = function()
+                        -- Clear and reset screen state
+                        term.setBackgroundColor(colors.black)
+                        term.clear()
+                        term.setCursorPos(1,1)
+                        gui.drawScreen()
+                        
+                        gui.drawFancyBox(5, 5, 40, 16, "Uninstall Settings", colors.black, colors.blue)
+                        
+                        -- Draw toggleable settings with descriptions
+                        local y = 7
+                        local settingButtons = {}
+                        
+                        -- Debug print
+                        term.setCursorPos(1, 1)
+                        term.setTextColor(colors.white)
+                        print("Settings:", textutils.serialize(_G.uninstaller.settings))
+                        
+                        for text, value in pairs(_G.uninstaller.settings) do
+                            local displayText = text:gsub("([A-Z])", " %1"):gsub("^%l", string.upper)
+                            table.insert(settingButtons, gui.drawClickableButton(8, y, displayText, value and colors.lime or colors.red))
+                            
+                            -- Add descriptions for settings
+                            term.setCursorPos(25, y)
+                            term.setTextColor(colors.lightGray)
+                            if text == "debugMode" then
+                                write("- Test run without deleting files")
+                            elseif text == "keepUserData" then
+                                write("- Keep personal files and settings")
+                            end
+                            term.setTextColor(colors.white)
+                            y = y + 2
+                        end
+                        
+                        -- Add navigation buttons
+                        table.insert(settingButtons, gui.drawClickableButton(10, 15, "Save Settings", colors.lime))
+                        table.insert(settingButtons, gui.drawClickableButton(25, 15, "Back", colors.gray))
+                        
+                        -- Reset cursor to a safe position
+                        term.setCursorPos(1, 1)
+                        return settingButtons
+                    end,
+                    handle = function(choice)
+                        if choice == "Save Settings" then
+                            -- Clean up screen state before returning
+                            term.setBackgroundColor(colors.black)
+                            term.setTextColor(colors.white)
+                            term.setCursorPos(1, 1)
+                            logMessage("Settings saved: " .. textutils.serialize(_G.uninstaller.settings))
+                            return "main"
+                        elseif choice == "Back" then
+                            -- Clean up screen state before returning
+                            term.setBackgroundColor(colors.black)
+                            term.setTextColor(colors.white)
+                            term.setCursorPos(1, 1)
+                            return "main"
+                        else
+                            -- Toggle setting if it was clicked
+                            for setting, _ in pairs(_G.uninstaller.settings) do
+                                local displayText = setting:gsub("([A-Z])", " %1"):gsub("^%l", string.upper)
+                                if choice == displayText then
+                                    _G.uninstaller.settings[setting] = not _G.uninstaller.settings[setting]
+                                    break
+                                end
+                            end
+                            return "settings"
+                        end
+                    end
+                },
+                
+                stats = {
+                    draw = function()
+                        term.setBackgroundColor(colors.black)
+                        term.clear()
+                        gui.drawScreen()
+                        
+                        gui.drawFancyBox(5, 5, 40, 14, "System Statistics", colors.black, colors.cyan)
+                        
+                        -- Display system stats
+                        local y = 7
+                        gui.drawCenteredText(y, "Computer ID: " .. _G.uninstaller.stats.computerID, colors.white)
+                        gui.drawCenteredText(y + 1, "Label: " .. _G.uninstaller.stats.label, colors.white)
+                        gui.drawCenteredText(y + 2, "Install Date: " .. _G.uninstaller.stats.installDate, colors.white)
+                        gui.drawCenteredText(y + 3, "Last Used: " .. _G.uninstaller.stats.lastUsed, colors.white)
+                        gui.drawCenteredText(y + 4, "Disk Usage: " .. _G.uninstaller.stats.diskUsage, colors.lime)
+                        gui.drawCenteredText(y + 5, "Available: " .. _G.uninstaller.stats.availableSpace, colors.lime)
+                        
+                        return {
+                            gui.drawClickableButton(17, 13, "Back", colors.gray)
+                        }
+                    end,
+                    handle = function(choice)
+                        return "main"
+                    end
+                },
+                
+                confirm = {
+                    draw = function()
+                        term.setBackgroundColor(colors.black)
+                        term.clear()
+                        gui.drawScreen()
+                        
+                        gui.drawFancyBox(5, 5, 40, 14, "Confirm Uninstall", colors.black, colors.red)
+                        gui.drawCenteredText(7, "Are you sure you want to uninstall", colors.white)
+                        gui.drawCenteredText(8, "SCI Sentinel?", colors.white)
+                        
+                        if _G.uninstaller.settings.debugMode then
+                            gui.drawCenteredText(10, "[ DEBUG MODE ]", colors.lime)
+                            gui.drawCenteredText(11, "No files will be modified", colors.lime)
+                        end
+                        
+                        return {
+                            gui.drawClickableButton(10, 12, "Yes", colors.lime),
+                            gui.drawClickableButton(25, 12, "No", colors.red)
+                        }
+                    end,
+                    handle = function(choice)
+                        if choice == "Yes" then
+                            return "uninstall"
+                        end
+                        return "main"
+                    end
+                }
+            }
+
+            -- Main screen loop
+            local function runInterface()
+                local currentScreen = "main"
+                while currentScreen ~= "exit" and currentScreen ~= "uninstall" do
+                    -- Draw current screen
+                    term.setBackgroundColor(colors.black)
                     term.clear()
                     term.setCursorPos(1,1)
+                    
+                    local buttons = screens[currentScreen].draw()
+                    local choice = gui.handleMouseEvents(buttons)
+                    currentScreen = screens[currentScreen].handle(choice)
                 end
                 
-                if isPocketPC then
-                    gui.drawBox(1, 1, minWidth, minHeight, "[ Uninstall ]")
-                    gui.drawCenteredText(3, "Remove SCIOS?", colors.red)
-                    if debugMode then
-                        gui.drawCenteredText(4, "(Debug Mode)", colors.lime)
-                        gui.drawCenteredText(5, "No files will be modified", colors.lime)
-                    end
-                    
-                    -- Draw buttons
-                    local buttons = {
-                        gui.drawClickableButton(3, 6, "Yes", colors.lime),
-                        gui.drawClickableButton(minWidth-6, 6, "No", colors.red)
-                    }
-                    
-                    -- Handle button click
-                    local choice = gui.handleMouseEvents(buttons)
-                    logMessage("Button click handled, choice: " .. tostring(choice))
-                    if choice ~= "Yes" then
-                        gui.drawCenteredText(3, "Cancelled", colors.lime)
-                        os.sleep(1)
-                        cleanup()
-                        logMessage("Uninstallation cancelled")
-                        return true
-                    end
-                else
-                    gui.drawBox(1, 1, minWidth, minHeight, "[ SCI Sentinel Uninstaller ]")
-                    gui.drawCenteredText(3, "WARNING!", colors.red)
-                    gui.drawCenteredText(5, "This will completely remove", colors.orange)
-                    gui.drawCenteredText(6, "SCI Sentinel from your computer.", colors.orange)
-                    if debugMode then
-                        gui.drawCenteredText(7, "[ DEBUG MODE ]", colors.lime)
-                        gui.drawCenteredText(8, "No files will be modified", colors.lime)
-                    end
-                    
-                    -- Draw buttons
-                    local buttons = {
-                        gui.drawClickableButton(15, 12, "Yes", colors.lime),
-                        gui.drawClickableButton(30, 12, "No", colors.red)
-                    }
-                    
-                    -- Handle button click
-                    local choice = gui.handleMouseEvents(buttons)
-                    logMessage("Button click handled, choice: " .. tostring(choice))
-                    if choice ~= "Yes" then
-                        gui.drawCenteredText(7, "Uninstall cancelled", colors.lime)
-                        os.sleep(1)
-                        cleanup()
-                        logMessage("Uninstallation cancelled")
-                        return true
-                    end
-                end
+                -- Clean up screen state before exiting
+                term.setBackgroundColor(colors.black)
+                term.clear()
+                term.setCursorPos(1,1)
+                return currentScreen
+            end
 
-                -- Second confirmation screen
+            -- Run the interface
+            logMessage("Starting uninstaller interface")
+            local result = runInterface()
+            
+            if result == "exit" then
+                logMessage("Uninstallation cancelled by user")
+                return true
+            end
+
+            -- Continue with uninstallation if confirmed
+            logMessage("Beginning uninstallation with settings: " .. textutils.serialize(_G.uninstaller.settings))
+            
+            -- Perform uninstallation
+            local success, err = pcall(function()
                 term.setBackgroundColor(colors.black)
                 term.clear()
                 term.setCursorPos(1,1)
                 
-                if isPocketPC then
-                    gui.drawBox(1, 1, minWidth, minHeight, "[ Confirm ]")
-                    gui.drawCenteredText(3, "Are you sure?", colors.yellow)
-                    if debugMode then
-                        gui.drawCenteredText(4, "(Debug Mode)", colors.lime)
+                -- Create backup if requested
+                if _G.uninstaller.settings.createBackup then
+                    gui.drawFancyBox(5, 5, 40, 8, "Creating Backup", colors.black, colors.blue)
+                    local backupDir = "scios/backup"
+                    if not fs.exists(backupDir) then
+                        fs.makeDir(backupDir)
                     end
                     
-                    -- Draw buttons
-                    local buttons = {
-                        gui.drawClickableButton(3, 6, "Yes", colors.lime),
-                        gui.drawClickableButton(minWidth-6, 6, "No", colors.red)
+                    -- Create timestamped backup directory
+                    local timestamp = os.date("%y%m%d_%H%M")
+                    local backupPath = backupDir .. "/backup_" .. timestamp
+                    fs.makeDir(backupPath)
+                    
+                    -- Copy files to backup
+                    local files = {
+                        {path = "/scios/Commands.lua", desc = "Commands Module"},
+                        {path = "/scios/GUI.lua", desc = "GUI Module"},
+                        {path = "/scios/Network.lua", desc = "Network Module"},
+                        {path = "/scios/sci_sentinel.lua", desc = "Main Program"},
+                        {path = "/scios/installer.lua", desc = "Installer"}
                     }
                     
-                    -- Handle button click
-                    local choice = gui.handleMouseEvents(buttons)
-                    logMessage("Button click handled, choice: " .. tostring(choice))
-                    if choice ~= "Yes" then
-                        gui.drawCenteredText(3, "Cancelled", colors.lime)
-                        os.sleep(1)
-                        cleanup()
-                        logMessage("Uninstallation cancelled")
-                        return true
-                    end
-                else
-                    gui.drawBox(1, 1, minWidth, minHeight, "[ Final Confirmation ]")
-                    gui.drawCenteredText(3, "Last Chance!", colors.yellow)
-                    gui.drawCenteredText(5, "Are you absolutely sure you want", colors.white)
-                    gui.drawCenteredText(6, "to uninstall SCI Sentinel?", colors.white)
-                    if debugMode then
-                        gui.drawCenteredText(7, "[ DEBUG MODE - No files will be modified ]", colors.lime)
-                    end
-                    
-                    -- Draw buttons
-                    local buttons = {
-                        gui.drawClickableButton(15, 12, "Yes", colors.lime),
-                        gui.drawClickableButton(30, 12, "No", colors.red)
-                    }
-                    
-                    -- Handle button click
-                    local choice = gui.handleMouseEvents(buttons)
-                    logMessage("Button click handled, choice: " .. tostring(choice))
-                    if choice ~= "Yes" then
-                        gui.drawCenteredText(7, "Uninstall cancelled", colors.lime)
-                        os.sleep(1)
-                        cleanup()
-                        logMessage("Uninstallation cancelled")
-                        return true
+                    for i, file in ipairs(files) do
+                        local progress = i / #files
+                        gui.drawCenteredText(7, "Backing up: " .. file.desc, colors.white)
+                        gui.drawProgressBar(7, 9, 30, "Progress", progress)
+                        
+                        if fs.exists(file.path) then
+                            -- Get destination path
+                            local destPath = backupPath .. "/" .. fs.getName(file.path)
+                            -- Copy file
+                            local source = fs.open(file.path, "r")
+                            if source then
+                                local content = source.readAll()
+                                source.close()
+                                
+                                local dest = fs.open(destPath, "w")
+                                if dest then
+                                    dest.write(content)
+                                    dest.close()
+                                    logMessage("Backed up file: " .. file.path .. " to " .. destPath)
+                                else
+                                    logError("Failed to open destination file: " .. destPath)
+                                end
+                            else
+                                logError("Failed to open source file: " .. file.path)
+                            end
+                        end
+                        os.sleep(0.1)  -- Small delay to show progress
                     end
                 end
-
-                logMessage("User confirmed. Creating uninstall script")
-
-                -- Create the uninstall script
-                local script = [[
--- SCI Sentinel Uninstall Script
-local debugMode = ]] .. tostring(debugMode) .. [[
-
-local function removeFile(path)
-    if fs.exists(path) then
-        if not debugMode then
-            local success, err = pcall(function() fs.delete(path) end)
-            if not success then
-                -- If deletion fails, try to clear the file contents instead
-                pcall(function()
-                    local f = fs.open(path, "w")
-                    if f then
-                        f.write("")
-                        f.close()
-                    end
-                end)
-            end
-        end
-    end
-end
-
--- Wait for system to be fully ready
-os.sleep(1)
-
--- Remove all SCI Sentinel files
-local files = {
-    "scios/Sci_sentinel.lua",
-    "scios/Gui.lua",
-    "scios/Commands.lua",
-    "scios/Updater.lua",
-    "scios/versions.db",
-    "scios/filetracker.db",
-    "scios/file_hashes.db",
-    "uninstall_debug.log"
-}
-
--- Draw uninstall progress screen
-term.clear()
-term.setCursorPos(1,1)
-local w, h = term.getSize()
-local isPocketPC = h <= 13
-local title = debugMode and "[ Debug Uninstall ]" or "[ Removing SCI Sentinel ]"
-local width = isPocketPC and 26 or 51
-local height = isPocketPC and 8 or 16
-
--- Draw box
-term.setBackgroundColor(colors.black)
-term.clear()
-term.setCursorPos(1,1)
-print(string.rep("-", width))
-print("|" .. string.rep(" ", math.floor((width - #title) / 2)) .. title .. string.rep(" ", width - #title - math.floor((width - #title) / 2) - 2) .. "|")
-print(string.rep("-", width))
-
--- Remove files with progress
-for i, file in ipairs(files) do
-    local progress = i / (#files + 1)  -- +1 for directory removal
-    local barWidth = width - 4
-    local filled = math.floor(barWidth * progress)
-    
-    -- Update progress bar
-    term.setCursorPos(2, isPocketPC and 4 or 5)
-    term.write(string.rep("=", filled) .. string.rep("-", barWidth - filled))
-    
-    -- Show current file
-    term.setCursorPos(2, isPocketPC and 6 or 7)
-    if debugMode then
-        term.write("Simulating: " .. string.sub(file, 1, width - 15))
-    else
-        term.write("Removing: " .. string.sub(file, 1, width - 13))
-    end
-    term.write(string.rep(" ", width - #file - 4))
-    
-    removeFile(file)
-    os.sleep(0.1)
-end
-
--- Clean up SCIOS directory
-if fs.exists("scios") then
-    local function removeDir(path)
-        if not fs.exists(path) then return end
-        
-        local success, list = pcall(function() return fs.list(path) end)
-        if not success then return end
-        
-        for _, file in ipairs(list) do
-            local fullPath = fs.combine(path, file)
-            if fs.isDir(fullPath) then
-                removeDir(fullPath)
-            else
-                removeFile(fullPath)
-            end
-        end
-        if not debugMode then
-            pcall(function() fs.delete(path) end)
-        end
-    end
-    
-    -- Update progress for directory removal
-    term.setCursorPos(2, isPocketPC and 6 or 7)
-    if debugMode then
-        term.write("Simulating directory removal" .. string.rep(" ", width - 26))
-    else
-        term.write("Removing SCIOS directory" .. string.rep(" ", width - 23))
-    end
-    removeDir("scios")
-end
-
--- Show completion message
-term.clear()
-term.setCursorPos(1,1)
-print(string.rep("-", width))
-if debugMode then
-    print("|" .. string.rep(" ", math.floor((width - 20) / 2)) .. "[ Debug Complete! ]" .. string.rep(" ", width - 20 - math.floor((width - 20) / 2) - 2) .. "|")
-else
-    print("|" .. string.rep(" ", math.floor((width - 16) / 2)) .. "[ Uninstalled! ]" .. string.rep(" ", width - 16 - math.floor((width - 16) / 2) - 2) .. "|")
-end
-print(string.rep("-", width))
-
-if not debugMode then
-    if fs.exists("uninstall.lua") then
-        fs.delete("uninstall.lua")
-    end
-end
-
--- Clean up and reboot
-os.sleep(1)
-os.reboot()
-]]
-
-                logMessage("Writing uninstall script")
-                local f = fs.open("uninstall.lua", "w")
-                if f then
-                    f.write(script)
-                    f.close()
-                else
-                    logMessage("Failed to create uninstall script")
-                    print("Error: Could not create uninstall script")
-                    return false
-                end
-
-                -- Modify startup.lua to run the uninstall script
-                logMessage("Modifying startup.lua")
-                local startup = [[
--- SCI Sentinel uninstall in progress
-if fs.exists("uninstall.lua") then
-    shell.run("uninstall.lua")
-end
-if fs.exists("startup.lua") then
-    fs.delete("startup.lua")
-end
-]]
                 
-                if not debugMode then
-                    local f = fs.open("startup.lua", "w")
-                    if f then
-                        f.write(startup)
-                        f.close()
-                    end
-                end
-
-                logMessage("Setup complete")
+                -- Draw uninstall progress screen
+                gui.drawFancyBox(5, 5, 40, 8, "Uninstalling", colors.black, colors.red)
                 
-                -- Show reboot prompt
-                if isPocketPC then
-                    gui.drawBox(1, 1, minWidth, minHeight, "[ Ready ]")
-                    gui.drawCenteredText(3, "Reboot now?", colors.yellow)
+                -- List of files to remove
+                local files = {
+                    {path = "/scios/Commands.lua", desc = "Commands Module"},
+                    {path = "/scios/GUI.lua", desc = "GUI Module"},
+                    {path = "/scios/Network.lua", desc = "Network Module"},
+                    {path = "/scios/sci_sentinel.lua", desc = "Main Program"},
+                    {path = "/scios/installer.lua", desc = "Installer"}
+                }
+                
+                -- Remove files
+                for i, file in ipairs(files) do
+                    local progress = i / #files
+                    gui.drawCenteredText(7, "Removing: " .. file.desc, colors.white)
+                    gui.drawProgressBar(7, 9, 30, "Progress", progress)
                     
-                    -- Draw buttons
-                    local buttons = {
-                        gui.drawClickableButton(3, 6, "Yes", colors.lime),
-                        gui.drawClickableButton(minWidth-6, 6, "No", colors.red)
-                    }
-                    
-                    -- Handle button click
-                    local choice = gui.handleMouseEvents(buttons)
-                    logMessage("Button click handled, choice: " .. tostring(choice))
-                    if choice == "Yes" then
-                        gui.drawCenteredText(3, "Rebooting...", colors.lime)
-                        os.sleep(1)
-                        os.reboot()
+                    if not _G.uninstaller.settings.debugMode and fs.exists(file.path) then
+                        fs.delete(file.path)
+                        logMessage("Removed file: " .. file.path)
                     else
-                        gui.drawCenteredText(3, "Reboot later", colors.lime)
-                        os.sleep(1)
+                        logMessage("Debug mode: Would remove file: " .. file.path)
                     end
-                else
-                    gui.drawBox(1, 1, minWidth, minHeight, "[ Ready to Uninstall ]")
-                    if debugMode then
-                        gui.drawCenteredText(4, "Debug simulation complete!", colors.lime)
-                    else
-                        gui.drawCenteredText(4, "Uninstaller is ready!", colors.lime)
-                    end
-                    gui.drawCenteredText(6, "System will be uninstalled on reboot.", colors.white)
-                    gui.drawCenteredText(8, "Would you like to reboot now?", colors.yellow)
-                    
-                    -- Draw buttons
-                    local buttons = {
-                        gui.drawClickableButton(15, 12, "Yes", colors.lime),
-                        gui.drawClickableButton(30, 12, "No", colors.red)
-                    }
-                    
-                    -- Handle button click
-                    local choice = gui.handleMouseEvents(buttons)
-                    logMessage("Button click handled, choice: " .. tostring(choice))
-                    if choice == "Yes" then
-                        gui.drawCenteredText(7, "Rebooting to complete uninstallation...", colors.lime)
-                        os.sleep(1)
-                        os.reboot()
-                    else
-                        gui.drawCenteredText(7, "Please reboot to complete uninstallation", colors.lime)
-                        os.sleep(1)
+                    os.sleep(0.1)  -- Small delay to show progress
+                end
+                
+                -- Final cleanup
+                if not _G.uninstaller.settings.debugMode then
+                    -- Remove empty directories
+                    if fs.exists("/scios") and fs.isDir("/scios") then
+                        local items = fs.list("/scios")
+                        if #items == 0 then
+                            fs.delete("/scios")
+                            logMessage("Removed empty directory: /scios")
+                        end
                     end
                 end
-
-                logMessage("Function completed successfully")
-                cleanup()
-                return true
+                
+                -- Show completion message
+                term.setBackgroundColor(colors.black)
+                term.clear()
+                term.setCursorPos(1,1)
+                gui.drawFancyBox(5, 5, 40, 8, "Uninstall Complete", colors.black, colors.lime)
+                gui.drawCenteredText(7, "SCI Sentinel has been uninstalled", colors.white)
+                os.sleep(2)
             end)
-
+            
             if not success then
-                logError(err)
-                print("An error occurred during uninstallation. Check uninstall_debug.log for details.")
-                return false
+                -- Show error message
+                term.setBackgroundColor(colors.black)
+                term.clear()
+                term.setCursorPos(1,1)
+                gui.drawFancyBox(5, 5, 40, 10, "Error", colors.black, colors.red)
+                gui.drawCenteredText(7, "An error occurred:", colors.white)
+                gui.drawCenteredText(8, err, colors.red)
+                logError("Uninstallation error: " .. tostring(err))
+                os.sleep(3)
             end
-
-            logMessage("Uninstallation process completed")
-
             return true
         end,
         mirror = function(args)
