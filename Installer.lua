@@ -1,7 +1,18 @@
 -- SCI Sentinel OS Installer
 local version = "1.2.0"
 
--- Embedded GUI module for installer
+-- Initialize screen dimensions immediately
+local screen = {
+    width = term.getSize(),
+    height = term.getSize()
+}
+
+-- Update screen dimensions function
+local function updateScreenDimensions()
+    screen.width, screen.height = term.getSize()
+end
+
+-- Enhanced GUI module
 local gui = {
     colors = {
         background = colors.blue,
@@ -14,7 +25,87 @@ local gui = {
         titleBar = colors.blue,
         titleText = colors.white,
         progressBar = colors.lime,
-        progressBg = colors.gray
+        progressBg = colors.gray,
+        highlight = colors.yellow,
+        error = colors.red
+    },
+    animations = {
+        loadingFrames = {"|", "/", "-", "\\"},
+        progressChars = {"░", "▒", "▓", "█"}
+    }
+}
+
+-- ASCII Art for the title screen
+local titleArt = {
+    "   _____ _____ _____    _____ _____ ",
+    "  / ____|_   _|  __ \\  / ____/ ____|",
+    " | (___   | | | |  | || |   | (___  ",
+    "  \\___ \\  | | | |  | || |    \\___ \\ ",
+    "  ____) |_| |_| |__| || |________) |",
+    " |_____/|_____|_____/  \\_____|_____/",
+    "      Sentinel Control Interface      ",
+    "          Operating System           "
+}
+
+-- Installation steps
+local steps = {
+    {
+        title = "Welcome",
+        description = "Welcome to SCI Sentinel OS Installation"
+    },
+    {
+        title = "License",
+        description = "License Agreement"
+    },
+    {
+        title = "Components",
+        description = "Select Components"
+    },
+    {
+        title = "Installing",
+        description = "Installing Components"
+    },
+    {
+        title = "Complete",
+        description = "Installation Complete"
+    }
+}
+
+local currentStep = 1
+
+-- Navigation buttons style
+local navButtons = {
+    back = {
+        text = "[ BACK ]",
+        colors = {
+            bg = colors.blue,
+            fg = colors.white,
+            disabled = colors.gray
+        }
+    },
+    next = {
+        text = "[ NEXT ]",
+        colors = {
+            bg = colors.blue,
+            fg = colors.white,
+            disabled = colors.gray
+        }
+    },
+    install = {
+        text = "[ INSTALL ]",
+        colors = {
+            bg = colors.green,
+            fg = colors.white,
+            disabled = colors.gray
+        }
+    },
+    finish = {
+        text = "[ REBOOT ]",
+        colors = {
+            bg = colors.green,
+            fg = colors.white,
+            disabled = colors.gray
+        }
     }
 }
 
@@ -57,6 +148,56 @@ function gui.drawWindow(x, y, width, height, title)
     term.setTextColor(oldFg)
 end
 
+-- Draw a styled navigation button
+function gui.drawNavButton(x, y, button, active)
+    local oldBg = term.getBackgroundColor()
+    local oldFg = term.getTextColor()
+    
+    if active then
+        term.setBackgroundColor(button.colors.bg)
+        term.setTextColor(button.colors.fg)
+    else
+        term.setBackgroundColor(button.colors.disabled)
+        term.setTextColor(colors.lightGray)
+    end
+    
+    term.setCursorPos(x, y)
+    write(button.text)
+    
+    term.setBackgroundColor(oldBg)
+    term.setTextColor(oldFg)
+end
+
+-- Enhanced progress bar with smooth animation
+function gui.drawAnimatedProgressBar(x, y, width, text, progress)
+    local oldBg = term.getBackgroundColor()
+    local oldFg = term.getTextColor()
+    
+    -- Progress bar background
+    term.setBackgroundColor(gui.colors.progressBg)
+    term.setCursorPos(x, y)
+    write(string.rep(" ", width))
+    
+    -- Progress fill
+    local fillWidth = math.floor(progress * width)
+    if fillWidth > 0 then
+        term.setBackgroundColor(gui.colors.progressBar)
+        term.setCursorPos(x, y)
+        write(string.rep("█", fillWidth))
+    end
+    
+    -- Text overlay
+    if text then
+        local textX = x + math.floor((width - #text) / 2)
+        term.setCursorPos(textX, y)
+        term.setTextColor(gui.colors.text)
+        write(text)
+    end
+    
+    term.setBackgroundColor(oldBg)
+    term.setTextColor(oldFg)
+end
+
 -- Draw a Windows 9x style button
 function gui.drawButton(x, y, width, text, active)
     local oldBg = term.getBackgroundColor()
@@ -85,78 +226,137 @@ function gui.drawButton(x, y, width, text, active)
     term.setTextColor(oldFg)
 end
 
--- Draw a Windows 9x style progress bar with animation
-function gui.drawAnimatedProgressBar(x, y, width, text, progress)
-    local oldBg = term.getBackgroundColor()
-    local oldFg = term.getTextColor()
+-- Draw the installation wizard window
+function drawInstallationWizard()
+    -- Clear screen
+    term.setBackgroundColor(gui.colors.background)
+    term.clear()
     
-    -- Progress bar background
-    term.setBackgroundColor(gui.colors.progressBg)
-    term.setCursorPos(x, y)
-    write(string.rep(" ", width))
+    -- Draw window
+    gui.drawWindow(2, 1, screen.width - 2, screen.height - 1, "SCI Sentinel OS Installation - " .. steps[currentStep].title)
     
-    -- Progress fill
-    local fillWidth = math.floor(progress * width)
-    if fillWidth > 0 then
-        term.setBackgroundColor(gui.colors.progressBar)
-        term.setCursorPos(x, y)
-        write(string.rep(" ", fillWidth))
+    -- Draw progress bar at the top
+    local progressWidth = screen.width - 8
+    local progress = 0
+    
+    -- Calculate actual progress based on step and installation progress
+    if currentStep == 1 then
+        progress = 0
+    elseif currentStep == 2 then
+        progress = 0.25
+    elseif currentStep == 3 then
+        progress = 0.5
+    elseif currentStep == 4 then
+        -- During installation, progress will be updated dynamically
+        if not installationProgress then
+            progress = 0.75
+        else
+            progress = 0.75 + (installationProgress * 0.25)
+        end
+    elseif currentStep == 5 then
+        progress = 1
     end
     
-    -- Progress text
-    if text then
-        term.setCursorPos(x, y - 1)
-        term.setBackgroundColor(gui.colors.windowBg)
-        term.setTextColor(gui.colors.text)
-        write(text)
-    end
+    gui.drawAnimatedProgressBar(4, 3, progressWidth, string.format("Step %d of %d", currentStep, #steps), progress)
     
-    -- Percentage
-    local percent = math.floor(progress * 100)
-    term.setCursorPos(x + width + 1, y)
+    -- Draw step description
     term.setBackgroundColor(gui.colors.windowBg)
     term.setTextColor(gui.colors.text)
-    write(percent .. "%")
+    term.setCursorPos(4, 5)
+    write(steps[currentStep].description)
     
-    term.setBackgroundColor(oldBg)
-    term.setTextColor(oldFg)
+    -- Draw navigation bar background
+    term.setBackgroundColor(gui.colors.titleBar)
+    for y = screen.height - 4, screen.height - 2 do
+        term.setCursorPos(2, y)
+        write(string.rep(" ", screen.width - 3))
+    end
+    
+    -- Draw navigation buttons
+    drawNavigationButtons()
 end
 
--- First, ensure we have the GUI module
--- if not fs.exists("Gui.lua") then
---     print("Downloading GUI module...")
---     local response = http.get("https://raw.githubusercontent.com/ickycoolboy/SCIOS-Computercraft/Github-updating-test/Gui.lua")
---     if response then
---         local content = response.readAll()
---         response.close()
---         local file = fs.open("Gui.lua", "w")
---         file.write(content)
---         file.close()
---     else
---         error("Failed to download GUI module. Please check your internet connection.")
---     end
--- end
+-- Global installation progress tracker
+local installationProgress = 0
 
--- local gui = require("Gui")
+-- Draw navigation buttons
+function drawNavigationButtons()
+    local y = screen.height - 3
+    
+    -- Back button (if not on first step)
+    if currentStep > 1 and currentStep < 4 then
+        gui.drawNavButton(4, y, navButtons.back, true)
+    end
+    
+    -- Draw step indicator in the middle
+    local stepText = string.format("Step %d of %d", currentStep, #steps)
+    term.setBackgroundColor(gui.colors.titleBar)
+    term.setTextColor(gui.colors.titleText)
+    term.setCursorPos(math.floor((screen.width - #stepText) / 2), y)
+    write(stepText)
+    
+    -- Next/Install/Finish button
+    local nextButton
+    if currentStep < 3 then
+        nextButton = navButtons.next
+    elseif currentStep == 3 then
+        nextButton = navButtons.install
+    elseif currentStep == 5 then
+        nextButton = navButtons.finish
+    else
+        nextButton = navButtons.next
+    end
+    
+    gui.drawNavButton(screen.width - #nextButton.text - 4, y, nextButton, true)
+end
 
--- Fun loading messages
-local loading_messages = {
-    "Downloading more RAM...",
-    "Reticulating splines...",
-    "Converting caffeine to code...",
-    "Generating witty dialog...",
-    "Swapping time and space...",
-    "Spinning violently around the y-axis...",
-    "Tokenizing real life...",
-    "Bending the spoon...",
-    "Filtering morale...",
-    "Don't think of purple hippos...",
-    "Solving for X...",
-    "Dividing by zero...",
-    "Debugging the universe...",
-    "Loading your digital future...",
-    "Preparing to turn it off and on again..."
-}
+-- Handle navigation button clicks
+function handleNavigation(x, y)
+    local navY = screen.height - 3
+    
+    -- Back button
+    if currentStep > 1 and currentStep < 4 then
+        if x >= 4 and x < 4 + #navButtons.back.text then
+            if y == navY then
+                currentStep = currentStep - 1
+                return true
+            end
+        end
+    end
+    
+    -- Next/Install/Finish button
+    local nextButton
+    if currentStep < 3 then
+        nextButton = navButtons.next
+    elseif currentStep == 3 then
+        nextButton = navButtons.install
+    elseif currentStep == 5 then
+        nextButton = navButtons.finish
+    else
+        nextButton = navButtons.next
+    end
+    
+    if y == navY then
+        if x >= screen.width - #nextButton.text - 4 and x < screen.width - 4 then
+            if currentStep == 5 then
+                -- Handle reboot
+                term.setBackgroundColor(colors.black)
+                term.setTextColor(colors.white)
+                term.clear()
+                term.setCursorPos(1,1)
+                print("Rebooting system...")
+                os.sleep(1)
+                os.reboot()
+                return false
+            else
+                currentStep = currentStep + 1
+                return true
+            end
+        end
+    end
+    
+    return false
+end
 
 -- Configuration
 local config = {
@@ -180,65 +380,67 @@ local config = {
     }
 }
 
--- Installation steps
-local steps = {
-    {name = "Welcome", description = "Welcome to SCI Sentinel OS Installation"},
-    {name = "License", description = "Please review the license agreement"},
-    {name = "Components", description = "Choose components to install"},
-    {name = "Installing", description = "Installing SCI Sentinel OS..."},
-    {name = "Complete", description = "Installation complete!"}
-}
-
-local currentStep = 1
-local screen = {width = 0, height = 0}
-
 -- Initialize screen
 local function initScreen()
-    screen.width, screen.height = term.getSize()
+    updateScreenDimensions()
+    term.clear()
+    term.setCursorPos(1, 1)
     term.setBackgroundColor(gui.colors.background)
     term.clear()
 end
 
--- Draw installation wizard
-local function drawInstallationWizard()
-    -- Draw main window
-    gui.drawWindow(2, 2, screen.width - 2, screen.height - 2, "SCI Sentinel OS Installation")
+-- Draw title screen with ASCII art
+function drawTitleScreen()
+    term.clear()
+    term.setCursorPos(1, 1)
+    term.setBackgroundColor(colors.black)
     
-    -- Draw step title
-    term.setBackgroundColor(gui.colors.windowBg)
+    local startY = math.floor((screen.height - #titleArt) / 2) - 2
+    
+    -- Rainbow effect for title with animation
+    for frame = 1, 3 do  -- Add animation frames
+        for i, line in ipairs(titleArt) do
+            term.setCursorPos(math.floor((screen.width - #line) / 2), startY + i)
+            local color = ({colors.red, colors.yellow, colors.lime, colors.cyan, colors.blue, colors.magenta})[((i-1 + frame) % 6) + 1]
+            term.setTextColor(color)
+            write(line)
+        end
+        os.sleep(0.5)  -- Pause between frames
+    end
+    
+    -- Version number with fade-in effect
     term.setTextColor(gui.colors.text)
-    term.setCursorPos(4, 4)
-    write(steps[currentStep].name)
-    term.setCursorPos(4, 5)
-    write(steps[currentStep].description)
+    local versionText = "Version " .. version
+    local versionX = math.floor((screen.width - #versionText) / 2)
+    local versionY = startY + #titleArt + 2
     
-    -- Draw navigation buttons
-    if currentStep > 1 then
-        gui.drawButton(screen.width - 20, screen.height - 4, 8, "< Back", false)
+    -- Fade in version text
+    for i = 1, #versionText do
+        term.setCursorPos(versionX + i - 1, versionY)
+        write(versionText:sub(i,i))
+        os.sleep(0.05)
     end
-    if currentStep < #steps then
-        gui.drawButton(screen.width - 10, screen.height - 4, 8, "Next >", true)
-    end
+    
+    -- Add a "Press any key to continue" message
+    local pressKeyMsg = "Press any key to continue..."
+    term.setCursorPos(math.floor((screen.width - #pressKeyMsg) / 2), versionY + 2)
+    term.setTextColor(colors.lightGray)
+    write(pressKeyMsg)
+    
+    -- Wait for keypress
+    os.pullEvent("key")
 end
 
--- Show a random loading message with animation
-local function showLoadingMessage()
-    local msg = loading_messages[math.random(1, #loading_messages)]
+-- Enhanced error handling with humor
+function showError(message, suggestion)
     term.setBackgroundColor(gui.colors.windowBg)
+    term.setTextColor(gui.colors.error)
+    term.setCursorPos(4, screen.height - 3)
+    write("Error: " .. message)
+    term.setCursorPos(4, screen.height - 2)
     term.setTextColor(gui.colors.text)
-    term.setCursorPos(4, screen.height - 6)
-    write(string.rep(" ", screen.width - 8))  -- Clear previous message
-    term.setCursorPos(4, screen.height - 6)
-    write(msg)
-end
-
--- Draw installation progress
-local function drawProgress(current, total, message)
-    -- Ensure we're working with numbers
-    current = tonumber(current) or 0
-    total = tonumber(total) or 1
-    local progress = current / total
-    gui.drawAnimatedProgressBar(4, screen.height - 4, screen.width - 8, message, progress)
+    write(suggestion or "Have you tried turning it off and on again?")
+    os.sleep(3)
 end
 
 -- Create GitHub raw URL
@@ -346,11 +548,39 @@ local function handlePendingUpdate()
     end
 end
 
+-- Fun loading messages
+local loadingMessages = {
+    "Initializing quantum flux capacitors...",
+    "Calibrating neural networks...",
+    "Downloading more RAM...",
+    "Preparing the coffee maker...",
+    "Teaching computers to dream...",
+    "Reticulating splines...",
+    "Generating witty dialog...",
+    "Adding unnecessary animations...",
+    "Solving P vs NP...",
+    "Dividing by zero..."
+}
+
+-- Show a random loading message
+function showLoadingMessage()
+    local msg = loadingMessages[math.random(1, #loadingMessages)]
+    term.setCursorPos(4, screen.height - 6)
+    term.setBackgroundColor(gui.colors.windowBg)
+    term.setTextColor(gui.colors.text)
+    write(string.rep(" ", screen.width - 8))  -- Clear line
+    term.setCursorPos(4, screen.height - 6)
+    write(msg)
+end
+
 -- Main installation process
 local function install()
+    updateScreenDimensions()  -- Update dimensions at start
     initScreen()
+    drawTitleScreen()
     
     while currentStep <= #steps do
+        updateScreenDimensions()  -- Update dimensions each iteration
         drawInstallationWizard()
         
         if currentStep == 1 then
@@ -390,16 +620,12 @@ local function install()
             
             for _, module in ipairs(config.modules) do
                 showLoadingMessage()
-                drawProgress(filesInstalled, totalFiles, "Installing: " .. module.name)
+                installationProgress = filesInstalled / totalFiles
+                drawInstallationWizard()  -- Redraw to update progress
                 -- Download and install module
                 local success = downloadFile(getGitHubRawURL(module.file), module.target)
                 if not success and module.required then
-                    term.setBackgroundColor(gui.colors.windowBg)
-                    term.setTextColor(gui.colors.text)
-                    term.setCursorPos(4, screen.height - 2)
-                    write("\nFailed to download " .. module.name .. " module")
-                    write("\nInstallation failed! (Have you tried turning it off and on again?)")
-                    os.sleep(3)
+                    showError("Failed to download " .. module.name .. " module", "Have you tried turning it off and on again?")
                     return
                 end
                 filesInstalled = filesInstalled + 1
@@ -408,16 +634,12 @@ local function install()
             
             for _, file in ipairs(config.root_files) do
                 showLoadingMessage()
-                drawProgress(filesInstalled, totalFiles, "Installing: " .. file.name)
+                installationProgress = filesInstalled / totalFiles
+                drawInstallationWizard()  -- Redraw to update progress
                 -- Download and install file
                 local success = downloadFile(getGitHubRawURL(file.file), file.target)
                 if not success and file.required then
-                    term.setBackgroundColor(gui.colors.windowBg)
-                    term.setTextColor(gui.colors.text)
-                    term.setCursorPos(4, screen.height - 2)
-                    write("\nFailed to download " .. file.name)
-                    write("\nInstallation failed! (Error 404: Success not found)")
-                    os.sleep(3)
+                    showError("Failed to download " .. file.name, "Error 404: Success not found")
                     return
                 end
                 filesInstalled = filesInstalled + 1
@@ -431,25 +653,18 @@ local function install()
             term.setCursorPos(4, 7)
             term.setBackgroundColor(gui.colors.windowBg)
             term.setTextColor(gui.colors.text)
-            write("Installation Complete!")
-            term.setCursorPos(4, 9)
             write("SCI Sentinel OS has been successfully installed.")
-            term.setCursorPos(4, 10)
-            write("Press any key to restart...")
-            os.pullEvent("key")
-            os.reboot()
+            term.setCursorPos(4, 9)
+            write("Click the REBOOT button to complete installation.")
         end
         
         -- Wait for user input
         local event, button, x, y = os.pullEvent("mouse_click")
         
         -- Handle navigation buttons
-        if y == screen.height - 4 then
-            if currentStep > 1 and x >= screen.width - 20 and x < screen.width - 12 then
-                currentStep = currentStep - 1
-            elseif currentStep < #steps and x >= screen.width - 10 and x < screen.width - 2 then
-                currentStep = currentStep + 1
-            end
+        if handleNavigation(x, y) then
+            -- Redraw the wizard window
+            drawInstallationWizard()
         end
     end
 end
