@@ -545,7 +545,18 @@ function checkInstallerUpdate()
     
     local installerPath = shell.getRunningProgram()
     local url = getGitHubRawURL("Installer.lua")
-    local tempPath = "installer_update.tmp"
+    
+    -- Create temp directory if it doesn't exist
+    if not fs.exists("scios/temp") then
+        fs.makeDir("scios/temp")
+    end
+    
+    local tempPath = "scios/temp/installer_update.tmp"
+    
+    -- Clean up any existing temp files
+    if fs.exists(tempPath) then
+        fs.delete(tempPath)
+    end
     
     -- Try to download the latest version
     local success, content = downloadFile(url, tempPath)
@@ -554,6 +565,7 @@ function checkInstallerUpdate()
         local currentFile = fs.open(installerPath, "r")
         if not currentFile then
             print("Error: Could not read current installer file.")
+            fs.delete(tempPath)
             return false
         end
         
@@ -565,15 +577,23 @@ function checkInstallerUpdate()
             print("The installer will be updated now.")
             os.sleep(1)
             
-            -- Create backup of current installer
-            if fs.exists(installerPath .. ".backup") then
-                fs.delete(installerPath .. ".backup")
+            -- Create backup in temp directory
+            local backupPath = "scios/temp/installer.backup"
+            if fs.exists(backupPath) then
+                fs.delete(backupPath)
             end
-            fs.copy(installerPath, installerPath .. ".backup")
+            fs.copy(installerPath, backupPath)
             
             -- Apply update
-            fs.delete(installerPath)
+            if fs.exists(installerPath) then
+                fs.delete(installerPath)
+            end
             fs.move(tempPath, installerPath)
+            
+            -- Clean up
+            if fs.exists(backupPath) then
+                fs.delete(backupPath)
+            end
             
             print("Update applied successfully!")
             print("Restarting installer...")
@@ -590,6 +610,9 @@ function checkInstallerUpdate()
         end
     else
         print("Could not check for updates. Continuing with current version.")
+        if fs.exists(tempPath) then
+            fs.delete(tempPath)
+        end
         os.sleep(1)
         return false
     end
