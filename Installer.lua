@@ -453,21 +453,39 @@ end
 local config = {
     repo_owner = "ickycoolboy",
     repo_name = "SCIOS-Computercraft",
-    branch = "Github-updating-test"
+    branch = "Github-updating-test",
+    install_dir = "scios",
+    modules = {
+        {name = "Core", file = "Sci_sentinel.lua", target = "scios/Sci_sentinel.lua", required = true},
+        {name = "GUI", file = "Gui.lua", target = "scios/Gui.lua", required = true},
+        {name = "Commands", file = "Commands.lua", target = "scios/Commands.lua", required = true},
+        {name = "Updater", file = "Updater.lua", target = "scios/Updater.lua", required = true},
+        {name = "Login", file = "Login.lua", target = "scios/Login.lua", required = true},
+        {name = "DisplayManager", file = "DisplayManager.lua", target = "scios/DisplayManager.lua", required = true},
+        {name = "Network", file = "Network.lua", target = "scios/Network.lua", required = true},
+        {name = "Help", file = "Help.lua", target = "scios/Help.lua", required = true},
+        {name = "Theme", file = "Theme.lua", target = "scios/Theme.lua", required = true},
+        {name = "ThemeEditor", file = "ThemeEditor.lua", target = "scios/ThemeEditor.lua", required = true},
+        {name = "Gaming", file = "Gaming.lua", target = "scios/Gaming.lua", required = true}
+    },
+    root_files = {
+        {name = "Startup", file = "Startup.lua", target = "startup.lua", required = true},
+        {name = "Installer", file = "Installer.lua", target = "Installer.lua", required = false}
+    }
 }
 
 -- Required files for installation
 local requiredFiles = {
     ["startup.lua"] = "startup.lua",
-    ["Sci_sentinel.lua"] = "Sci_sentinel.lua",
-    ["Gui.lua"] = "Gui.lua",
-    ["Commands.lua"] = "Commands.lua",
-    ["Updater.lua"] = "Updater.lua",
-    ["Theme.lua"] = "Theme.lua",
-    ["ThemeEditor.lua"] = "ThemeEditor.lua",
-    ["Gaming.lua"] = "Gaming.lua",
-    ["DisplayManager.lua"] = "DisplayManager.lua",
-    ["Login.lua"] = "Login.lua"
+    ["Sci_sentinel.lua"] = "scios/Sci_sentinel.lua",
+    ["Gui.lua"] = "scios/Gui.lua",
+    ["Commands.lua"] = "scios/Commands.lua",
+    ["Updater.lua"] = "scios/Updater.lua",
+    ["Theme.lua"] = "scios/Theme.lua",
+    ["ThemeEditor.lua"] = "scios/ThemeEditor.lua",
+    ["Gaming.lua"] = "scios/Gaming.lua",
+    ["DisplayManager.lua"] = "scios/DisplayManager.lua",
+    ["Login.lua"] = "scios/Login.lua"
 }
 
 -- Initialize screen
