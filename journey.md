@@ -1,6 +1,7 @@
 # Development Journey
 
 ## Active Tasks
+- [ ] Implement persistent SCI Sentinel OS title bar across all screens
 - [ ] Review and update Theme.lua modularity
 - [ ] Document existing features in README.md
 - [ ] Implement error handling in Installer.lua

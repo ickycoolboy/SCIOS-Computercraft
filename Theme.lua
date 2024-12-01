@@ -178,6 +178,29 @@ function theme.drawTitleBar(title)
     end
 end
 
+-- Draw the persistent title bar
+function theme.drawTitleBar()
+    local w, h = term.getSize()
+    local oldBg = term.getBackgroundColor()
+    local oldFg = term.getTextColor()
+    
+    -- Draw title bar background
+    term.setBackgroundColor(theme.getColor("titleBar"))
+    term.setCursorPos(1, 1)
+    term.clearLine()
+    
+    -- Draw title text
+    term.setTextColor(theme.getColor("titleText"))
+    local title = "SCI Sentinel OS"
+    local centerX = math.floor((w - #title) / 2) + 1
+    term.setCursorPos(centerX, 1)
+    write(title)
+    
+    -- Restore colors
+    term.setBackgroundColor(oldBg)
+    term.setTextColor(oldFg)
+end
+
 -- Apply theme to a window
 function theme.applyWindow(window)
     if window then
@@ -652,6 +675,20 @@ function theme.drawInterface()
     
     -- Set cursor to proper position after header
     current.setCursorPos(1, 2)
+end
+
+-- Modified drawInterface function to include title bar
+function theme.drawInterface()
+    local w, h = term.getSize()
+    
+    -- Draw background
+    term.setBackgroundColor(theme.getColor("background"))
+    term.clear()
+    
+    -- Draw title bar (except for login screen)
+    if not theme.isLoginScreen then
+        theme.drawTitleBar()
+    end
 end
 
 -- Clear screen while maintaining theme

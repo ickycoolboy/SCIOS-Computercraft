@@ -10,6 +10,8 @@ local users = {
 function login.showLoginScreen()
     -- Initialize theme and clear screen
     theme.init()
+    theme.isLoginScreen = true  -- Set flag to hide title bar
+    theme.drawInterface()
     
     -- Get terminal dimensions
     local w, h = term.getSize()
@@ -47,6 +49,11 @@ function login.showLoginScreen()
     
     theme.init() -- Clear screen with theme
     return false
+end
+
+function login.exitLoginScreen()
+    theme.isLoginScreen = false  -- Reset flag to show title bar
+    theme.init() -- Clear screen with theme
 end
 
 return login
