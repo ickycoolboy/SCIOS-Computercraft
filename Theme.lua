@@ -107,6 +107,25 @@ local function createShellWindow()
     return shellWindow
 end
 
+-- Create a new window for the content area
+local mainWindow = nil
+
+-- Initialize content window
+function theme.initContentWindow()
+    local dims = theme.getScreenDimensions()
+    -- Create window for everything below the title bar
+    mainWindow = window.create(term.current(), 1, dims.usableStartY, dims.width, dims.height - dims.titleBarHeight)
+    return mainWindow
+end
+
+-- Get the main content window
+function theme.getContentWindow()
+    if not mainWindow then
+        mainWindow = theme.initContentWindow()
+    end
+    return mainWindow
+end
+
 -- Initialize theme
 function theme.init()
     -- Get both native and current terminal
@@ -129,6 +148,58 @@ function theme.init()
     term.redirect(shell)
     shell.clear()
     shell.setCursorPos(1, 1)
+end
+
+-- Draw just the title bar
+function theme.drawTitleBar()
+    if theme.isLoginScreen then return end
+    
+    local w, h = term.getSize()
+    local oldTerm = term.redirect(term.native())
+    
+    -- Save current colors
+    local oldBg = term.getBackgroundColor()
+    local oldFg = term.getTextColor()
+    
+    -- Draw title bar background
+    term.setBackgroundColor(theme.getColor("titleBar"))
+    term.setCursorPos(1, 1)
+    term.clearLine()
+    
+    -- Draw title text
+    term.setTextColor(theme.getColor("titleText"))
+    local title = "SCI Sentinel OS"
+    local centerX = math.floor((w - #title) / 2) + 1
+    term.setCursorPos(centerX, 1)
+    write(title)
+    
+    -- Restore colors and terminal
+    term.setBackgroundColor(oldBg)
+    term.setTextColor(oldFg)
+    term.redirect(oldTerm)
+end
+
+-- Modified drawInterface function to handle separate content window
+function theme.drawInterface()
+    -- Get or create content window
+    local contentWindow = theme.getContentWindow()
+    
+    -- Draw title bar on native terminal
+    theme.drawTitleBar()
+    
+    -- Set up content window
+    contentWindow.setBackgroundColor(theme.getColor("background"))
+    contentWindow.clear()
+    contentWindow.setCursorPos(1, 1)
+    
+    -- Return the content window for further operations
+    return contentWindow
+end
+
+-- Redirect to content window
+function theme.redirect()
+    local contentWindow = theme.getContentWindow()
+    return term.redirect(contentWindow)
 end
 
 -- Draw a simple window
@@ -154,7 +225,7 @@ function theme.drawBox(x, y, width, height, title)
 end
 
 -- Draw full-width title bar
-function theme.drawTitleBar(title)
+function theme.drawFullWidthTitleBar(title)
     local current = term.current()
     local w, h = current.getSize()
     
@@ -179,7 +250,7 @@ function theme.drawTitleBar(title)
 end
 
 -- Draw the persistent title bar
-function theme.drawTitleBar()
+function theme.drawPersistentTitleBar()
     local w, h = term.getSize()
     local oldBg = term.getBackgroundColor()
     local oldFg = term.getTextColor()
@@ -210,104 +281,60 @@ function theme.applyWindow(window)
     end
 end
 
--- Screen resolution management
-local screen = {
-    width = 0,
-    height = 0,
-    isColor = false,
-    mode = "normal", -- normal, compact, or expanded
-    scale = 1
-}
-
--- Initialize screen properties
-local function initScreen()
-    -- Get terminal properties
-    screen.width, screen.height = term.getSize()
-    screen.isColor = term.isColor()
+-- Screen size utilities
+function theme.getScreenDimensions()
+    local w, h = term.getSize()
+    local isPocketPC = h <= 13  -- Standard pocket computer height is 13 or less
     
-    -- Check if we're on an advanced computer or monitor
-    if term.native then
-        local native = term.native()
-        screen.isAdvanced = native.isColor()
-    end
+    -- Reserve top line for title bar (except during login)
+    local titleBarHeight = theme.isLoginScreen and 0 or 1
     
-    -- Set appropriate mode based on screen size
-    if screen.height <= 13 then
-        screen.mode = "compact"    -- Pocket computer or small screen
-    elseif screen.height >= 25 then
-        screen.mode = "expanded"   -- Advanced computer or monitor
-    else
-        screen.mode = "normal"     -- Standard computer
-    end
+    return {
+        width = w,
+        height = h,
+        isPocketPC = isPocketPC,
+        titleBarHeight = titleBarHeight,
+        headerHeight = isPocketPC and 2 or 3,
+        footerHeight = 1,
+        contentHeight = h - (isPocketPC and 3 or 4) - titleBarHeight,
+        usableStartY = titleBarHeight + 1
+    }
+end
+
+-- Modified drawInterface function to handle reserved title bar space
+function theme.drawInterfaceWithReservedTitleBar()
+    local w, h = term.getSize()
+    local dims = theme.getScreenDimensions()
     
-    -- Adjust scale for different modes
-    if screen.mode == "compact" then
-        screen.scale = 0.75
-    elseif screen.mode == "expanded" then
-        screen.scale = 1.5
-    else
-        screen.scale = 1
+    -- Draw background
+    term.setBackgroundColor(theme.getColor("background"))
+    term.clear()
+    
+    -- Draw title bar (except for login screen)
+    if not theme.isLoginScreen then
+        -- Save current colors
+        local oldBg = term.getBackgroundColor()
+        local oldFg = term.getTextColor()
+        
+        -- Draw title bar background
+        term.setBackgroundColor(theme.getColor("titleBar"))
+        term.setCursorPos(1, 1)
+        term.clearLine()
+        
+        -- Draw title text
+        term.setTextColor(theme.getColor("titleText"))
+        local title = "SCI Sentinel OS"
+        local centerX = math.floor((w - #title) / 2) + 1
+        term.setCursorPos(centerX, 1)
+        write(title)
+        
+        -- Restore colors
+        term.setBackgroundColor(oldBg)
+        term.setTextColor(oldFg)
+        
+        -- Set cursor to start of usable area
+        term.setCursorPos(1, dims.usableStartY)
     end
-end
-
--- Current active theme
-local currentTheme = {}
-
--- Get the current theme
-function theme.get()
-    return currentTheme
-end
-
--- Get a border character
-function theme.getBorder(borderName)
-    return currentTheme.borders[screen.mode][borderName] or " "
-end
-
--- Apply a new theme
-function theme.apply(newTheme)
-    if type(newTheme) == "table" then
-        -- Merge with default theme to ensure all properties exist
-        currentTheme = {}
-        for k, v in pairs(defaultTheme) do
-            if type(v) == "table" then
-                currentTheme[k] = {}
-                for subK, subV in pairs(v) do
-                    currentTheme[k][subK] = newTheme[k] and newTheme[k][subK] or subV
-                end
-            else
-                currentTheme[k] = newTheme[k] or v
-            end
-        end
-    end
-end
-
--- Reset to default theme
-function theme.reset()
-    theme.apply(defaultTheme)
-end
-
--- Get current screen properties
-function theme.getScreen()
-    return screen
-end
-
--- Set terminal mode
-function theme.setMode(mode)
-    if mode == "compact" or mode == "normal" or mode == "expanded" then
-        screen.mode = mode
-        -- Reinitialize screen properties
-        initScreen()
-    end
-end
-
--- Get layout settings for current mode
-function theme.getLayout()
-    return defaultTheme.layout[screen.mode]
-end
-
--- Scale a dimension based on current mode
-function theme.scale(size)
-    return math.floor(size * screen.scale)
 end
 
 -- Draw a themed box
@@ -648,54 +675,13 @@ function theme.drawTooltip(x, y, text)
     term.setTextColor(oldFg)
 end
 
--- Draw the main interface
-function theme.drawInterface()
-    local w, h = term.getSize()
-    local current = term.current()
-    
-    -- Clear entire screen
-    current.setBackgroundColor(theme.getColor("background"))
-    current.clear()
-    
-    -- Draw minimal purple header
-    current.setBackgroundColor(theme.getColor("titleBar"))
-    current.setTextColor(theme.getColor("titleText"))
-    current.setCursorPos(1, 1)
-    current.write(string.rep(" ", w))
-    current.setCursorPos(2, 1)
-    current.write("SCI Sentinel")
-    
-    -- Reset colors and fill rest of screen
-    current.setBackgroundColor(theme.getColor("background"))
-    current.setTextColor(theme.getColor("text"))
-    for i = 2, h do
-        current.setCursorPos(1, i)
-        current.write(string.rep(" ", w))
-    end
-    
-    -- Set cursor to proper position after header
-    current.setCursorPos(1, 2)
-end
-
--- Modified drawInterface function to include title bar
-function theme.drawInterface()
-    local w, h = term.getSize()
-    
-    -- Draw background
-    term.setBackgroundColor(theme.getColor("background"))
-    term.clear()
-    
-    -- Draw title bar (except for login screen)
-    if not theme.isLoginScreen then
-        theme.drawTitleBar()
-    end
-end
-
 -- Clear screen while maintaining theme
 function theme.clear()
-    local current = term.current()
-    theme.drawInterface()
-    current.setCursorPos(1, 2) -- Position cursor below header
+    local contentWindow = theme.getContentWindow()
+    contentWindow.setBackgroundColor(theme.getColor("background"))
+    contentWindow.clear()
+    contentWindow.setCursorPos(1, 1)
+    theme.drawTitleBar()
 end
 
 -- Initialize theme
@@ -753,7 +739,7 @@ function theme.showResolutionHelp()
 end
 
 -- Initialize screen on load
-initScreen()
+local dims = theme.getScreenDimensions()
 
 -- Initialize theme
 theme.init()

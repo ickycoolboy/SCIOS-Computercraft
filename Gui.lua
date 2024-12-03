@@ -15,26 +15,29 @@ end
 
 -- Screen size utilities
 function gui.getScreenDimensions()
-    local w, h = term.getSize()
-    local isPocketPC = h <= 13  -- Standard pocket computer height is 13 or less
-    return {
-        width = w,
-        height = h,
-        isPocketPC = isPocketPC,
-        headerHeight = isPocketPC and 2 or 3,
-        footerHeight = 1,
-        contentHeight = h - (isPocketPC and 3 or 4)  -- Adjust content area based on device
-    }
+    return theme.getScreenDimensions()
 end
 
 function gui.drawScreen()
-    theme.drawInterface()
+    -- This will draw the interface and return the content window
+    return theme.drawInterface()
 end
 
 function gui.clear()
     theme.clear()
 end
 
+-- Get the content window for drawing operations
+function gui.getContentWindow()
+    return theme.getContentWindow()
+end
+
+-- Redirect terminal to content window
+function gui.redirect()
+    return theme.redirect()
+end
+
+-- Print prompt
 function gui.printPrompt()
     -- Show current directory in prompt
     local currentDir = shell.dir()
