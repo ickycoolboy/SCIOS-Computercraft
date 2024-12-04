@@ -1,4 +1,4 @@
-# SCIOS: Sentinel ComputerCraft Integrated Operating System
+# SCIOS: Sentinel Operating System
 
 To install, run:
 ```
