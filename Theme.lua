@@ -1,199 +1,284 @@
 -- SCI Sentinel Theme Module
-local theme = {}
+local ErrorHandler = require("ErrorHandler")
+
+-- Log module loading attempt
+ErrorHandler.logError("Theme", "Theme module is being loaded")
+
+local theme = {
+    -- Module version
+    version = "1.34",
+    -- Initialize flag
+    _initialized = false
+}
+
+-- Validate ErrorHandler
+if not ErrorHandler or type(ErrorHandler) ~= "table" then
+    error("ErrorHandler module failed to load correctly")
+end
 
 -- Default color definitions
 local defaultColors = {
     titleBar = colors.purple,
     titleText = colors.white,
     windowBg = colors.black,
-    text = colors.purple,  -- Default text is now purple
+    text = colors.purple,
     background = colors.black,
     shellBg = colors.black,
-    shellText = colors.purple  -- Shell text also purple
+    shellText = colors.purple,
+    buttonBg = colors.gray,
+    buttonText = colors.white,
+    buttonHover = colors.lightGray,
+    menuBg = colors.black,
+    menuText = colors.white,
+    menuSelect = colors.blue,
+    menuSelectText = colors.white,
+    progressBg = colors.black,
+    progressBar = colors.blue,
+    scrollBg = colors.black,
+    scrollHandle = colors.blue,
+    tabActive = colors.blue,
+    tabInactive = colors.gray,
+    tabTextActive = colors.white,
+    tabTextInactive = colors.black,
+    border = colors.gray,
+    dimText = colors.gray,
+    shadow = colors.gray
 }
 
 -- Current theme colors (can be modified by user)
 local currentColors = {}
 
--- Load saved theme
-local function loadTheme()
-    if fs.exists("/scios/theme.cfg") then
-        local file = fs.open("/scios/theme.cfg", "r")
-        if file then
-            local data = textutils.unserialize(file.readAll())
-            file.close()
-            if data then
-                for k, v in pairs(data) do
-                    currentColors[k] = v
-                end
-                return
-            end
+-- Load saved theme with error handling
+function theme.loadTheme()
+    ErrorHandler.logError("Theme", "Loading theme configuration...")
+    return ErrorHandler.protectedCall("load_theme", function()
+        -- Initialize with defaults first
+        for k, v in pairs(defaultColors) do
+            currentColors[k] = v
         end
-    end
-    -- If no saved theme or error, use defaults
-    for k, v in pairs(defaultColors) do
-        currentColors[k] = v
-    end
+        
+        if fs.exists("/scios/theme.cfg") then
+            ErrorHandler.logError("Theme", "Theme configuration file found")
+            local file = fs.open("/scios/theme.cfg", "r")
+            if not file then
+                error("Failed to open theme configuration")
+            end
+            
+            local content = file.readAll()
+            file.close()
+            
+            local data = textutils.unserialize(content)
+            if type(data) ~= "table" then
+                error("Invalid theme configuration format")
+            end
+            
+            -- Validate colors before applying
+            for k, v in pairs(data) do
+                if type(v) ~= "number" then
+                    error("Invalid color value for " .. k .. ": " .. tostring(v))
+                end
+                currentColors[k] = v
+            end
+            ErrorHandler.logError("Theme", "Theme configuration loaded successfully")
+        else
+            ErrorHandler.logError("Theme", "No saved theme configuration. Using defaults")
+        end
+        return true
+    end)
 end
 
--- Save current theme
+-- Initialize the theme system
+function theme.init()
+    if theme._initialized then
+        ErrorHandler.logError("Theme", "Initialization skipped: already initialized")
+        return true
+    end
+    
+    ErrorHandler.logError("Theme", "Starting theme initialization")
+    local success = theme.loadTheme()
+    if not success then
+        ErrorHandler.logError("Theme", "Failed to load theme configuration")
+        return false
+    end
+    
+    theme._initialized = true
+    ErrorHandler.logError("Theme", "Theme initialization completed successfully")
+    return true
+end
+
+-- Check if theme is initialized
+function theme.isInitialized()
+    return theme._initialized
+end
+
+-- Direct terminal operations
+local function setBackgroundColor(color)
+    if type(color) ~= "number" then
+        ErrorHandler.logError("Set Background Color", "Invalid color value: " .. tostring(color))
+        color = colors.black -- Fallback to default
+    end
+    term.setBackgroundColor(color)
+end
+
+local function setTextColor(color)
+    if type(color) ~= "number" then
+        ErrorHandler.logError("Set Text Color", "Invalid color value: " .. tostring(color))
+        color = colors.white -- Fallback to default
+    end
+    term.setTextColor(color)
+end
+
+-- Save current theme with error handling
 function theme.saveTheme()
-    local file = fs.open("/scios/theme.cfg", "w")
-    if file then
+    return ErrorHandler.protectedCall("save_theme", function()
+        -- Validate theme before saving
+        for k, v in pairs(currentColors) do
+            if type(v) ~= "number" then
+                error("Invalid color value for " .. k .. ": " .. tostring(v))
+            end
+        end
+        
+        local file = fs.open("/scios/theme.cfg", "w")
+        if not file then
+            error("Failed to create theme configuration file")
+        end
+        
         file.write(textutils.serialize(currentColors))
         file.close()
         return true
-    end
-    return false
+    end)
 end
 
--- Set a specific color
+-- Set a specific color with validation
 function theme.setColor(name, color)
-    if defaultColors[name] ~= nil then
+    return ErrorHandler.protectedCall("set_color", function()
+        if defaultColors[name] == nil then
+            error("Invalid theme element: " .. tostring(name))
+        end
+        if type(color) ~= "number" then
+            error("Invalid color value: " .. tostring(color))
+        end
+        
         currentColors[name] = color
         return true
-    end
-    return false
+    end)
 end
 
--- Get color from theme
+-- Get a color value safely
 function theme.getColor(name)
-    return currentColors[name] or defaultColors[name] or colors.white
+    return ErrorHandler.protectedCall("get_color", function()
+        if not currentColors[name] then
+            ErrorHandler.logError("Get Color", "Color not initialized: " .. tostring(name))
+            -- Return a fallback color based on the type of element
+            if name:match("Bg$") or name == "background" then
+                return colors.black
+            elseif name:match("Text$") or name == "text" then
+                return colors.white
+            else
+                return colors.gray
+            end
+        end
+        ErrorHandler.logError("Get Color", "Retrieved color for " .. name .. ": " .. tostring(currentColors[name]))
+        return currentColors[name]
+    end)
 end
 
--- Reset to defaults
+-- Reset to defaults with error handling
 function theme.resetToDefaults()
-    for k, v in pairs(defaultColors) do
-        currentColors[k] = v
-    end
-    theme.saveTheme()
+    return ErrorHandler.protectedCall("reset_defaults", function()
+        for k, v in pairs(defaultColors) do
+            currentColors[k] = v
+        end
+        return theme.saveTheme()
+    end)
 end
 
--- Get all theme colors
+-- Get all theme colors safely
 function theme.getColors()
-    local result = {}
-    for k, v in pairs(currentColors) do
-        result[k] = v
-    end
-    return result
+    return ErrorHandler.protectedCall("get_colors", function()
+        local result = {}
+        for k, v in pairs(currentColors) do
+            result[k] = v
+        end
+        return result
+    end)
 end
 
--- Get available color names
+-- Get available color names safely
 function theme.getColorNames()
-    local names = {}
-    for k, _ in pairs(defaultColors) do
-        table.insert(names, k)
-    end
-    return names
+    return ErrorHandler.protectedCall("get_color_names", function()
+        local names = {}
+        for k, _ in pairs(defaultColors) do
+            table.insert(names, k)
+        end
+        return names
+    end)
 end
 
--- Get native terminal
+-- Get native terminal safely
 local native = term.native()
 local shellWindow = nil
 
--- Create a themed shell window
+-- Create a themed shell window with error handling
 local function createShellWindow()
     local w, h = term.getSize()
-    if shellWindow then
-        shellWindow.setBackgroundColor(theme.getColor("shellBg"))
-        shellWindow.setTextColor(theme.getColor("shellText"))
-        return shellWindow
+    shellWindow = window.create(term.current(), 1, 1, w, h, true)
+    if not shellWindow then
+        error("Failed to create shell window")
     end
     
-    -- Create a window for the shell that takes up the full terminal
-    shellWindow = window.create(term.current(), 1, 1, w, h, true)
-    shellWindow.setBackgroundColor(theme.getColor("shellBg"))
-    shellWindow.setTextColor(theme.getColor("shellText"))
+    local bgColor = theme.getColor("shellBg")
+    ErrorHandler.logError("Shell Window", "Background color: " .. tostring(bgColor))
+    shellWindow.setBackgroundColor(bgColor)
+    
+    local textColor = theme.getColor("shellText")
+    ErrorHandler.logError("Shell Window", "Text color: " .. tostring(textColor))
+    shellWindow.setTextColor(textColor)
+    
     return shellWindow
+end
+
+-- Safe terminal redirection
+local function safeRedirect(target)
+    local success, result = ErrorHandler.protectedCall("terminal_redirect", function()
+        return term.redirect(target)
+    end)
+    
+    if success then
+        return result
+    else
+        ErrorHandler.logError("Theme", "Failed to redirect terminal: " .. tostring(result))
+        return term.current() -- Fallback to current terminal
+    end
 end
 
 -- Create a new window for the content area
 local mainWindow = nil
 
--- Initialize content window
+-- Initialize content window with error handling
 function theme.initContentWindow()
-    local dims = theme.getScreenDimensions()
-    -- Create window for everything below the title bar
-    mainWindow = window.create(term.current(), 1, dims.usableStartY, dims.width, dims.height - dims.titleBarHeight)
-    return mainWindow
+    return ErrorHandler.protectedCall("init_content_window", function()
+        local dims = theme.getScreenDimensions()
+        if not dims then
+            error("Failed to get screen dimensions")
+        end
+        
+        mainWindow = window.create(term.current(), 1, dims.usableStartY, dims.width, dims.height - dims.titleBarHeight)
+        if not mainWindow then
+            error("Failed to create main window")
+        end
+        return mainWindow
+    end)
 end
 
--- Get the main content window
+-- Get the main content window safely
 function theme.getContentWindow()
-    if not mainWindow then
-        mainWindow = theme.initContentWindow()
-    end
-    return mainWindow
-end
-
--- Initialize theme
-function theme.init()
-    -- Get both native and current terminal
-    local current = term.current()
-    
-    -- Reset native terminal first
-    native.setBackgroundColor(theme.getColor("background"))
-    native.setTextColor(theme.getColor("text"))
-    native.clear()
-    
-    -- Reset current terminal if different from native
-    if current ~= native then
-        current.setBackgroundColor(theme.getColor("background"))
-        current.setTextColor(theme.getColor("text"))
-        current.clear()
-    end
-    
-    -- Create and set up shell window
-    local shell = createShellWindow()
-    term.redirect(shell)
-    shell.clear()
-    shell.setCursorPos(1, 1)
-end
-
--- Draw just the title bar
-function theme.drawTitleBar()
-    if theme.isLoginScreen then return end
-    
-    local w, h = term.getSize()
-    local oldTerm = term.redirect(term.native())
-    
-    -- Save current colors
-    local oldBg = term.getBackgroundColor()
-    local oldFg = term.getTextColor()
-    
-    -- Draw title bar background
-    term.setBackgroundColor(theme.getColor("titleBar"))
-    term.setCursorPos(1, 1)
-    term.clearLine()
-    
-    -- Draw title text
-    term.setTextColor(theme.getColor("titleText"))
-    local title = "SCI Sentinel OS"
-    local centerX = math.floor((w - #title) / 2) + 1
-    term.setCursorPos(centerX, 1)
-    write(title)
-    
-    -- Restore colors and terminal
-    term.setBackgroundColor(oldBg)
-    term.setTextColor(oldFg)
-    term.redirect(oldTerm)
-end
-
--- Modified drawInterface function to handle separate content window
-function theme.drawInterface()
-    -- Get or create content window
-    local contentWindow = theme.getContentWindow()
-    
-    -- Draw title bar on native terminal
-    theme.drawTitleBar()
-    
-    -- Set up content window
-    contentWindow.setBackgroundColor(theme.getColor("background"))
-    contentWindow.clear()
-    contentWindow.setCursorPos(1, 1)
-    
-    -- Return the content window for further operations
-    return contentWindow
+    return ErrorHandler.protectedCall("get_content_window", function()
+        if not mainWindow then
+            return theme.initContentWindow()
+        end
+        return mainWindow
+    end)
 end
 
 -- Redirect to content window
@@ -250,55 +335,95 @@ function theme.drawFullWidthTitleBar(title)
 end
 
 -- Draw the persistent title bar
-function theme.drawPersistentTitleBar()
-    local w, h = term.getSize()
-    local oldBg = term.getBackgroundColor()
-    local oldFg = term.getTextColor()
-    
-    -- Draw title bar background
-    term.setBackgroundColor(theme.getColor("titleBar"))
-    term.setCursorPos(1, 1)
-    term.clearLine()
-    
-    -- Draw title text
-    term.setTextColor(theme.getColor("titleText"))
-    local title = "SCI Sentinel OS"
-    local centerX = math.floor((w - #title) / 2) + 1
-    term.setCursorPos(centerX, 1)
-    write(title)
-    
-    -- Restore colors
-    term.setBackgroundColor(oldBg)
-    term.setTextColor(oldFg)
+function theme.drawPersistentTitleBar(title)
+    return ErrorHandler.protectedCall("draw_title_bar", function()
+        if not title then
+            title = "SCI Sentinel OS"
+        end
+        
+        local current = term.current()
+        local w, h = current.getSize()
+        
+        -- Draw the title bar background
+        setBackgroundColor(theme.getColor("titleBar"))
+        setTextColor(theme.getColor("titleText"))
+        current.setCursorPos(1, 1)
+        current.write(string.rep(" ", w))
+        
+        -- Center the title
+        local titleX = math.floor((w - #title) / 2) + 1
+        current.setCursorPos(titleX, 1)
+        current.write(title)
+        
+        -- Reset cursor position
+        current.setCursorPos(1, 2)
+        
+        return true
+    end)
 end
 
--- Apply theme to a window
-function theme.applyWindow(window)
-    if window then
-        window.setBackgroundColor(theme.getColor("background"))
-        window.setTextColor(theme.getColor("text"))
-        window.clear()
-    end
+-- Draw the persistent title bar
+function theme.drawTitleBar(title)
+    return ErrorHandler.protectedCall("draw_title_bar", function()
+        if not title then
+            title = "SCI Sentinel OS"
+        end
+        
+        local current = term.current()
+        local w, h = current.getSize()
+        
+        -- Draw the title bar background
+        setBackgroundColor(theme.getColor("titleBar"))
+        setTextColor(theme.getColor("titleText"))
+        current.setCursorPos(1, 1)
+        current.write(string.rep(" ", w))
+        
+        -- Center the title
+        local titleX = math.floor((w - #title) / 2) + 1
+        current.setCursorPos(titleX, 1)
+        current.write(title)
+        
+        -- Reset cursor position
+        current.setCursorPos(1, 2)
+        
+        return true
+    end)
 end
 
--- Screen size utilities
+-- Alias for backward compatibility
+theme.drawPersistentTitleBar = theme.drawTitleBar
+
+-- Get screen dimensions safely
 function theme.getScreenDimensions()
     local w, h = term.getSize()
-    local isPocketPC = h <= 13  -- Standard pocket computer height is 13 or less
-    
-    -- Reserve top line for title bar (except during login)
-    local titleBarHeight = theme.isLoginScreen and 0 or 1
+    if type(w) ~= "number" or type(h) ~= "number" then
+        error("Invalid screen dimensions")
+    end
     
     return {
         width = w,
         height = h,
-        isPocketPC = isPocketPC,
-        titleBarHeight = titleBarHeight,
-        headerHeight = isPocketPC and 2 or 3,
-        footerHeight = 1,
-        contentHeight = h - (isPocketPC and 3 or 4) - titleBarHeight,
-        usableStartY = titleBarHeight + 1
+        titleBarHeight = 1,
+        usableStartY = 2,
+        usableHeight = h - 1
     }
+end
+
+-- Modified drawInterface function to handle separate content window
+function theme.drawInterface()
+    -- Get or create content window
+    local contentWindow = theme.getContentWindow()
+    
+    -- Draw title bar on native terminal
+    theme.drawTitleBar()
+    
+    -- Set up content window
+    contentWindow.setBackgroundColor(theme.getColor("background"))
+    contentWindow.clear()
+    contentWindow.setCursorPos(1, 1)
+    
+    -- Return the content window for further operations
+    return contentWindow
 end
 
 -- Modified drawInterface function to handle reserved title bar space
@@ -307,7 +432,7 @@ function theme.drawInterfaceWithReservedTitleBar()
     local dims = theme.getScreenDimensions()
     
     -- Draw background
-    term.setBackgroundColor(theme.getColor("background"))
+    setBackgroundColor(theme.getColor("background"))
     term.clear()
     
     -- Draw title bar (except for login screen)
@@ -317,20 +442,20 @@ function theme.drawInterfaceWithReservedTitleBar()
         local oldFg = term.getTextColor()
         
         -- Draw title bar background
-        term.setBackgroundColor(theme.getColor("titleBar"))
-        term.setCursorPos(1, 1)
-        term.clearLine()
+        -- setBackgroundColor(theme.getColor("titleBar"))
+        -- term.setCursorPos(1, 1)
+        -- term.clearLine()
         
         -- Draw title text
-        term.setTextColor(theme.getColor("titleText"))
-        local title = "SCI Sentinel OS"
-        local centerX = math.floor((w - #title) / 2) + 1
-        term.setCursorPos(centerX, 1)
-        write(title)
+        -- setTextColor(theme.getColor("titleText"))
+        -- local title = "SCI Sentinel OS"
+        -- local centerX = math.floor((w - #title) / 2) + 1
+        -- term.setCursorPos(centerX, 1)
+        -- term.write(title)
         
         -- Restore colors
-        term.setBackgroundColor(oldBg)
-        term.setTextColor(oldFg)
+        -- setBackgroundColor(oldBg)
+        -- setTextColor(oldFg)
         
         -- Set cursor to start of usable area
         term.setCursorPos(1, dims.usableStartY)
@@ -342,8 +467,8 @@ function theme.drawCompactHeader(text)
     local oldBg = term.getBackgroundColor()
     local oldFg = term.getTextColor()
     
-    term.setBackgroundColor(theme.getColor("titleBar"))
-    term.setTextColor(theme.getColor("titleText"))
+    setBackgroundColor(theme.getColor("titleBar"))
+    setTextColor(theme.getColor("titleText"))
     term.setCursorPos(1, 1)
     
     -- Create shortened text if needed
@@ -354,8 +479,8 @@ function theme.drawCompactHeader(text)
     local padding = math.floor((screen.width - #displayText) / 2)
     term.write(string.rep(" ", padding) .. displayText .. string.rep(" ", screen.width - padding - #displayText))
     
-    term.setBackgroundColor(oldBg)
-    term.setTextColor(oldFg)
+    setBackgroundColor(oldBg)
+    setTextColor(oldFg)
 end
 
 -- Draw a themed button
@@ -364,14 +489,14 @@ function theme.drawButton(x, y, text, active)
     local oldFg = term.getTextColor()
     
     local bg = active and theme.getColor("buttonHover") or theme.getColor("buttonBg")
-    term.setBackgroundColor(bg)
-    term.setTextColor(theme.getColor("buttonText"))
+    setBackgroundColor(bg)
+    setTextColor(theme.getColor("buttonText"))
     
     term.setCursorPos(x, y)
     term.write(" " .. text .. " ")
     
-    term.setBackgroundColor(oldBg)
-    term.setTextColor(oldFg)
+    setBackgroundColor(oldBg)
+    setTextColor(oldFg)
     
     -- Return button bounds for click detection
     return {
@@ -389,8 +514,8 @@ function theme.drawCompactButton(x, y, text, active)
     local oldFg = term.getTextColor()
     
     local bg = active and theme.getColor("buttonHover") or theme.getColor("buttonBg")
-    term.setBackgroundColor(bg)
-    term.setTextColor(theme.getColor("buttonText"))
+    setBackgroundColor(bg)
+    setTextColor(theme.getColor("buttonText"))
     
     -- Shorten text if needed
     local maxWidth = 5
@@ -399,8 +524,8 @@ function theme.drawCompactButton(x, y, text, active)
     term.setCursorPos(x, y)
     term.write(displayText)
     
-    term.setBackgroundColor(oldBg)
-    term.setTextColor(oldFg)
+    setBackgroundColor(oldBg)
+    setTextColor(oldFg)
     
     return {
         x1 = x,
@@ -417,14 +542,14 @@ function theme.drawProgressBar(x, y, width, progress, text)
     local oldFg = term.getTextColor()
     
     -- Draw background
-    term.setBackgroundColor(theme.getColor("progressBg"))
+    setBackgroundColor(theme.getColor("progressBg"))
     term.setCursorPos(x, y)
     term.write(string.rep(" ", width))
     
     -- Draw progress
     local fillWidth = math.floor(progress * width)
     if fillWidth > 0 then
-        term.setBackgroundColor(theme.getColor("progressBar"))
+        setBackgroundColor(theme.getColor("progressBar"))
         term.setCursorPos(x, y)
         term.write(string.rep(" ", fillWidth))
     end
@@ -433,12 +558,12 @@ function theme.drawProgressBar(x, y, width, progress, text)
     if text then
         local textX = x + math.floor((width - #text) / 2)
         term.setCursorPos(textX, y)
-        term.setTextColor(theme.getColor("text"))
+        setTextColor(theme.getColor("text"))
         term.write(text)
     end
     
-    term.setBackgroundColor(oldBg)
-    term.setTextColor(oldFg)
+    setBackgroundColor(oldBg)
+    setTextColor(oldFg)
 end
 
 -- Draw a menu item
@@ -447,18 +572,18 @@ function theme.drawMenuItem(x, y, text, selected, disabled)
     local oldFg = term.getTextColor()
     
     if selected then
-        term.setBackgroundColor(theme.getColor("menuSelect"))
-        term.setTextColor(theme.getColor("menuSelectText"))
+        setBackgroundColor(theme.getColor("menuSelect"))
+        setTextColor(theme.getColor("menuSelectText"))
     else
-        term.setBackgroundColor(theme.getColor("menuBg"))
-        term.setTextColor(disabled and theme.getColor("dimText") or theme.getColor("menuText"))
+        setBackgroundColor(theme.getColor("menuBg"))
+        setTextColor(disabled and theme.getColor("dimText") or theme.getColor("menuText"))
     end
     
     term.setCursorPos(x, y)
     term.write(text)
     
-    term.setBackgroundColor(oldBg)
-    term.setTextColor(oldFg)
+    setBackgroundColor(oldBg)
+    setTextColor(oldFg)
 end
 
 -- Draw a status message
@@ -467,11 +592,11 @@ function theme.drawStatus(x, y, text, status)
     local oldFg = term.getTextColor()
     
     term.setCursorPos(x, y)
-    term.setTextColor(theme.getColor(status or "text"))
+    setTextColor(theme.getColor(status or "text"))
     term.write(text)
     
-    term.setBackgroundColor(oldBg)
-    term.setTextColor(oldFg)
+    setBackgroundColor(oldBg)
+    setTextColor(oldFg)
 end
 
 -- Draw a header
@@ -482,18 +607,18 @@ function theme.drawHeader(text, y)
     local oldFg = term.getTextColor()
     
     -- Draw header background
-    term.setBackgroundColor(theme.getColor("titleBar"))
+    setBackgroundColor(theme.getColor("titleBar"))
     term.setCursorPos(1, y)
     term.write(string.rep(" ", width))
     
     -- Draw header text
     local textX = math.floor((width - #text) / 2)
     term.setCursorPos(textX, y)
-    term.setTextColor(theme.getColor("titleText"))
+    setTextColor(theme.getColor("titleText"))
     term.write(text)
     
-    term.setBackgroundColor(oldBg)
-    term.setTextColor(oldFg)
+    setBackgroundColor(oldBg)
+    setTextColor(oldFg)
 end
 
 -- Draw a separator line
@@ -502,12 +627,12 @@ function theme.drawSeparator(y, style)
     local oldBg = term.getBackgroundColor()
     local oldFg = term.getTextColor()
     
-    term.setTextColor(theme.getColor("border"))
+    setTextColor(theme.getColor("border"))
     term.setCursorPos(1, y)
     term.write(string.rep(theme.getBorder(style or "headerSeparator"), width))
     
-    term.setBackgroundColor(oldBg)
-    term.setTextColor(oldFg)
+    setBackgroundColor(oldBg)
+    setTextColor(oldFg)
 end
 
 -- Draw a scrollable list
@@ -537,20 +662,20 @@ function theme.drawList(x, y, width, height, items, selectedIndex, scrollIndex)
         -- Draw scrollbar track
         for i = 1, height - 2 do
             term.setCursorPos(x + width - 1, y + i)
-            term.setBackgroundColor(theme.getColor("scrollBg"))
-            term.setTextColor(theme.getColor("scrollHandle"))
+            setBackgroundColor(theme.getColor("scrollBg"))
+            setTextColor(theme.getColor("scrollHandle"))
             term.write(theme.getBorder("scrollBarTrack"))
         end
         
         -- Draw scrollbar handle
         local handlePos = math.floor((scrollIndex - 1) * (height - 2) / maxScroll) + 1
         term.setCursorPos(x + width - 1, y + handlePos)
-        term.setBackgroundColor(theme.getColor("scrollHandle"))
+        setBackgroundColor(theme.getColor("scrollHandle"))
         term.write(theme.getBorder("scrollBarHandle"))
     end
     
-    term.setBackgroundColor(oldBg)
-    term.setTextColor(oldFg)
+    setBackgroundColor(oldBg)
+    setTextColor(oldFg)
     
     return scrollIndex
 end
@@ -566,8 +691,8 @@ function theme.drawTabs(x, y, width, tabs, activeTab)
         local tabWidth = #tab + 2
         
         -- Draw tab background
-        term.setBackgroundColor(theme.getColor(isActive and "tabActive" or "tabInactive"))
-        term.setTextColor(theme.getColor(isActive and "tabTextActive" or "tabTextInactive"))
+        setBackgroundColor(theme.getColor(isActive and "tabActive" or "tabInactive"))
+        setTextColor(theme.getColor(isActive and "tabTextActive" or "tabTextInactive"))
         
         -- Draw tab
         term.setCursorPos(currentX, y)
@@ -575,7 +700,7 @@ function theme.drawTabs(x, y, width, tabs, activeTab)
         
         -- Draw separator unless it's the last tab
         if i < #tabs then
-            term.setTextColor(theme.getColor("border"))
+            setTextColor(theme.getColor("border"))
             term.write(theme.getBorder("tabSeparator"))
         end
         
@@ -583,12 +708,12 @@ function theme.drawTabs(x, y, width, tabs, activeTab)
     end
     
     -- Draw bottom line for inactive tabs
-    term.setBackgroundColor(theme.getColor("tabActive"))
+    setBackgroundColor(theme.getColor("tabActive"))
     term.setCursorPos(x, y + 1)
     term.write(string.rep(" ", width))
     
-    term.setBackgroundColor(oldBg)
-    term.setTextColor(oldFg)
+    setBackgroundColor(oldBg)
+    setTextColor(oldFg)
 end
 
 -- Draw a dropdown menu
@@ -608,8 +733,8 @@ function theme.drawDropdown(x, y, width, items, selectedIndex, isOpen)
         end
     end
     
-    term.setBackgroundColor(oldBg)
-    term.setTextColor(oldFg)
+    setBackgroundColor(oldBg)
+    setTextColor(oldFg)
 end
 
 -- Draw a checkbox
@@ -618,13 +743,13 @@ function theme.drawCheckbox(x, y, text, checked)
     local oldFg = term.getTextColor()
     
     -- Draw checkbox
-    term.setBackgroundColor(theme.getColor("windowBg"))
-    term.setTextColor(theme.getColor("text"))
+    setBackgroundColor(theme.getColor("windowBg"))
+    setTextColor(theme.getColor("text"))
     term.setCursorPos(x, y)
     term.write("[" .. (checked and "X" or " ") .. "] " .. text)
     
-    term.setBackgroundColor(oldBg)
-    term.setTextColor(oldFg)
+    setBackgroundColor(oldBg)
+    setTextColor(oldFg)
     
     return {
         x1 = x,
@@ -640,13 +765,13 @@ function theme.drawRadio(x, y, text, selected)
     local oldFg = term.getTextColor()
     
     -- Draw radio button
-    term.setBackgroundColor(theme.getColor("windowBg"))
-    term.setTextColor(theme.getColor("text"))
+    setBackgroundColor(theme.getColor("windowBg"))
+    setTextColor(theme.getColor("text"))
     term.setCursorPos(x, y)
     term.write("(" .. (selected and "•" or " ") .. ") " .. text)
     
-    term.setBackgroundColor(oldBg)
-    term.setTextColor(oldFg)
+    setBackgroundColor(oldBg)
+    setTextColor(oldFg)
     
     return {
         x1 = x,
@@ -666,13 +791,13 @@ function theme.drawTooltip(x, y, text)
     theme.drawBox(x, y, width, 3)
     
     -- Draw tooltip text
-    term.setBackgroundColor(theme.getColor("windowBg"))
-    term.setTextColor(theme.getColor("text"))
+    setBackgroundColor(theme.getColor("windowBg"))
+    setTextColor(theme.getColor("text"))
     term.setCursorPos(x + 1, y + 1)
     term.write(text)
     
-    term.setBackgroundColor(oldBg)
-    term.setTextColor(oldFg)
+    setBackgroundColor(oldBg)
+    setTextColor(oldFg)
 end
 
 -- Clear screen while maintaining theme
@@ -684,67 +809,40 @@ function theme.clear()
     theme.drawTitleBar()
 end
 
--- Initialize theme
-function theme.init()
-    -- Get both native and current terminal
-    local current = term.current()
-    
-    -- Reset native terminal first
-    native.setBackgroundColor(theme.getColor("background"))
-    native.setTextColor(theme.getColor("text"))
-    native.clear()
-    
-    -- Reset current terminal if different from native
-    if current ~= native then
-        current.setBackgroundColor(theme.getColor("background"))
-        current.setTextColor(theme.getColor("text"))
-        current.clear()
-    end
-    
-    -- Create and set up shell window
-    local shell = createShellWindow()
-    term.redirect(shell)
-    
-    -- Draw initial interface
-    theme.drawInterface()
+-- Get the shell cursor position
+function theme.getShellStartPos()
+    return 1, 2 -- X, Y coordinates where shell should start
 end
 
--- Resolution controls
-function theme.handleKey(key)
-    if key == keys.leftCtrl then
-        theme.ctrlPressed = true
-    elseif theme.ctrlPressed then
-        if key == keys.equals then
-            term.setTextScale(0.5)
-        elseif key == keys.minus then
-            term.setTextScale(2)
+-- Initialize shell environment
+function theme.initShell()
+    if theme.isLoginScreen then return end
+    
+    local x, y = theme.getShellStartPos()
+    term.setCursorPos(x, y)
+    term.setBackgroundColor(currentColors.background)
+    term.setTextColor(currentColors.text)
+    term.clearLine()
+    term.write("> ")
+end
+
+-- Return the theme module
+ErrorHandler.logError("Theme", "Theme module loaded successfully")
+
+local function validateTheme(theme)
+    -- Perform comprehensive validation of the theme module
+    local requiredMethods = {
+        "getColor", "drawTitleBar", "loadTheme", "clear"
+    }
+    
+    for _, method in ipairs(requiredMethods) do
+        if type(theme[method]) ~= "function" then
+            error("Theme module missing required method: " .. method)
         end
     end
+    
+    return theme
 end
 
-function theme.keyUp(key)
-    if key == keys.leftCtrl then
-        theme.ctrlPressed = false
-    end
-end
-
--- Show help message
-function theme.showResolutionHelp()
-    local w, h = term.getSize()
-    local msg = "Press Ctrl + +/- to adjust screen size"
-    term.setBackgroundColor(colors.titleBar)
-    term.setTextColor(colors.titleText)
-    term.setCursorPos(math.floor((w - #msg) / 2), h)
-    term.write(msg)
-end
-
--- Initialize screen on load
-local dims = theme.getScreenDimensions()
-
--- Initialize theme
-theme.init()
-
--- Load saved theme
-loadTheme()
-
-return theme
+-- Validate and return theme
+return validateTheme(theme)

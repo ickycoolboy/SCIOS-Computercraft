@@ -1,17 +1,26 @@
 -- SCI Sentinel OS Commands Module
 local version = "1.34"
 
--- Load required modules
-local gui = require("Gui")
-local updater = require("Updater")
-local help = require("Help")
-local network = require("Network")
-local theme = require("Theme")  -- Add theme module
+-- Load error handling
+local ErrorHandler = require("ErrorHandler")
+
+-- Module cache for lazy loading
+local modules = {}
+
+-- Lazy load a module
+local function requireModule(name)
+    if not modules[name] then
+        ErrorHandler.logError("Commands", "Loading module: " .. name)
+        modules[name] = require(name)
+    end
+    return modules[name]
+end
 
 local commands = {}
 local sentinel_state = {}
 
 function commands.saveState()
+    local gui = requireModule("Gui")
     -- Save current terminal state
     sentinel_state.term_redirect = term.current()
     sentinel_state.background = gui.getBackground()
@@ -21,6 +30,7 @@ function commands.saveState()
 end
 
 function commands.restoreState()
+    local gui = requireModule("Gui")
     -- Restore terminal state
     term.redirect(sentinel_state.term_redirect)
     term.setCursorPos(sentinel_state.cursor_x, sentinel_state.cursor_y)
@@ -37,6 +47,7 @@ local function dir(args)
     local fullPath = fs.combine(shell.dir(), path)
     
     if not fs.exists(fullPath) then
+        local gui = requireModule("Gui")
         gui.drawError("Path not found - " .. path)
         return false
     end
@@ -47,6 +58,7 @@ local function dir(args)
     local totalSize = 0
     
     -- Header
+    local gui = requireModule("Gui")
     gui.drawInfo(" Directory of " .. fullPath)
     gui.drawInfo("")
     
@@ -86,6 +98,7 @@ local function cd(args)
         if fs.exists(newPath) and fs.isDir(newPath) then
             shell.setDir(newPath)
         else
+            local gui = requireModule("Gui")
             gui.drawError("The system cannot find the path specified.")
             return false
         end
@@ -96,23 +109,27 @@ end
 local function cls()
     term.clear()
     term.setCursorPos(1,1)
+    local theme = requireModule("Theme")
     theme.drawInterface()
     return true
 end
 
 local function type(args)
     if not args[1] then
+        local gui = requireModule("Gui")
         gui.drawError("Required parameter missing")
         return false
     end
     
     local file = args[1]
     if not fs.exists(file) then
+        local gui = requireModule("Gui")
         gui.drawError("The system cannot find the file specified.")
         return false
     end
     
     if fs.isDir(file) then
+        local gui = requireModule("Gui")
         gui.drawError("Access is denied.")
         return false
     end
@@ -129,6 +146,7 @@ end
 
 local function copy(args)
     if #args < 2 then
+        local gui = requireModule("Gui")
         gui.drawError("The syntax of the command is incorrect.")
         return false
     end
@@ -137,11 +155,13 @@ local function copy(args)
     local dest = args[2]
     
     if not fs.exists(source) then
+        local gui = requireModule("Gui")
         gui.drawError("The system cannot find the file specified.")
         return false
     end
     
     if fs.isDir(source) then
+        local gui = requireModule("Gui")
         gui.drawError("The source is a directory.")
         return false
     end
@@ -157,9 +177,11 @@ local function copy(args)
     end)
     
     if success then
+        local gui = requireModule("Gui")
         gui.drawSuccess(string.format("        1 file(s) copied."))
         return true
     else
+        local gui = requireModule("Gui")
         gui.drawError("The system cannot copy the file.")
         return false
     end
@@ -167,17 +189,20 @@ end
 
 local function del(args)
     if #args < 1 then
+        local gui = requireModule("Gui")
         gui.drawError("The syntax of the command is incorrect.")
         return false
     end
     
     local path = args[1]
     if not fs.exists(path) then
+        local gui = requireModule("Gui")
         gui.drawError("The system cannot find the file specified.")
         return false
     end
     
     if fs.isDir(path) then
+        local gui = requireModule("Gui")
         gui.drawError("The system cannot delete a directory.")
         return false
     end
@@ -188,12 +213,14 @@ end
 
 local function md(args)
     if #args < 1 then
+        local gui = requireModule("Gui")
         gui.drawError("The syntax of the command is incorrect.")
         return false
     end
     
     local path = args[1]
     if fs.exists(path) then
+        local gui = requireModule("Gui")
         gui.drawError("A subdirectory or file already exists.")
         return false
     end
@@ -204,23 +231,27 @@ end
 
 local function rd(args)
     if #args < 1 then
+        local gui = requireModule("Gui")
         gui.drawError("The syntax of the command is incorrect.")
         return false
     end
     
     local path = args[1]
     if not fs.exists(path) then
+        local gui = requireModule("Gui")
         gui.drawError("The system cannot find the path specified.")
         return false
     end
     
     if not fs.isDir(path) then
+        local gui = requireModule("Gui")
         gui.drawError("The directory name is invalid.")
         return false
     end
     
     local files = fs.list(path)
     if #files > 0 then
+        local gui = requireModule("Gui")
         gui.drawError("The directory is not empty.")
         return false
     end
@@ -230,6 +261,7 @@ local function rd(args)
 end
 
 local function ver()
+    local gui = requireModule("Gui")
     gui.drawInfo("SCI Sentinel [Version 1.34]")
     return true
 end
@@ -237,6 +269,7 @@ end
 -- Network commands
 local function net(args)
     if #args == 0 then
+        local gui = requireModule("Gui")
         gui.drawError("Usage: NET <command>")
         gui.drawInfo("Available commands:")
         gui.drawInfo("  NET STATUS    - Show network status")
@@ -253,21 +286,26 @@ local function net(args)
     if cmd == "debug" then
         _G.DEBUG = not _G.DEBUG
         if _G.DEBUG then
+            local gui = requireModule("Gui")
             gui.drawSuccess("Network debugging enabled")
         else
+            local gui = requireModule("Gui")
             gui.drawSuccess("Network debugging disabled")
         end
         return true
         
     elseif cmd == "status" then
         -- Initialize network if needed
+        local network = requireModule("Network")
         network.init()
         
         -- Show network status
+        local gui = requireModule("Gui")
         gui.drawInfo(network.getStatus())
         return true
         
     elseif cmd == "scan" then
+        local gui = requireModule("Gui")
         gui.drawInfo("Scanning for nearby computers...")
         local computers, err = network.scan()
         if not computers then
@@ -289,23 +327,28 @@ local function net(args)
         
     elseif cmd == "open" then
         if network.openRednet() then
+            local gui = requireModule("Gui")
             gui.drawSuccess("Network opened successfully")
             return true
         else
+            local gui = requireModule("Gui")
             gui.drawError("Failed to open network - No modems available")
             return false
         end
         
     elseif cmd == "close" then
         if network.closeRednet() then
+            local gui = requireModule("Gui")
             gui.drawSuccess("Network closed successfully")
             return true
         else
+            local gui = requireModule("Gui")
             gui.drawInfo("No modems were open")
             return true
         end
         
     else
+        local gui = requireModule("Gui")
         gui.drawError("Unknown network command: " .. cmd)
         return false
     end
@@ -313,17 +356,21 @@ end
 
 local function ping(args)
     if #args < 1 then
+        local gui = requireModule("Gui")
         gui.drawError("Usage: PING <computer-id>")
         return false
     end
     
     local targetId = tonumber(args[1])
     if not targetId then
+        local gui = requireModule("Gui")
         gui.drawError("Invalid computer ID")
         return false
     end
     
+    local gui = requireModule("Gui")
     gui.drawInfo("Pinging computer " .. targetId .. "...")
+    local network = requireModule("Network")
     local time, err = network.ping(targetId)
     if not time then
         gui.drawError("Ping failed: " .. (err or "Unknown error"))
@@ -336,12 +383,14 @@ end
 
 local function msg(args)
     if #args < 2 then
+        local gui = requireModule("Gui")
         gui.drawError("Usage: MSG <computer-id> <message>")
         return false
     end
     
     local targetId = tonumber(args[1])
     if not targetId then
+        local gui = requireModule("Gui")
         gui.drawError("Invalid computer ID")
         return false
     end
@@ -350,12 +399,15 @@ local function msg(args)
     table.remove(args, 1)
     local message = table.concat(args, " ")
     
+    local network = requireModule("Network")
     local success, err = network.sendMessage(targetId, message)
     if not success then
+        local gui = requireModule("Gui")
         gui.drawError("Failed to send message: " .. (err or "Unknown error"))
         return false
     end
     
+    local gui = requireModule("Gui")
     gui.drawSuccess("Message sent to computer " .. targetId)
     return true
 end
@@ -373,6 +425,7 @@ local function displayPaginatedText(lines, title)
         
         -- Display title
         if title then
+            local gui = requireModule("Gui")
             gui.drawInfo(title)
             gui.drawInfo(string.rep("-", w))
         end
@@ -383,6 +436,7 @@ local function displayPaginatedText(lines, title)
         
         -- Display current page content
         for i = startLine, endLine do
+            local gui = requireModule("Gui")
             gui.drawInfo(lines[i])
         end
         
@@ -392,6 +446,7 @@ local function displayPaginatedText(lines, title)
             currentPage, totalPages
         )
         term.setCursorPos(1, h-1)
+        local gui = requireModule("Gui")
         gui.drawInfo(string.rep("-", w))
         gui.drawInfo(footer)
         
@@ -420,6 +475,7 @@ local function displayHelp(args)
             ""
         }
         
+        local help = requireModule("Help")
         local cmdList = help.listCommands()
         for _, cmd in ipairs(cmdList) do
             table.insert(lines, string.format("%-12s - %s", cmd.name, cmd.desc))
@@ -431,6 +487,7 @@ local function displayHelp(args)
         displayPaginatedText(lines, "SCI Sentinel Help")
     else
         -- Display help for specific command
+        local help = requireModule("Help")
         local cmdHelp = help.getCommandHelp(args[1])
         if cmdHelp then
             local lines = {
@@ -450,6 +507,7 @@ local function displayHelp(args)
             
             displayPaginatedText(lines, "Command Help: " .. args[1]:upper())
         else
+            local gui = requireModule("Gui")
             gui.drawError("No help available for '" .. args[1] .. "'")
             return false
         end
@@ -462,6 +520,7 @@ local function mem()
     -- Get available memory from fs.getFreeSpace
     local freeSpace = fs.getFreeSpace("/")
     if not freeSpace then
+        local gui = requireModule("Gui")
         gui.drawError("Could not get storage information")
         return false
     end
@@ -469,6 +528,7 @@ local function mem()
     local totalSpace = math.pow(2, 20)  -- ComputerCraft typically has 1MB space
     local usedSpace = totalSpace - freeSpace
     
+    local gui = requireModule("Gui")
     gui.drawInfo("Storage Information:")
     gui.drawInfo(string.format("Total Space: %.2f KB", totalSpace/1024))
     gui.drawInfo(string.format("Used Space: %.2f KB", usedSpace/1024))
@@ -482,21 +542,26 @@ local function label(args)
         -- Display current label
         local currentLabel = os.getComputerLabel()
         if currentLabel then
+            local gui = requireModule("Gui")
             gui.drawInfo("Current computer label: " .. currentLabel)
         else
+            local gui = requireModule("Gui")
             gui.drawInfo("Computer has no label")
         end
+        local gui = requireModule("Gui")
         gui.drawInfo("")
         gui.drawInfo("To set a new label, use: LABEL <new-name>")
         gui.drawInfo("To remove the label, use: LABEL clear")
     elseif args[1]:lower() == "clear" then
         -- Clear the label
         os.setComputerLabel(nil)
+        local gui = requireModule("Gui")
         gui.drawSuccess("Computer label cleared")
     else
         -- Set new label
         local newLabel = args[1]
         os.setComputerLabel(newLabel)
+        local gui = requireModule("Gui")
         gui.drawSuccess("Computer label set to: " .. newLabel)
     end
     return true
@@ -506,9 +571,11 @@ local function ps()
     local running = parallel.getRunningTasks and parallel.getRunningTasks() or {}
     
     if #running == 0 then
+        local gui = requireModule("Gui")
         gui.drawInfo("No active parallel tasks found")
         
         -- Show basic computer info instead
+        local gui = requireModule("Gui")
         gui.drawInfo("")
         gui.drawInfo("Computer Information:")
         gui.drawInfo(string.format("Computer ID: %d", os.getComputerID()))
@@ -516,6 +583,7 @@ local function ps()
         gui.drawInfo(string.format("Time: %d", os.time()))
         gui.drawInfo(string.format("Day: %d", os.day()))
     else
+        local gui = requireModule("Gui")
         gui.drawInfo("Running Parallel Tasks:")
         for i, task in ipairs(running) do
             gui.drawInfo(string.format("Task %d: %s", i, tostring(task)))
@@ -527,6 +595,7 @@ end
 
 local function find(args)
     if #args < 1 then
+        local gui = requireModule("Gui")
         gui.drawError("Usage: find <pattern>")
         return false
     end
@@ -550,11 +619,13 @@ local function find(args)
     searchDir(shell.dir())
     
     if #results > 0 then
+        local gui = requireModule("Gui")
         gui.drawInfo(string.format("Found %d matches:", #results))
         for _, path in ipairs(results) do
             gui.drawInfo(path)
         end
     else
+        local gui = requireModule("Gui")
         gui.drawInfo("No matches found.")
     end
     return true
@@ -562,6 +633,7 @@ end
 
 local function tail(args)
     if #args < 1 then
+        local gui = requireModule("Gui")
         gui.drawError("Usage: tail <file> [lines]")
         return false
     end
@@ -571,12 +643,14 @@ local function tail(args)
     local fullPath = fs.combine(shell.dir(), filename)
     
     if not fs.exists(fullPath) then
+        local gui = requireModule("Gui")
         gui.drawError("File not found: " .. filename)
         return false
     end
     
     local file = fs.open(fullPath, "r")
     if not file then
+        local gui = requireModule("Gui")
         gui.drawError("Cannot open file: " .. filename)
         return false
     end
@@ -592,6 +666,7 @@ local function tail(args)
     end
     file.close()
     
+    local gui = requireModule("Gui")
     gui.drawInfo(string.format("Last %d lines of %s:", lines, filename))
     for _, line in ipairs(content) do
         gui.drawInfo(line)
@@ -601,10 +676,12 @@ end
 
 local function history()
     if #commandHistory == 0 then
+        local gui = requireModule("Gui")
         gui.drawInfo("No commands in history")
         return true
     end
     
+    local gui = requireModule("Gui")
     gui.drawInfo("Command History (most recent first):")
     gui.drawInfo("")
     for i, cmd in ipairs(commandHistory) do
@@ -672,11 +749,13 @@ loadHistory()
 -- Display management commands
 commands["mirror"] = {
     action = function(args)
-        local displayManager = require("DisplayManager")
+        local displayManager = requireModule("DisplayManager")
         local enabled = displayManager.toggleMirroring()
         if enabled then
+            local gui = requireModule("Gui")
             gui.drawSuccess("Display mirroring enabled")
         else
+            local gui = requireModule("Gui")
             gui.drawSuccess("Display mirroring disabled")
         end
     end,
@@ -687,19 +766,19 @@ commands["mirror"] = {
 function commands.handleCommand(input)
     if input == "" then return true end
     
+    -- Get required modules
+    local gui = requireModule("Gui")
+    local theme = requireModule("Theme")
+    
     -- Split input into command and args
     local parts = {}
-    for part in input:gmatch("%S+") do
-        table.insert(parts, part)
+    for word in string.gmatch(input, "[^%s]+") do
+        table.insert(parts, word)
     end
     
-    local cmd = parts[1]:lower()
-    table.remove(parts, 1)  -- Remove command, leaving only args
+    local cmd = table.remove(parts, 1):lower()
     
-    -- Add command to history before executing
-    addToHistory(input)
-    
-    -- MS-DOS style command mapping
+    -- Command handlers with lazy-loaded modules
     local commandHandlers = {
         dir = dir,
         cd = cd,
@@ -723,23 +802,26 @@ function commands.handleCommand(input)
         msg = msg,
         network = net,
         theme = function(args)
-            local themeEditor = require("ThemeEditor")
+            local themeEditor = requireModule("ThemeEditor")
             themeEditor.run()
             return true
         end,
         shutdown = function(args)
+            local gui = requireModule("Gui")
             gui.drawInfo("Shutting down...")
             os.sleep(1)
             os.shutdown()
             return true
         end,
         reboot = function(args)
+            local gui = requireModule("Gui")
             gui.drawInfo("Rebooting...")
             os.sleep(1)
             os.reboot()
             return true
         end,
         restart = function(args)
+            local gui = requireModule("Gui")
             gui.drawInfo("Restarting SCI Sentinel OS...")
             os.sleep(1)
             shell.run("startup")
@@ -747,27 +829,33 @@ function commands.handleCommand(input)
         end,
         update = function(args)
             -- Initialize updater with GUI
+            local updater = requireModule("Updater")
             updater = updater.init(gui)
             if not updater then
+                local gui = requireModule("Gui")
                 gui.drawError("Failed to initialize updater")
                 return true
             end
             
             local updates = updater.checkForUpdates()
             if updates == false then
+                local gui = requireModule("Gui")
                 gui.drawSuccess("No updates available")
             end
             return true
         end,
         reinstall = function(args)
+            local gui = requireModule("Gui")
             gui.drawError("WARNING: This will reinstall all SCI Sentinel files.")
             gui.drawError("Type 'confirm' to proceed or anything else to cancel.")
             gui.printPrompt()
             local response = read()
             if response == "confirm" then
+                local gui = requireModule("Gui")
                 gui.drawSuccess("Starting reinstallation...")
                 shell.run("wget", "run", "https://raw.githubusercontent.com/ickycoolboy/SCIOS-Computercraft/Github-updating-test/Installer.lua")
             else
+                local gui = requireModule("Gui")
                 gui.drawSuccess("Reinstallation cancelled.")
             end
             return true
@@ -838,6 +926,7 @@ function commands.handleCommand(input)
                     draw = function()
                         term.setBackgroundColor(colors.black)
                         term.clear()
+                        local gui = requireModule("Gui")
                         gui.drawScreen()
                         
                         gui.drawFancyBox(5, 5, 40, 12, "SCI Sentinel Uninstaller", colors.black, colors.yellow)
@@ -866,6 +955,7 @@ function commands.handleCommand(input)
                         term.setBackgroundColor(colors.black)
                         term.clear()
                         term.setCursorPos(1,1)
+                        local gui = requireModule("Gui")
                         gui.drawScreen()
                         
                         gui.drawFancyBox(5, 5, 40, 16, "Uninstall Settings", colors.black, colors.blue)
@@ -935,6 +1025,7 @@ function commands.handleCommand(input)
                     draw = function()
                         term.setBackgroundColor(colors.black)
                         term.clear()
+                        local gui = requireModule("Gui")
                         gui.drawScreen()
                         
                         gui.drawFancyBox(5, 5, 40, 14, "System Statistics", colors.black, colors.cyan)
@@ -961,6 +1052,7 @@ function commands.handleCommand(input)
                     draw = function()
                         term.setBackgroundColor(colors.black)
                         term.clear()
+                        local gui = requireModule("Gui")
                         gui.drawScreen()
                         
                         gui.drawFancyBox(5, 5, 40, 14, "Confirm Uninstall", colors.black, colors.red)
@@ -1113,6 +1205,7 @@ function commands.handleCommand(input)
                 term.setBackgroundColor(colors.black)
                 term.clear()
                 term.setCursorPos(1,1)
+                local gui = requireModule("Gui")
                 gui.drawFancyBox(5, 5, 40, 10, "Error", colors.black, colors.red)
                 gui.drawCenteredText(7, "An error occurred:", colors.white)
                 gui.drawCenteredText(8, err, colors.red)
@@ -1122,11 +1215,13 @@ function commands.handleCommand(input)
             return true
         end,
         mirror = function(args)
-            local displayManager = require("DisplayManager")
+            local displayManager = requireModule("DisplayManager")
             local enabled = displayManager.toggleMirroring()
             if enabled then
+                local gui = requireModule("Gui")
                 gui.drawSuccess("Display mirroring enabled")
             else
+                local gui = requireModule("Gui")
                 gui.drawSuccess("Display mirroring disabled")
             end
             return true
@@ -1138,6 +1233,7 @@ function commands.handleCommand(input)
         return commandHandlers[cmd](parts)
     else
         -- Only run recognized commands
+        local gui = requireModule("Gui")
         gui.drawError("'" .. cmd .. "' is not recognized as an internal or external command.")
         gui.drawError("Type 'HELP' for a list of available commands")
         return false
