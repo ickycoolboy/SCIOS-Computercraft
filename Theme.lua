@@ -42,7 +42,8 @@ local defaultColors = {
     tabTextInactive = colors.black,
     border = colors.gray,
     dimText = colors.gray,
-    shadow = colors.gray
+    shadow = colors.gray,
+    error = colors.red
 }
 
 -- Current theme colors (can be modified by user)
@@ -89,8 +90,9 @@ end
 
 -- Initialize the theme system
 function theme.init()
-    if theme._initialized then
-        ErrorHandler.logError("Theme", "Initialization skipped: already initialized")
+    -- Check for persistent initialization state
+    if fs.exists("/scios/.theme_initialized") then
+        ErrorHandler.logError("Theme", "Initialization skipped: found persistent state")
         return true
     end
     
@@ -101,9 +103,25 @@ function theme.init()
         return false
     end
     
+    -- Create persistent initialization state
+    local file = fs.open("/scios/.theme_initialized", "w")
+    if file then
+        file.write("initialized")
+        file.close()
+    end
+    
     theme._initialized = true
     ErrorHandler.logError("Theme", "Theme initialization completed successfully")
     return true
+end
+
+-- Reset theme initialization state
+function theme.reset()
+    if fs.exists("/scios/.theme_initialized") then
+        fs.delete("/scios/.theme_initialized")
+    end
+    theme._initialized = false
+    ErrorHandler.logError("Theme", "Theme initialization state reset")
 end
 
 -- Check if theme is initialized
@@ -166,21 +184,47 @@ end
 
 -- Get a color value safely
 function theme.getColor(name)
-    return ErrorHandler.protectedCall("get_color", function()
-        if not currentColors[name] then
-            ErrorHandler.logError("Get Color", "Color not initialized: " .. tostring(name))
-            -- Return a fallback color based on the type of element
-            if name:match("Bg$") or name == "background" then
-                return colors.black
-            elseif name:match("Text$") or name == "text" then
-                return colors.white
-            else
-                return colors.gray
-            end
+    -- Ensure currentColors is initialized
+    if not currentColors or not next(currentColors) then
+        -- Force initialization, but don't error out
+        pcall(theme.init)
+    end
+    
+    -- Fallback color mapping with comprehensive coverage
+    local fallbackColors = {
+        titleBar = colors.purple,
+        titleText = colors.white,
+        windowBg = colors.black,
+        text = colors.white,
+        background = colors.black,
+        border = colors.gray,
+        shadow = colors.gray,
+        buttonBg = colors.gray,
+        buttonText = colors.white,
+        progressBar = colors.blue,
+        progressBg = colors.black,
+        error = colors.red,
+        shellBg = colors.black,
+        shellText = colors.white
+    }
+    
+    -- Safely retrieve color
+    local color = currentColors and currentColors[name]
+    
+    -- If color is nil, use fallback
+    if color == nil then
+        color = fallbackColors[name]
+        
+        -- Log color retrieval for debugging
+        if color ~= nil then
+            ErrorHandler.logError("Get Color", "Using fallback color for " .. tostring(name) .. ": " .. tostring(color))
+        else
+            ErrorHandler.logError("Get Color", "No color found for " .. tostring(name) .. ", using default gray")
+            color = colors.gray
         end
-        ErrorHandler.logError("Get Color", "Retrieved color for " .. name .. ": " .. tostring(currentColors[name]))
-        return currentColors[name]
-    end)
+    end
+    
+    return color
 end
 
 -- Reset to defaults with error handling
@@ -851,6 +895,81 @@ function theme.drawLogo()
     -- Restore original colors
     term.setBackgroundColor(oldBg)
     term.setTextColor(oldFg)
+end
+
+-- Draw the persistent title bar
+function theme.drawPersistentTitleBar(title)
+    local current = term.current()
+    local w, h = current.getSize()
+    local logoText = "SCI Sentinel OS"
+    local centerX = math.floor((w - #logoText) / 2)
+    
+    -- Save current colors
+    local oldBg = term.getBackgroundColor()
+    local oldFg = term.getTextColor()
+    
+    -- Set logo colors
+    term.setBackgroundColor(theme.getColor("titleBar"))
+    term.setTextColor(theme.getColor("titleText"))
+    
+    -- Clear the first line
+    term.setCursorPos(1, 1)
+    term.write(string.rep(" ", w))
+    
+    -- Draw centered logo
+    term.setCursorPos(centerX, 1)
+    term.write(logoText)
+    
+    -- Restore original colors
+    term.setBackgroundColor(oldBg)
+    term.setTextColor(oldFg)
+end
+
+-- Draw the MS-DOS style blinking cursor
+function theme.drawMSDOSCursor()
+    local w, h = term.getSize()
+    local cursorChar = "_"
+    local blinkInterval = 0.5  -- Half-second blink
+    
+    -- Ensure we're using a valid terminal
+    if not term or not term.getSize then
+        ErrorHandler.logError("Theme", "Invalid terminal for cursor drawing")
+        return
+    end
+    
+    while true do
+        -- Protect against terminal errors
+        local success, err = pcall(function()
+            term.setCursorPos(1, h)
+            term.setTextColor(colors.white)
+            term.write(cursorChar)
+        end)
+        
+        if not success then
+            ErrorHandler.logError("Theme", "Error drawing cursor: " .. tostring(err))
+            break
+        end
+        
+        os.sleep(blinkInterval)
+        
+        -- Protect against terminal errors
+        success, err = pcall(function()
+            term.setCursorPos(1, h)
+            term.write(" ")
+        end)
+        
+        if not success then
+            ErrorHandler.logError("Theme", "Error clearing cursor: " .. tostring(err))
+            break
+        end
+        
+        os.sleep(blinkInterval)
+    end
+end
+
+-- Wrapper function to start cursor in a separate coroutine
+function theme.startMSDOSCursor()
+    return coroutine.create(theme.drawMSDOSCursor)
 end
 
 -- Return the theme module

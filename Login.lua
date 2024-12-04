@@ -138,8 +138,12 @@ function login.showLoginScreen()
             
             -- Initialize shell environment with error handling
             success = ErrorHandler.protectedCall("init_shell", function()
-                term.setBackgroundColor(theme.getColor("background"))
-                term.setTextColor(theme.getColor("text"))
+                -- Safely get colors with fallback
+                local bgColor = pcall(theme.getColor, "background") and theme.getColor("background") or colors.black
+                local textColor = pcall(theme.getColor, "text") and theme.getColor("text") or colors.white
+                
+                term.setBackgroundColor(bgColor)
+                term.setTextColor(textColor)
                 term.clear()
                 term.setCursorPos(1, 2)
                 term.write("> ")
@@ -167,8 +171,12 @@ function login.showLoginScreen()
                 
                 -- Initialize shell environment with error handling
                 success = ErrorHandler.protectedCall("init_shell", function()
-                    term.setBackgroundColor(theme.getColor("background"))
-                    term.setTextColor(theme.getColor("text"))
+                    -- Safely get colors with fallback
+                    local bgColor = pcall(theme.getColor, "background") and theme.getColor("background") or colors.black
+                    local textColor = pcall(theme.getColor, "text") and theme.getColor("text") or colors.white
+                    
+                    term.setBackgroundColor(bgColor)
+                    term.setTextColor(textColor)
                     term.clear()
                     term.setCursorPos(1, 2)
                     term.write("> ")
@@ -188,7 +196,11 @@ function login.showLoginScreen()
     
     -- Add error handling for invalid username
     term.setCursorPos(startX + 2, startY + 3)
-    term.setTextColor(theme.getColor("error"))
+    
+    -- Safely get error color with fallback
+    local errorColor = pcall(theme.getColor, "error") and theme.getColor("error") or colors.red
+    term.setTextColor(errorColor)
+    
     term.write("Invalid username. Try again.")
     os.sleep(2)  -- Pause to show error message
         

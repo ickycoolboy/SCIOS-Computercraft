@@ -12,179 +12,233 @@ package.path = "./?.lua;/scios/?.lua;" .. package.path
 -- Initialize error handling
 local ErrorHandler = require("ErrorHandler")
 
--- Module cache to prevent circular dependencies
-local loadedModules = {}
-
--- Forward declarations
-local gui = nil
-local theme
-local login
-local commands
-local displayManager
-local help
-local updater
-
--- GitHub repository information
-local GITHUB_REPO = {
-    owner = "ickycoolboy",
-    name = "SCIOS-Computercraft",
-    branch = "Github-updating-test"
-}
-
--- Module file mappings
-local MODULE_FILES = {
-    updater = "Updater.lua",
-    gui = "Gui.lua",
-    commands = "Commands.lua",
-    sci_sentinel = "Sci_sentinel.lua",
-    help = "Help.lua",
-    displayManager = "DisplayManager.lua",
-    login = "Login.lua",
-    errorHandler = "ErrorHandler.lua"
-}
-
 -- Enhanced logging function
 local function verboseLog(context, message)
-    ErrorHandler.logError(context, message)
+    if ErrorHandler and ErrorHandler.logError then
+        ErrorHandler.logError(context, message)
+    end
     print("[VERBOSE] " .. context .. ": " .. message)  -- Also print to screen for immediate visibility
 end
+
+-- Global module to track system modules
+SystemModules = {}
 
 -- Protected require function with module caching and initialization
 local function requireModule(name, additionalParams)
     verboseLog("Module Loader", "ATTEMPTING to load module: " .. tostring(name))
     
-    if loadedModules[name] then
-        verboseLog("Module Loader", "Returning CACHED module: " .. name)
-        return loadedModules[name]
+    -- Check if module is already loaded and initialized
+    if SystemModules[name] then
+        verboseLog("Module Loader", "Module already loaded and initialized: " .. name)
+        return SystemModules[name]
     end
     
-    local loadedModule  -- Declare outside of the protected call
-    local success, result = ErrorHandler.protectedCall("require_" .. name, function()
-        verboseLog("Module Loader", "Calling require() for: " .. name)
-        loadedModule = require(name)
-        
-        verboseLog("Module Loader", "Module loaded type: " .. type(loadedModule))
-        
-        if loadedModule == nil then
-            error("Module loaded as nil: " .. name)
-        end
-        
-        if type(loadedModule) ~= "table" then
-            error("Module did not return a table: " .. name .. ", type: " .. type(loadedModule))
-        end
-        
-        return loadedModule
-    end)
+    local success, loadedModule = pcall(require, name)
     
     if not success then
-        verboseLog("Module Loader", "FAILED to load module: " .. name .. ", Error: " .. tostring(result))
+        verboseLog("Module Loader", "FAILED to load module: " .. name .. ", Error: " .. tostring(loadedModule))
+        return nil
+    end
+    
+    if loadedModule == nil then
+        verboseLog("Module Loader", "Module loaded as nil: " .. name)
+        return nil
+    end
+    
+    if type(loadedModule) ~= "table" then
+        verboseLog("Module Loader", "Module did not return a table: " .. name .. ", type: " .. type(loadedModule))
         return nil
     end
     
     verboseLog("Module Loader", "Module loaded successfully: " .. name)
     
-    -- Store module before initialization to prevent circular dependencies
-    loadedModules[name] = loadedModule
+    -- Store module in SystemModules before initialization to prevent cycles
+    SystemModules[name] = loadedModule
     
     -- Initialize the module if it has an init function
     if type(loadedModule.init) == "function" then
         verboseLog("Module Loader", "Attempting to initialize module: " .. name)
         
-        -- Prepare initialization parameters
-        local initParams = {}
-        if additionalParams then
-            for k, v in pairs(additionalParams) do
-                initParams[k] = v
-            end
-        end
-        
-        local initSuccess = ErrorHandler.protectedCall("init_" .. name, function()
-            -- Special handling for modules with specific initialization requirements
-            if name == "Updater" and _G.SystemModules and _G.SystemModules.Gui then
-                initParams.guiInstance = _G.SystemModules.Gui
-            end
-            
-            return loadedModule.init(unpack(initParams))
+        local initSuccess, initErr = pcall(function()
+            return loadedModule.init(additionalParams)
         end)
         
         if not initSuccess then
-            verboseLog("Module Loader", "Failed to initialize module: " .. name)
-            loadedModules[name] = nil
-            return nil
+            verboseLog("Module Loader", "Failed to initialize module: " .. name .. ", Error: " .. tostring(initErr))
+            -- Don't remove from SystemModules, just mark as failed
+            SystemModules[name .. "_init_failed"] = true
         end
-        
-        verboseLog("Module Loader", "Module initialized successfully: " .. name)
     end
     
     return loadedModule
 end
 
--- Initialize all system modules
-local function initializeSystemModules()
+-- Global function to initialize system modules
+function initializeSystemModules()
     verboseLog("System", "STARTING system initialization")
     
     -- Create a dependency order for module loading
     local moduleLoadOrder = {
-        "Theme",      -- Load first as it's a core dependency
-        "Gui",        -- Load GUI next as it manages display
+        "ErrorHandler",
+        "Theme",
+        "Gui",
         "DisplayManager",
-        "Commands",
-        "Help",
         "Login",
-        "Updater"
+        "Commands"
     }
     
-    local modules = {}
+    -- Track module loading status
+    local loadedModules = {}
     
-    -- Load modules in order
+    -- Load and initialize modules
     for _, moduleName in ipairs(moduleLoadOrder) do
-        verboseLog("System", "Attempting to load module: " .. moduleName)
-        
-        -- Prepare any additional parameters for specific modules
-        local additionalParams = {}
-        
-        local module = requireModule(moduleName, additionalParams)
-        
-        if not module then
-            verboseLog("System", "CRITICAL FAILURE loading module: " .. moduleName)
-            
-            -- Provide a fallback for critical modules
-            if moduleName == "Theme" then
-                module = {
-                    version = "fallback",
-                    getColor = function(name) return colors.black end,
-                    drawTitleBar = function() end,
-                    init = function() return true end
-                }
-            elseif moduleName == "Gui" then
-                module = {
-                    version = "fallback",
-                    clear = function() term.clear() end,
-                    init = function() return true end
-                }
-            elseif moduleName == "Updater" then
-                module = {
-                    version = "fallback",
-                    checkUpdates = function() return false end,
-                    init = function() return true end
-                }
-            end
-            
-            -- If still no module, return false to indicate system initialization failure
-            if not module then
-                verboseLog("System", "ABSOLUTE FAILURE: No fallback for " .. moduleName)
-                return false
-            end
+        -- Skip if module is already properly loaded and initialized
+        if SystemModules[moduleName] and not SystemModules[moduleName .. "_init_failed"] then
+            verboseLog("Module Loader", "Skipping already initialized module: " .. moduleName)
+            loadedModules[moduleName] = SystemModules[moduleName]
+            goto continue
         end
         
-        modules[moduleName] = module
-        verboseLog("System", "Module stored: " .. moduleName)
+        verboseLog("Module Loader", "Loading module: " .. moduleName)
+        local module = requireModule(moduleName)
+        
+        if not module then
+            verboseLog("Module Loader", "CRITICAL: Failed to load module: " .. moduleName)
+            term.clear()
+            term.setCursorPos(1,1)
+            term.setTextColor(colors.red)
+            term.write("SYSTEM INITIALIZATION FAILED: COULD NOT LOAD " .. moduleName:upper())
+            return false
+        end
+        
+        loadedModules[moduleName] = module
+        ::continue::
     end
     
-    -- Store modules globally
-    _G.SystemModules = modules
+    -- Update SystemModules global with newly loaded modules
+    for name, module in pairs(loadedModules) do
+        SystemModules[name] = module
+    end
     
-    verboseLog("System", "SYSTEM MODULES INITIALIZED SUCCESSFULLY")
+    -- Attempt to start system UI
+    if type(startSystemUI) ~= "function" then
+        verboseLog("System", "CRITICAL: startSystemUI is not a valid function")
+        term.clear()
+        term.setCursorPos(1,1)
+        term.setTextColor(colors.red)
+        term.write("SYSTEM INITIALIZATION FAILED: INVALID STARTUP FUNCTION")
+        return false
+    end
+    
+    local uiSuccess, uiResult = pcall(startSystemUI)
+    if not uiSuccess then
+        verboseLog("System", "Failed to start system UI: " .. tostring(uiResult))
+        term.clear()
+        term.setCursorPos(1,1)
+        term.setTextColor(colors.red)
+        term.write("SYSTEM UI INITIALIZATION FAILED: " .. tostring(uiResult))
+        return false
+    end
+    
+    -- Check the return value of startSystemUI
+    if uiResult ~= true then
+        verboseLog("System", "System UI initialization returned false")
+        term.clear()
+        term.setCursorPos(1,1)
+        term.setTextColor(colors.red)
+        term.write("SYSTEM UI INITIALIZATION FAILED")
+        return false
+    end
+    
+    return true
+end
+
+-- Start system UI
+function startSystemUI()
+    verboseLog("System", "Starting System UI Components")
+    
+    -- Verify theme module is loaded
+    local themeModule = SystemModules.Theme
+    if not themeModule then
+        verboseLog("System", "CRITICAL: Theme module not loaded")
+        term.clear()
+        term.setCursorPos(1,1)
+        term.setTextColor(colors.red)
+        term.write("SYSTEM UI INITIALIZATION FAILED: THEME MODULE MISSING")
+        return false
+    end
+    
+    -- Check if required theme functions exist
+    local requiredFunctions = {
+        "drawPersistentTitleBar",
+        "startMSDOSCursor"
+    }
+    
+    for _, funcName in ipairs(requiredFunctions) do
+        if type(themeModule[funcName]) ~= "function" then
+            verboseLog("System", "CRITICAL: Missing theme function: " .. funcName)
+            term.clear()
+            term.setCursorPos(1,1)
+            term.setTextColor(colors.red)
+            term.write("SYSTEM UI INITIALIZATION FAILED: MISSING " .. funcName:upper())
+            return false
+        end
+    end
+    
+    -- Protect title bar drawing
+    local titleBarSuccess, titleBarErr = pcall(function()
+        themeModule.drawPersistentTitleBar()
+    end)
+    
+    if not titleBarSuccess then
+        verboseLog("System", "Failed to draw persistent title bar: " .. tostring(titleBarErr))
+        term.clear()
+        term.setCursorPos(1,1)
+        term.setTextColor(colors.red)
+        term.write("SYSTEM UI INITIALIZATION FAILED: TITLE BAR ERROR")
+        return false
+    end
+    
+    -- Start blinking cursor in a separate coroutine
+    local cursorThread
+    local cursorSuccess, cursorErr = pcall(function()
+        cursorThread = themeModule.startMSDOSCursor()
+    end)
+    
+    if not cursorSuccess then
+        verboseLog("System", "Failed to start cursor thread: " .. tostring(cursorErr))
+        term.clear()
+        term.setCursorPos(1,1)
+        term.setTextColor(colors.red)
+        term.write("SYSTEM UI INITIALIZATION FAILED: CURSOR THREAD ERROR")
+        return false
+    end
+    
+    -- Protect cursor thread resuming
+    local threadSuccess, threadErr = pcall(function()
+        -- Resume the cursor thread periodically
+        while true do
+            if coroutine.status(cursorThread) ~= "dead" then
+                local success, err = coroutine.resume(cursorThread)
+                if not success then
+                    error("Cursor thread error: " .. tostring(err))
+                end
+            else
+                break
+            end
+            os.sleep(0.5)  -- Prevent tight loop
+        end
+    end)
+    
+    if not threadSuccess then
+        verboseLog("System", "Cursor thread failed: " .. tostring(threadErr))
+        term.clear()
+        term.setCursorPos(1,1)
+        term.setTextColor(colors.red)
+        term.write("SYSTEM UI INITIALIZATION FAILED: CURSOR THREAD RESUMING")
+        return false
+    end
+    
     return true
 end
 
@@ -193,9 +247,9 @@ local function startCommandLoop()
     verboseLog("Main", "Starting command loop")
     
     -- Ensure critical modules are available
-    local commands = _G.SystemModules and _G.SystemModules.Commands
-    local gui = _G.SystemModules and _G.SystemModules.Gui
-    local theme = _G.SystemModules and _G.SystemModules.Theme
+    local commands = SystemModules.Commands
+    local gui = SystemModules.Gui
+    local theme = SystemModules.Theme
     
     if not commands or not gui or not theme then
         verboseLog("Main", "CRITICAL: One or more required modules are missing")
@@ -286,10 +340,10 @@ local function main()
     verboseLog("Main", "System modules initialized, proceeding...")
     
     -- Safely get modules from global SystemModules
-    local gui = _G.SystemModules and _G.SystemModules.Gui
-    local theme = _G.SystemModules and _G.SystemModules.Theme
-    local login = _G.SystemModules and _G.SystemModules.Login
-    local commands = _G.SystemModules and _G.SystemModules.Commands
+    local gui = SystemModules.Gui
+    local theme = SystemModules.Theme
+    local login = SystemModules.Login
+    local commands = SystemModules.Commands
     
     -- Validate critical modules
     local criticalModules = {
@@ -343,7 +397,7 @@ local function drawInitialScreen()
         verboseLog("Main", "Inside drawScreen function")
         
         -- Use SystemModules instead of local gui variable
-        local gui = _G.SystemModules and _G.SystemModules.Gui
+        local gui = SystemModules.Gui
         if not gui then
             verboseLog("Main", "GUI module not available, using fallback")
             term.clear()
@@ -357,7 +411,7 @@ local function drawInitialScreen()
         -- Rest of the existing drawing logic
         gui.clear()
         
-        local theme = _G.SystemModules and _G.SystemModules.Theme
+        local theme = SystemModules.Theme
         if theme then
             theme.drawTitleBar("SCI Sentinel OS v" .. version)
         end
@@ -369,22 +423,50 @@ end
 -- Wrap the entire script execution in a protected call
 local function safeStart()
     verboseLog("Startup", "SAFE START INITIATED")
-    local status, result = pcall(main)
     
-    if not status then
-        verboseLog("Startup", "CATASTROPHIC FAILURE: " .. tostring(result))
+    -- Attempt to initialize system modules
+    local initSuccess, initResult = pcall(initializeSystemModules)
+    
+    if not initSuccess then
+        verboseLog("Startup", "CATASTROPHIC FAILURE: " .. tostring(initResult))
         term.clear()
         term.setCursorPos(1,1)
-        term.setBackgroundColor(colors.red)
-        term.setTextColor(colors.white)
-        term.write("SYSTEM STARTUP FAILED")
-        term.setCursorPos(1,2)
-        term.write(tostring(result))
-        sleep(10)  -- Give time to read error
+        term.setTextColor(colors.red)
+        term.write("SYSTEM STARTUP FAILED: " .. tostring(initResult))
+        return false
     end
     
-    return status
+    -- Check the return value of initializeSystemModules
+    if initResult ~= true then
+        verboseLog("Startup", "SYSTEM INITIALIZATION FAILED")
+        term.clear()
+        term.setCursorPos(1,1)
+        term.setTextColor(colors.red)
+        term.write("SYSTEM INITIALIZATION FAILED")
+        return false
+    end
+    
+    -- If initialization succeeds, start the main command loop
+    local loopSuccess, loopResult = pcall(startCommandLoop)
+    
+    if not loopSuccess then
+        verboseLog("Startup", "COMMAND LOOP FAILED: " .. tostring(loopResult))
+        term.clear()
+        term.setCursorPos(1,1)
+        term.setTextColor(colors.red)
+        term.write("SYSTEM COMMAND LOOP FAILED: " .. tostring(loopResult))
+        return false
+    end
+    
+    return true
 end
 
--- Call the safe start function
-safeStart()
+-- Attempt to start the system safely
+local startupSuccess, startupResult = pcall(safeStart)
+
+if not startupSuccess then
+    term.clear()
+    term.setCursorPos(1,1)
+    term.setTextColor(colors.red)
+    term.write("CRITICAL SYSTEM STARTUP ERROR: " .. tostring(startupResult))
+end

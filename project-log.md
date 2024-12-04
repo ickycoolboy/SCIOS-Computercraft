@@ -243,6 +243,26 @@ Looking at:
 - Login.lua command handling
 - Theme terminal state
 
+## Recent Changes
+
+## [Feature] Login Screen Improvements
+### Files: Login.lua, Theme.lua
+- **Change**: Added a fancy animated logo to the login screen
+- **Reason**: Enhance user experience and provide visual branding
+- **Outcome**: Login screen now displays "SCI Sentinel" with a letter-by-letter animation
+
+## [Fix] Terminal State Management
+### Files: Login.lua
+- **Change**: Fixed terminal state saving to prevent nil argument errors
+- **Reason**: Resolve login screen crashes during invalid username attempts
+- **Outcome**: Improved error handling and login screen stability
+
+## [Enhancement] Error Handling
+### Files: Login.lua
+- **Change**: Added user-friendly error message for invalid login attempts
+- **Reason**: Provide clear feedback to users during login process
+- **Outcome**: Users now see a clear "Invalid username" message
+
 ## Future Considerations
 - Consider implementing automated changelog generation
 - Keep monitoring performance impacts of theme changes
