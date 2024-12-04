@@ -104,6 +104,9 @@ function login.showLoginScreen()
         return false
     end
     
+    -- Draw the logo at the top of the screen
+    theme.drawLogo()
+    
     -- Draw minimal login interface
     success = ErrorHandler.protectedCall("draw_login_box", function()
         theme.drawBox(startX, startY, boxWidth, boxHeight, "Login")

@@ -826,6 +826,33 @@ function theme.initShell()
     term.write("> ")
 end
 
+-- Draw a fancy logo as a title bar
+function theme.drawLogo()
+    local current = term.current()
+    local w, _ = current.getSize()
+    local logoText = "SCI Sentinel"
+    local centerX = math.floor((w - #logoText) / 2)
+    
+    -- Save current colors
+    local oldBg = term.getBackgroundColor()
+    local oldFg = term.getTextColor()
+    
+    -- Set logo colors
+    term.setBackgroundColor(theme.getColor("titleBar"))
+    term.setTextColor(theme.getColor("titleText"))
+    
+    -- Draw the logo with a simple animation effect
+    for i = 1, #logoText do
+        term.setCursorPos(centerX + i - 1, 1)
+        term.write(logoText:sub(i, i))
+        os.sleep(0.1)  -- Small delay for animation effect
+    end
+    
+    -- Restore original colors
+    term.setBackgroundColor(oldBg)
+    term.setTextColor(oldFg)
+end
+
 -- Return the theme module
 ErrorHandler.logError("Theme", "Theme module loaded successfully")
 
