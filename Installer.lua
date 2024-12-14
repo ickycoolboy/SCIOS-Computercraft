@@ -456,6 +456,7 @@ local config = {
     branch = "Github-updating-test",
     install_dir = "scios",
     modules = {
+        {name = "ErrorHandler", file = "ErrorHandler.lua", target = "scios/ErrorHandler.lua", required = true},  -- Must be first!
         {name = "Core", file = "Sci_sentinel.lua", target = "scios/Sci_sentinel.lua", required = true},
         {name = "GUI", file = "Gui.lua", target = "scios/Gui.lua", required = true},
         {name = "Commands", file = "Commands.lua", target = "scios/Commands.lua", required = true},
@@ -476,8 +477,10 @@ local config = {
 
 -- Required files for installation
 local requiredFiles = {
-    ["startup.lua"] = "startup.lua",
+    ["startup.lua"] = "startup.lua",  -- Only file in root
+    -- All other files go in /scios/
     ["Sci_sentinel.lua"] = "scios/Sci_sentinel.lua",
+    ["ErrorHandler.lua"] = "scios/ErrorHandler.lua",
     ["Gui.lua"] = "scios/Gui.lua",
     ["Commands.lua"] = "scios/Commands.lua",
     ["Updater.lua"] = "scios/Updater.lua",
@@ -485,7 +488,16 @@ local requiredFiles = {
     ["ThemeEditor.lua"] = "scios/ThemeEditor.lua",
     ["Gaming.lua"] = "scios/Gaming.lua",
     ["DisplayManager.lua"] = "scios/DisplayManager.lua",
-    ["Login.lua"] = "scios/Login.lua"
+    ["Login.lua"] = "scios/Login.lua",
+    ["Network.lua"] = "scios/Network.lua",
+    ["Help.lua"] = "scios/Help.lua",
+    -- Documentation and config files
+    ["README.md"] = "scios/README.md",
+    ["journey.md"] = "scios/journey.md",
+    ["files.md"] = "scios/files.md",
+    ["project-log.md"] = "scios/project-log.md",
+    ["development_log.md"] = "scios/development_log.md",
+    ["filetracker.db"] = "scios/filetracker.db"
 }
 
 -- Initialize screen
@@ -565,6 +577,7 @@ end
 -- Download a file from GitHub
 local function downloadFile(url, path)
     print(string.format("Downloading from: %s", url))
+    print(string.format("Installing to: %s", path))
     
     -- Try direct HTTP request first
     local ok, response = pcall(function()
@@ -585,6 +598,11 @@ local function downloadFile(url, path)
     local content = response.readAll()
     response.close()
     
+    if not content or #content == 0 then
+        print("Downloaded file is empty")
+        return false
+    end
+    
     -- Create directory if needed
     local dir = fs.getDir(path)
     if dir and dir ~= "" and not fs.exists(dir) then
@@ -599,6 +617,16 @@ local function downloadFile(url, path)
         end
         file.write(content)
         file.close()
+        
+        -- Verify file was written
+        if not fs.exists(path) then
+            error("File was not created after writing: " .. path)
+        end
+        
+        local size = fs.getSize(path)
+        if size == 0 then
+            error("File was created but is empty: " .. path)
+        end
     end)
     
     if not ok then
@@ -606,6 +634,13 @@ local function downloadFile(url, path)
         return false
     end
     
+    -- Double check the file exists and has content
+    if not fs.exists(path) then
+        print("File does not exist after writing: " .. path)
+        return false
+    end
+    
+    print(string.format("Successfully installed %s (%d bytes)", path, fs.getSize(path)))
     return true, content
 end
 
@@ -817,6 +852,48 @@ local function main()
             local totalFiles = #config.modules + #config.root_files
             local filesInstalled = 0
             
+            -- Ensure scios directory exists and is empty
+            if fs.exists("scios") then
+                fs.delete("scios")
+            end
+            fs.makeDir("scios")
+            
+            -- First install ErrorHandler since other modules depend on it
+            local errorHandler = nil
+            for i, module in ipairs(config.modules) do
+                if module.name == "ErrorHandler" then
+                    errorHandler = table.remove(config.modules, i)
+                    break
+                end
+            end
+            
+            if errorHandler then
+                showLoadingMessage("Installing " .. errorHandler.name .. "...")
+                installationProgress = filesInstalled / totalFiles
+                drawInstallationWizard()
+                
+                -- Ensure clean installation
+                if fs.exists(errorHandler.target) then
+                    fs.delete(errorHandler.target)
+                end
+                
+                local success = downloadFile(getGitHubRawURL(errorHandler.file), errorHandler.target)
+                if not success then
+                    showError("Failed to download ErrorHandler module", "Critical module installation failed")
+                    return
+                end
+                
+                -- Verify ErrorHandler was installed correctly
+                if not fs.exists(errorHandler.target) then
+                    showError("ErrorHandler file missing after installation", "Installation verification failed")
+                    return
+                end
+                
+                filesInstalled = filesInstalled + 1
+                os.sleep(0.5)
+            end
+            
+            -- Then install remaining modules
             for _, module in ipairs(config.modules) do
                 showLoadingMessage("Installing " .. module.name .. "...")
                 installationProgress = filesInstalled / totalFiles
@@ -831,6 +908,7 @@ local function main()
                 os.sleep(0.5)  -- Add slight delay for visual effect
             end
             
+            -- Finally install root files
             for _, file in ipairs(config.root_files) do
                 showLoadingMessage("Installing " .. file.name .. "...")
                 installationProgress = filesInstalled / totalFiles

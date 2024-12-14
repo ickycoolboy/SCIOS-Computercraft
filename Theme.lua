@@ -1,18 +1,26 @@
 -- SCI Sentinel Theme Module
 local ErrorHandler = require("ErrorHandler")
 
--- Log module loading attempt
+-- Log module loading
 ErrorHandler.logError("Theme", "Theme module is being loaded")
 
 local theme = {
     -- Module version
     version = "1.34",
     -- Initialize flag
-    _initialized = false
+    _initialized = false,
+    -- Debug flag
+    _debug = true
 }
+
+-- Debug logging function
+local function debugLog(message)
+    ErrorHandler.logError("Theme", message)
+end
 
 -- Validate ErrorHandler
 if not ErrorHandler or type(ErrorHandler) ~= "table" then
+    ErrorHandler.logError("Theme", "ErrorHandler module failed to load correctly")
     error("ErrorHandler module failed to load correctly")
 end
 
@@ -90,36 +98,42 @@ end
 
 -- Initialize the theme system
 function theme.init()
-    -- Check for persistent initialization state
-    if fs.exists("/scios/.theme_initialized") then
-        ErrorHandler.logError("Theme", "Initialization skipped: found persistent state")
+    ErrorHandler.logError("Theme", "Starting theme initialization")
+    
+    if theme._initialized then
+        ErrorHandler.logError("Theme", "Theme already initialized, skipping")
         return true
     end
     
-    ErrorHandler.logError("Theme", "Starting theme initialization")
-    local success = theme.loadTheme()
+    local success, err = pcall(function()
+        -- Copy default colors to current colors
+        for k, v in pairs(defaultColors) do
+            currentColors[k] = v
+        end
+        
+        -- Set up initial terminal colors
+        if term and term.setBackgroundColor and term.setTextColor then
+            term.setBackgroundColor(theme.getColor("background"))
+            term.setTextColor(theme.getColor("text"))
+            term.clear()
+        else
+            error("Terminal API not available")
+        end
+        
+        theme._initialized = true
+        ErrorHandler.logError("Theme", "Theme initialization completed successfully")
+    end)
+    
     if not success then
-        ErrorHandler.logError("Theme", "Failed to load theme configuration")
+        ErrorHandler.logError("Theme", "Theme initialization failed: " .. tostring(err))
         return false
     end
     
-    -- Create persistent initialization state
-    local file = fs.open("/scios/.theme_initialized", "w")
-    if file then
-        file.write("initialized")
-        file.close()
-    end
-    
-    theme._initialized = true
-    ErrorHandler.logError("Theme", "Theme initialization completed successfully")
     return true
 end
 
 -- Reset theme initialization state
 function theme.reset()
-    if fs.exists("/scios/.theme_initialized") then
-        fs.delete("/scios/.theme_initialized")
-    end
     theme._initialized = false
     ErrorHandler.logError("Theme", "Theme initialization state reset")
 end
@@ -926,50 +940,139 @@ function theme.drawPersistentTitleBar(title)
 end
 
 -- Draw the MS-DOS style blinking cursor
+local cursorState = false
 function theme.drawMSDOSCursor()
-    local w, h = term.getSize()
-    local cursorChar = "_"
-    local blinkInterval = 0.5  -- Half-second blink
-    
-    -- Ensure we're using a valid terminal
-    if not term or not term.getSize then
-        ErrorHandler.logError("Theme", "Invalid terminal for cursor drawing")
-        return
-    end
-    
-    while true do
-        -- Protect against terminal errors
-        local success, err = pcall(function()
-            term.setCursorPos(1, h)
-            term.setTextColor(colors.white)
-            term.write(cursorChar)
-        end)
+    return ErrorHandler.protectedCall("draw_msdos_cursor", function()
+        local w, h = term.getSize()
+        local cursorChar = "_"
+        local blinkInterval = 0.5  -- Half-second blink
         
-        if not success then
-            ErrorHandler.logError("Theme", "Error drawing cursor: " .. tostring(err))
-            break
+        -- Ensure we're using a valid terminal
+        if not term or not term.getSize then
+            ErrorHandler.logError("Theme", "Invalid terminal for cursor drawing")
+            return
         end
         
-        os.sleep(blinkInterval)
-        
-        -- Protect against terminal errors
-        success, err = pcall(function()
-            term.setCursorPos(1, h)
-            term.write(" ")
-        end)
-        
-        if not success then
-            ErrorHandler.logError("Theme", "Error clearing cursor: " .. tostring(err))
-            break
+        while true do
+            -- Protect against terminal errors
+            local success, err = pcall(function()
+                term.setCursorPos(1, h)
+                term.setTextColor(theme.getColor("text"))
+                term.write(cursorChar)
+            end)
+            
+            if not success then
+                ErrorHandler.logError("Theme", "Error drawing cursor: " .. tostring(err))
+                break
+            end
+            
+            os.sleep(blinkInterval)
+            
+            -- Protect against terminal errors
+            success, err = pcall(function()
+                term.setCursorPos(1, h)
+                term.write(" ")
+            end)
+            
+            if not success then
+                ErrorHandler.logError("Theme", "Error clearing cursor: " .. tostring(err))
+                break
+            end
+            
+            os.sleep(blinkInterval)
         end
-        
-        os.sleep(blinkInterval)
-    end
+    end)
 end
 
 -- Wrapper function to start cursor in a separate coroutine
 function theme.startMSDOSCursor()
-    return coroutine.create(theme.drawMSDOSCursor)
+    local cursorThread
+    
+    -- Create the cursor thread
+    local success = ErrorHandler.protectedCall("start_msdos_cursor", function()
+        cursorThread = coroutine.create(function()
+            while true do
+                local w, h = term.getSize()
+                local x, y = term.getCursorPos()
+                
+                -- Only draw cursor if we're at the bottom of the screen
+                if y == h then
+                    term.setTextColor(theme.getColor("text"))
+                    term.write(cursorState and "_" or " ")
+                    cursorState = not cursorState
+                end
+                
+                os.sleep(0.5)  -- Half-second blink interval
+            end
+        end)
+    end)
+    
+    if not success then
+        ErrorHandler.logError("Theme", "Failed to create cursor thread")
+        return nil
+    end
+    
+    return cursorThread
+end
+
+-- Draw persistent title bar
+function theme.drawPersistentTitleBar()
+    return ErrorHandler.protectedCall("draw_persistent_title_bar", function()
+        local w, h = term.getSize()
+        local oldBg = term.getBackgroundColor()
+        local oldFg = term.getTextColor()
+        
+        -- Draw title bar background
+        term.setCursorPos(1, 1)
+        term.setBackgroundColor(theme.getColor("titleBar"))
+        term.setTextColor(theme.getColor("titleText"))
+        term.write(string.rep(" ", w))
+        
+        -- Draw title text
+        local title = "SCI Sentinel OS"
+        local centerX = math.floor((w - #title) / 2) + 1
+        term.setCursorPos(centerX, 1)
+        term.write(title)
+        
+        -- Reset colors
+        term.setBackgroundColor(oldBg)
+        term.setTextColor(oldFg)
+        
+        -- Move cursor below title bar
+        term.setCursorPos(1, 2)
+        return true
+    end)
+end
+
+-- Draw MS-DOS style blinking cursor
+function theme.startMSDOSCursor()
+    local cursorThread
+    
+    -- Create the cursor thread
+    local success = ErrorHandler.protectedCall("start_msdos_cursor", function()
+        cursorThread = coroutine.create(function()
+            while true do
+                local w, h = term.getSize()
+                local x, y = term.getCursorPos()
+                
+                -- Only draw cursor if we're at the bottom of the screen
+                if y == h then
+                    term.setTextColor(theme.getColor("text"))
+                    term.write(cursorState and "_" or " ")
+                    cursorState = not cursorState
+                end
+                
+                os.sleep(0.5)  -- Half-second blink interval
+            end
+        end)
+    end)
+    
+    if not success then
+        ErrorHandler.logError("Theme", "Failed to create cursor thread")
+        return nil
+    end
+    
+    return cursorThread
 end
 
 -- Return the theme module

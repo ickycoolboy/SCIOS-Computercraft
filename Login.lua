@@ -8,6 +8,16 @@ local users = {
     ["The Dertopian"] = ""
 }
 
+-- Validate login credentials
+local function validateLogin(username)
+    ErrorHandler.logError("Login", "Validating login for user: " .. username)
+    if not users[username] then
+        ErrorHandler.logError("Login", "Invalid username: " .. username)
+        return false
+    end
+    return true
+end
+
 -- Save terminal state
 local function saveTerminalState()
     local x, y = term.getCursorPos()
@@ -84,129 +94,81 @@ function login.showLoginScreen()
     -- Set login screen flag
     theme.isLoginScreen = true
     
-    -- Get terminal dimensions
-    local w, h = term.getSize()
-    local boxWidth = 30
-    local boxHeight = 5
-    local startX = math.floor((w - boxWidth) / 2)
-    local startY = math.floor((h - boxHeight) / 2)
-    
-    -- Clear screen with current theme colors
-    local success = ErrorHandler.protectedCall("clear_screen", function()
-        term.setBackgroundColor(theme.getColor("background"))
-        term.clear()
-        return true
-    end)
-    
-    if not success then
-        ErrorHandler.logError("Login", "Failed to clear screen")
-        restoreTerminalState(initialState)
-        return false
-    end
-    
-    -- Draw the logo at the top of the screen
-    theme.drawLogo()
-    
-    -- Draw minimal login interface
-    success = ErrorHandler.protectedCall("draw_login_box", function()
-        theme.drawBox(startX, startY, boxWidth, boxHeight, "Login")
-        return true
-    end)
-    
-    if not success then
-        ErrorHandler.logError("Login", "Failed to draw login box")
-        restoreTerminalState(initialState)
-        return false
-    end
-    
-    -- Username input
-    term.setBackgroundColor(theme.getColor("windowBg"))
-    term.setTextColor(theme.getColor("text"))
-    term.setCursorPos(startX + 2, startY + 2)
-    term.write("Username: ")
-    local username = getUserInput(startX + 11, startY + 2, false)
-    
-    ErrorHandler.logError("Login", "Username entered: " .. username)
-    
-    -- Validate credentials
-    if users[username] ~= nil then
-        if users[username] == "" then
-            ErrorHandler.logError("Login", "Login successful for user: " .. username)
+    while true do
+        -- Get terminal dimensions
+        local w, h = term.getSize()
+        local boxWidth = 30
+        local boxHeight = 7
+        local startX = math.floor((w - boxWidth) / 2)
+        local startY = math.floor((h - boxHeight) / 2)
+        
+        -- Draw login box
+        local success = ErrorHandler.protectedCall("draw_login_box", function()
+            term.setBackgroundColor(theme.getColor("background"))
+            term.clear()
             
-            -- Reset login screen flag
-            theme.isLoginScreen = false
+            -- Draw box
+            term.setBackgroundColor(theme.getColor("windowBg"))
+            term.setTextColor(theme.getColor("text"))
             
-            -- Initialize shell environment with error handling
-            success = ErrorHandler.protectedCall("init_shell", function()
-                -- Safely get colors with fallback
-                local bgColor = pcall(theme.getColor, "background") and theme.getColor("background") or colors.black
-                local textColor = pcall(theme.getColor, "text") and theme.getColor("text") or colors.white
-                
-                term.setBackgroundColor(bgColor)
-                term.setTextColor(textColor)
-                term.clear()
-                term.setCursorPos(1, 2)
-                term.write("> ")
-                return true
-            end)
-            
-            if not success then
-                ErrorHandler.logError("Login", "Failed to initialize shell environment")
-                restoreTerminalState(initialState)
-                return false
+            for y = startY, startY + boxHeight - 1 do
+                term.setCursorPos(startX, y)
+                term.write(string.rep(" ", boxWidth))
             end
             
-            return true
-        else
-            -- Handle password-protected accounts
-            term.setCursorPos(startX + 2, startY + 3)
-            term.write("Password: ")
-            local password = getUserInput(startX + 11, startY + 3, true)
+            -- Draw title
+            term.setCursorPos(startX + (boxWidth - 11) / 2, startY)
+            term.write("Login Screen")
             
-            if password == users[username] then
+            -- Draw input prompts
+            term.setCursorPos(startX + 2, startY + 2)
+            term.write("Username: ")
+            
+            -- Draw valid users
+            term.setCursorPos(startX + 2, startY + 4)
+            term.write("Valid users:")
+            local userList = {}
+            for user, _ in pairs(users) do
+                table.insert(userList, user)
+            end
+            term.setCursorPos(startX + 2, startY + 5)
+            term.write(table.concat(userList, ", "))
+            
+            return true
+        end)
+        
+        if not success then
+            ErrorHandler.logError("Login", "Failed to draw login screen")
+            return false
+        end
+        
+        -- Handle login input
+        term.setCursorPos(startX + 11, startY + 2)
+        term.setTextColor(theme.getColor("text"))
+        local username = getUserInput(startX + 11, startY + 2, false)
+        
+        if not username or username == "" then
+            ErrorHandler.logError("Login", "No username entered")
+            -- Show error message
+            term.setCursorPos(startX + 2, startY + 6)
+            term.setTextColor(theme.getColor("error"))
+            term.write("Please enter a username!")
+            os.sleep(2)
+        else
+            -- Validate login
+            if validateLogin(username) then
                 ErrorHandler.logError("Login", "Login successful for user: " .. username)
-                
-                -- Reset login screen flag
-                theme.isLoginScreen = false
-                
-                -- Initialize shell environment with error handling
-                success = ErrorHandler.protectedCall("init_shell", function()
-                    -- Safely get colors with fallback
-                    local bgColor = pcall(theme.getColor, "background") and theme.getColor("background") or colors.black
-                    local textColor = pcall(theme.getColor, "text") and theme.getColor("text") or colors.white
-                    
-                    term.setBackgroundColor(bgColor)
-                    term.setTextColor(textColor)
-                    term.clear()
-                    term.setCursorPos(1, 2)
-                    term.write("> ")
-                    return true
-                end)
-                
-                if not success then
-                    ErrorHandler.logError("Login", "Failed to initialize shell environment")
-                    restoreTerminalState(initialState)
-                    return false
-                end
-                
+                login.exitLoginScreen()
                 return true
+            else
+                -- Show error message
+                term.setCursorPos(startX + 2, startY + 6)
+                term.setTextColor(theme.getColor("error"))
+                term.write("Invalid username!")
+                os.sleep(2)
             end
         end
     end
-    
-    -- Add error handling for invalid username
-    term.setCursorPos(startX + 2, startY + 3)
-    
-    -- Safely get error color with fallback
-    local errorColor = pcall(theme.getColor, "error") and theme.getColor("error") or colors.red
-    term.setTextColor(errorColor)
-    
-    term.write("Invalid username. Try again.")
-    os.sleep(2)  -- Pause to show error message
-        
-    ErrorHandler.logError("Login", "Login failed for user: " .. username)
-    restoreTerminalState(initialState)
-    return false
 end
 
 function login.exitLoginScreen()

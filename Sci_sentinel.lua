@@ -1,70 +1,73 @@
 -- SCI Sentinel OS: A Modular Operating System for Advanced Computer with Update Capability
 local version = "1.34" -- Minor version bump for startup handling improvements
 
--- Set up the module path
-if not fs.exists("scios") then
-    fs.makeDir("scios")
-end
-
--- Add the scios directory to package path
-package.path = "./?.lua;/scios/?.lua;" .. package.path
-
 -- Initialize error handling
 local ErrorHandler = require("ErrorHandler")
 
 -- Enhanced logging function
 local function verboseLog(context, message)
-    if ErrorHandler and ErrorHandler.logError then
-        ErrorHandler.logError(context, message)
-    end
-    print("[VERBOSE] " .. context .. ": " .. message)  -- Also print to screen for immediate visibility
+    ErrorHandler.logError(context, message)
 end
 
 -- Global module to track system modules
 SystemModules = {}
 
+-- Set up the module path
+if not fs.exists("scios") then
+    ErrorHandler.logError("System", "Creating SCIOS directory...")
+    local success = pcall(function() fs.makeDir("scios") end)
+    if not success then
+        error("Failed to create SCIOS directory")
+    end
+end
+
+ErrorHandler.logError("System", "Starting SCIOS initialization...")
+
+-- Add the scios directory to package path
+package.path = "./?.lua;/scios/?.lua;" .. package.path
+
 -- Protected require function with module caching and initialization
 local function requireModule(name, additionalParams)
-    verboseLog("Module Loader", "ATTEMPTING to load module: " .. tostring(name))
+    ErrorHandler.logError("Module Loader", "Loading module: " .. tostring(name))
     
     -- Check if module is already loaded and initialized
     if SystemModules[name] then
-        verboseLog("Module Loader", "Module already loaded and initialized: " .. name)
+        ErrorHandler.logError("Module Loader", "Module already loaded: " .. name)
         return SystemModules[name]
     end
     
     local success, loadedModule = pcall(require, name)
     
     if not success then
-        verboseLog("Module Loader", "FAILED to load module: " .. name .. ", Error: " .. tostring(loadedModule))
+        ErrorHandler.logError("Module Loader", "ERROR loading module: " .. name .. " - " .. tostring(loadedModule))
         return nil
     end
     
     if loadedModule == nil then
-        verboseLog("Module Loader", "Module loaded as nil: " .. name)
+        ErrorHandler.logError("Module Loader", "Module loaded as nil: " .. name)
         return nil
     end
     
     if type(loadedModule) ~= "table" then
-        verboseLog("Module Loader", "Module did not return a table: " .. name .. ", type: " .. type(loadedModule))
+        ErrorHandler.logError("Module Loader", "Module did not return a table: " .. name .. ", type: " .. type(loadedModule))
         return nil
     end
     
-    verboseLog("Module Loader", "Module loaded successfully: " .. name)
+    ErrorHandler.logError("Module Loader", "Module loaded successfully: " .. name)
     
     -- Store module in SystemModules before initialization to prevent cycles
     SystemModules[name] = loadedModule
     
     -- Initialize the module if it has an init function
     if type(loadedModule.init) == "function" then
-        verboseLog("Module Loader", "Attempting to initialize module: " .. name)
+        ErrorHandler.logError("Module Loader", "Initializing module: " .. name)
         
         local initSuccess, initErr = pcall(function()
             return loadedModule.init(additionalParams)
         end)
         
         if not initSuccess then
-            verboseLog("Module Loader", "Failed to initialize module: " .. name .. ", Error: " .. tostring(initErr))
+            ErrorHandler.logError("Module Loader", "ERROR initializing module: " .. name .. " - " .. tostring(initErr))
             -- Don't remove from SystemModules, just mark as failed
             SystemModules[name .. "_init_failed"] = true
         end
@@ -75,7 +78,7 @@ end
 
 -- Global function to initialize system modules
 function initializeSystemModules()
-    verboseLog("System", "STARTING system initialization")
+    ErrorHandler.logError("System", "STARTING system initialization")
     
     -- Create a dependency order for module loading
     local moduleLoadOrder = {
@@ -94,16 +97,16 @@ function initializeSystemModules()
     for _, moduleName in ipairs(moduleLoadOrder) do
         -- Skip if module is already properly loaded and initialized
         if SystemModules[moduleName] and not SystemModules[moduleName .. "_init_failed"] then
-            verboseLog("Module Loader", "Skipping already initialized module: " .. moduleName)
+            ErrorHandler.logError("Module Loader", "Skipping already initialized module: " .. moduleName)
             loadedModules[moduleName] = SystemModules[moduleName]
             goto continue
         end
         
-        verboseLog("Module Loader", "Loading module: " .. moduleName)
+        ErrorHandler.logError("Module Loader", "Loading module: " .. moduleName)
         local module = requireModule(moduleName)
         
         if not module then
-            verboseLog("Module Loader", "CRITICAL: Failed to load module: " .. moduleName)
+            ErrorHandler.logError("Module Loader", "CRITICAL: Failed to load module: " .. moduleName)
             term.clear()
             term.setCursorPos(1,1)
             term.setTextColor(colors.red)
@@ -122,7 +125,7 @@ function initializeSystemModules()
     
     -- Attempt to start system UI
     if type(startSystemUI) ~= "function" then
-        verboseLog("System", "CRITICAL: startSystemUI is not a valid function")
+        ErrorHandler.logError("System", "CRITICAL: startSystemUI is not a valid function")
         term.clear()
         term.setCursorPos(1,1)
         term.setTextColor(colors.red)
@@ -132,7 +135,7 @@ function initializeSystemModules()
     
     local uiSuccess, uiResult = pcall(startSystemUI)
     if not uiSuccess then
-        verboseLog("System", "Failed to start system UI: " .. tostring(uiResult))
+        ErrorHandler.logError("System", "Failed to start system UI: " .. tostring(uiResult))
         term.clear()
         term.setCursorPos(1,1)
         term.setTextColor(colors.red)
@@ -142,7 +145,7 @@ function initializeSystemModules()
     
     -- Check the return value of startSystemUI
     if uiResult ~= true then
-        verboseLog("System", "System UI initialization returned false")
+        ErrorHandler.logError("System", "System UI initialization returned false")
         term.clear()
         term.setCursorPos(1,1)
         term.setTextColor(colors.red)
@@ -155,96 +158,64 @@ end
 
 -- Start system UI
 function startSystemUI()
-    verboseLog("System", "Starting System UI Components")
+    ErrorHandler.logError("System", "Starting System UI Components")
     
     -- Verify theme module is loaded
     local themeModule = SystemModules.Theme
     if not themeModule then
-        verboseLog("System", "CRITICAL: Theme module not loaded")
+        ErrorHandler.logError("System", "CRITICAL: Theme module not loaded")
         term.clear()
         term.setCursorPos(1,1)
         term.setTextColor(colors.red)
-        term.write("SYSTEM UI INITIALIZATION FAILED: THEME MODULE MISSING")
+        term.write("SYSTEM UI INITIALIZATION FAILED: THEME NOT LOADED")
         return false
     end
     
-    -- Check if required theme functions exist
-    local requiredFunctions = {
-        "drawPersistentTitleBar",
-        "startMSDOSCursor"
-    }
-    
-    for _, funcName in ipairs(requiredFunctions) do
-        if type(themeModule[funcName]) ~= "function" then
-            verboseLog("System", "CRITICAL: Missing theme function: " .. funcName)
-            term.clear()
-            term.setCursorPos(1,1)
-            term.setTextColor(colors.red)
-            term.write("SYSTEM UI INITIALIZATION FAILED: MISSING " .. funcName:upper())
-            return false
-        end
-    end
-    
-    -- Protect title bar drawing
-    local titleBarSuccess, titleBarErr = pcall(function()
-        themeModule.drawPersistentTitleBar()
-    end)
-    
-    if not titleBarSuccess then
-        verboseLog("System", "Failed to draw persistent title bar: " .. tostring(titleBarErr))
-        term.clear()
-        term.setCursorPos(1,1)
-        term.setTextColor(colors.red)
-        term.write("SYSTEM UI INITIALIZATION FAILED: TITLE BAR ERROR")
-        return false
-    end
-    
-    -- Start blinking cursor in a separate coroutine
+    -- Start the cursor thread
     local cursorThread
     local cursorSuccess, cursorErr = pcall(function()
         cursorThread = themeModule.startMSDOSCursor()
-    end)
-    
-    if not cursorSuccess then
-        verboseLog("System", "Failed to start cursor thread: " .. tostring(cursorErr))
-        term.clear()
-        term.setCursorPos(1,1)
-        term.setTextColor(colors.red)
-        term.write("SYSTEM UI INITIALIZATION FAILED: CURSOR THREAD ERROR")
-        return false
-    end
-    
-    -- Protect cursor thread resuming
-    local threadSuccess, threadErr = pcall(function()
-        -- Resume the cursor thread periodically
-        while true do
-            if coroutine.status(cursorThread) ~= "dead" then
-                local success, err = coroutine.resume(cursorThread)
-                if not success then
-                    error("Cursor thread error: " .. tostring(err))
-                end
-            else
-                break
-            end
-            os.sleep(0.5)  -- Prevent tight loop
+        if not cursorThread then
+            error("Failed to create cursor thread")
         end
     end)
     
-    if not threadSuccess then
-        verboseLog("System", "Cursor thread failed: " .. tostring(threadErr))
-        term.clear()
-        term.setCursorPos(1,1)
-        term.setTextColor(colors.red)
-        term.write("SYSTEM UI INITIALIZATION FAILED: CURSOR THREAD RESUMING")
+    if not cursorSuccess then
+        ErrorHandler.logError("System", "Failed to start cursor thread: " .. tostring(cursorErr))
         return false
     end
+    
+    -- Start parallel execution of cursor thread and login screen
+    parallel.waitForAny(
+        function()
+            while true do
+                local success, err = coroutine.resume(cursorThread)
+                if not success then
+                    ErrorHandler.logError("System", "Cursor thread error: " .. tostring(err))
+                    break
+                end
+                if coroutine.status(cursorThread) == "dead" then
+                    break
+                end
+                os.sleep(0.5)
+            end
+        end,
+        function()
+            local login = SystemModules.Login
+            if login then
+                login.showLoginScreen()
+            else
+                ErrorHandler.logError("System", "Login module not available")
+            end
+        end
+    )
     
     return true
 end
 
 -- Command loop function
 local function startCommandLoop()
-    verboseLog("Main", "Starting command loop")
+    ErrorHandler.logError("Main", "Starting command loop")
     
     -- Ensure critical modules are available
     local commands = SystemModules.Commands
@@ -252,7 +223,7 @@ local function startCommandLoop()
     local theme = SystemModules.Theme
     
     if not commands or not gui or not theme then
-        verboseLog("Main", "CRITICAL: One or more required modules are missing")
+        ErrorHandler.logError("Main", "CRITICAL: One or more required modules are missing")
         term.clear()
         term.setCursorPos(1,1)
         term.setTextColor(colors.red)
@@ -281,19 +252,19 @@ local function startCommandLoop()
     end)
     
     if not screenDrawSuccess then
-        verboseLog("Main", "Failed to draw initial screen")
+        ErrorHandler.logError("Main", "Failed to draw initial screen")
         return false
     end
     
     -- Main command processing loop
     while true do
-        verboseLog("Main", "Waiting for user input")
+        ErrorHandler.logError("Main", "Waiting for user input")
         
         -- Safely read input
         local inputSuccess, input = pcall(read)
         
         if not inputSuccess then
-            verboseLog("Main", "Input reading failed: " .. tostring(input))
+            ErrorHandler.logError("Main", "Input reading failed: " .. tostring(input))
             gui.drawError("Input error: " .. tostring(input))
             sleep(2)
             goto continue
@@ -301,7 +272,7 @@ local function startCommandLoop()
         
         -- Handle empty input
         if input and input ~= "" then
-            verboseLog("Main", "Processing command: " .. tostring(input))
+            ErrorHandler.logError("Main", "Processing command: " .. tostring(input))
             
             -- Attempt to handle command with error handling
             local cmdSuccess, cmdResult = pcall(function()
@@ -309,7 +280,7 @@ local function startCommandLoop()
             end)
             
             if not cmdSuccess then
-                verboseLog("Main", "Command handling failed: " .. tostring(cmdResult))
+                ErrorHandler.logError("Main", "Command handling failed: " .. tostring(cmdResult))
                 gui.drawError("Error processing command: " .. tostring(cmdResult))
                 sleep(2)
             end
@@ -325,7 +296,7 @@ end
 
 -- Main function to initialize and draw interface
 local function main()
-    verboseLog("Main", "STARTING main initialization")
+    ErrorHandler.logError("Main", "STARTING main initialization")
     
     -- Initialize system modules
     if not initializeSystemModules() then
@@ -337,7 +308,7 @@ local function main()
         return false
     end
     
-    verboseLog("Main", "System modules initialized, proceeding...")
+    ErrorHandler.logError("Main", "System modules initialized, proceeding...")
     
     -- Safely get modules from global SystemModules
     local gui = SystemModules.Gui
@@ -355,7 +326,7 @@ local function main()
     
     for _, mod in ipairs(criticalModules) do
         if not mod.module then
-            verboseLog("Main", "CRITICAL MODULE MISSING: " .. mod.name)
+            ErrorHandler.logError("Main", "CRITICAL MODULE MISSING: " .. mod.name)
             term.clear()
             term.setCursorPos(1,1)
             term.setBackgroundColor(colors.red)
@@ -380,7 +351,7 @@ local function main()
     end)
     
     if not screenInitSuccess then
-        verboseLog("Main", "Failed to draw initial screen")
+        ErrorHandler.logError("Main", "Failed to draw initial screen")
         return false
     end
     
@@ -392,14 +363,14 @@ end
 
 -- Draw initial screen with error handling
 local function drawInitialScreen()
-    verboseLog("Main", "Attempting to draw initial screen...")
+    ErrorHandler.logError("Main", "Attempting to draw initial screen...")
     return ErrorHandler.protectedCall("draw_screen", function()
-        verboseLog("Main", "Inside drawScreen function")
+        ErrorHandler.logError("Main", "Inside drawScreen function")
         
         -- Use SystemModules instead of local gui variable
         local gui = SystemModules.Gui
         if not gui then
-            verboseLog("Main", "GUI module not available, using fallback")
+            ErrorHandler.logError("Main", "GUI module not available, using fallback")
             term.clear()
             term.setCursorPos(1,1)
             term.setBackgroundColor(colors.black)
@@ -420,15 +391,20 @@ local function drawInitialScreen()
     end)
 end
 
--- Wrap the entire script execution in a protected call
-local function safeStart()
-    verboseLog("Startup", "SAFE START INITIATED")
+-- Create the module table
+local sci_sentinel = {
+    version = version
+}
+
+-- Main run function that will be called by Startup.lua
+function sci_sentinel.run()
+    ErrorHandler.logError("Startup", "SAFE START INITIATED")
     
     -- Attempt to initialize system modules
     local initSuccess, initResult = pcall(initializeSystemModules)
     
     if not initSuccess then
-        verboseLog("Startup", "CATASTROPHIC FAILURE: " .. tostring(initResult))
+        ErrorHandler.logError("Startup", "CATASTROPHIC FAILURE: " .. tostring(initResult))
         term.clear()
         term.setCursorPos(1,1)
         term.setTextColor(colors.red)
@@ -438,7 +414,7 @@ local function safeStart()
     
     -- Check the return value of initializeSystemModules
     if initResult ~= true then
-        verboseLog("Startup", "SYSTEM INITIALIZATION FAILED")
+        ErrorHandler.logError("Startup", "SYSTEM INITIALIZATION FAILED")
         term.clear()
         term.setCursorPos(1,1)
         term.setTextColor(colors.red)
@@ -450,7 +426,7 @@ local function safeStart()
     local loopSuccess, loopResult = pcall(startCommandLoop)
     
     if not loopSuccess then
-        verboseLog("Startup", "COMMAND LOOP FAILED: " .. tostring(loopResult))
+        ErrorHandler.logError("Startup", "COMMAND LOOP FAILED: " .. tostring(loopResult))
         term.clear()
         term.setCursorPos(1,1)
         term.setTextColor(colors.red)
@@ -461,12 +437,5 @@ local function safeStart()
     return true
 end
 
--- Attempt to start the system safely
-local startupSuccess, startupResult = pcall(safeStart)
-
-if not startupSuccess then
-    term.clear()
-    term.setCursorPos(1,1)
-    term.setTextColor(colors.red)
-    term.write("CRITICAL SYSTEM STARTUP ERROR: " .. tostring(startupResult))
-end
+-- Return the module
+return sci_sentinel

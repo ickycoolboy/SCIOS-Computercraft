@@ -2,12 +2,17 @@
 local ErrorHandler = {}
 
 -- Configure logging
-local LOG_FILE = "scios/error.log"
+local LOG_FILE = "error.log"
 local MAX_LOG_SIZE = 10240 -- 10KB
 
--- Ensure log directory exists
-if not fs.exists("scios") then
-    fs.makeDir("scios")
+-- Initialize or clear log file on startup
+local function initLogFile()
+    -- Create or clear the log file
+    local file = fs.open(LOG_FILE, "w")
+    if file then
+        file.write("=== SCIOS Log Started ===\n")
+        file.close()
+    end
 end
 
 -- Trim log file if it gets too large
@@ -26,74 +31,54 @@ local function trimLogFile()
     end
 end
 
+-- Format timestamp consistently
+local function getTimestamp()
+    local time = os.date("*t")
+    return string.format(
+        "%02d:%02d:%02d",
+        time.hour,
+        time.min,
+        time.sec
+    )
+end
+
 -- Log an error with timestamp and context
 function ErrorHandler.logError(context, err)
     trimLogFile()
     local file = fs.open(LOG_FILE, "a")
-    local timeString = os.date("*t")
-    local logEntry = string.format(
-        "[%d:%02d] %s: %s\n",
-        timeString.hour,
-        timeString.min,
-        context,
-        tostring(err)
-    )
-    file.write(logEntry)
-    file.close()
+    if file then
+        local timestamp = getTimestamp()
+        local logEntry = string.format(
+            "[%s] %s: %s\n",
+            timestamp,
+            context,
+            tostring(err)
+        )
+        file.write(logEntry)
+        file.close()
+        
+        -- Also print to terminal for immediate visibility
+        if term and term.isColor and term.isColor() then
+            local oldColor = term.getTextColor()
+            term.setTextColor(colors.yellow)
+            print(logEntry)
+            term.setTextColor(oldColor)
+        end
+    end
 end
 
 -- Protected call with error logging
 function ErrorHandler.protectedCall(context, func, ...)
-    local result = {pcall(func, ...)}
-    if not result[1] then
-        ErrorHandler.logError(context, result[2])
-        return false, result[2]
+    local results = {pcall(func, ...)}
+    if not results[1] then
+        ErrorHandler.logError(context, results[2])
+        return false, results[2]
     end
-    -- Return all results after the success boolean
-    return table.unpack(result, 2)
+    -- Return success flag and all actual results
+    return true, table.unpack(results, 2)
 end
 
--- Wrap a function with error handling
-function ErrorHandler.wrap(context, func)
-    return function(...)
-        return ErrorHandler.protectedCall(context, func, ...)
-    end
-end
-
--- Create a protected environment for running code
-function ErrorHandler.createSafeEnvironment()
-    local env = {}
-    for k, v in pairs(_G) do
-        if type(v) == "function" then
-            env[k] = ErrorHandler.wrap(k, v)
-        else
-            env[k] = v
-        end
-    end
-    return env
-end
-
--- Get the error log contents
-function ErrorHandler.getLog()
-    if not fs.exists(LOG_FILE) then
-        return "No errors logged"
-    end
-    local file = fs.open(LOG_FILE, "r")
-    local content = file.readAll()
-    file.close()
-    return content
-end
-
--- Clear the error log
-function ErrorHandler.clearLog()
-    if fs.exists(LOG_FILE) then
-        fs.delete(LOG_FILE)
-    end
-end
-
--- Protected require function
-function ErrorHandler.safeRequire(module)
-    return ErrorHandler.protectedCall("require:" .. module, require, module)
-end
+-- Initialize log file when module is loaded
+initLogFile()
 
 return ErrorHandler

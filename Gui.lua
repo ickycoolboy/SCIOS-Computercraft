@@ -7,19 +7,29 @@ local theme
 
 -- Improved theme initialization with error handling
 local function getTheme()
-    return ErrorHandler.protectedCall("get_theme", function()
-        if not theme then
-            theme = require("Theme")
-            if not theme then
-                error("Failed to load Theme module")
-            end
-            -- Initialize theme if needed
-            if type(theme.init) == "function" then
-                theme.init()
+    if theme then return theme end
+    
+    local success, loadedTheme = ErrorHandler.protectedCall("get_theme", function()
+        local t = require("Theme")
+        if not t then
+            error("Failed to load Theme module")
+        end
+        -- Initialize theme if needed
+        if type(t.init) == "function" and not t.isInitialized() then
+            local initSuccess = t.init()
+            if not initSuccess then
+                error("Theme initialization failed")
             end
         end
-        return theme
-    end) or error("Critical: Theme initialization failed")
+        return t
+    end)
+    
+    if not success or type(loadedTheme) ~= "table" then
+        error("Critical: Theme initialization failed: " .. tostring(loadedTheme))
+    end
+    
+    theme = loadedTheme
+    return theme
 end
 
 local gui = {}

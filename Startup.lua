@@ -4,109 +4,173 @@ print("Startup.lua script execution started.")
 sleep(2)  -- Add delay to ensure message is visible
 local version = "1.34"
 
--- Improve module loading path and diagnostics
-local function setupModulePath()
-    local currentDir = shell.dir()
-    local modulePaths = {
-        fs.combine(currentDir, "?.lua"),
-        fs.combine(currentDir, "scios/?.lua"),
-        fs.combine(currentDir, "/?.lua"),
-        fs.combine(currentDir, "/scios/?.lua"),
-        "/?",
-        "/scios/?"
-    }
-    
-    package.path = table.concat(modulePaths, ";") .. ";" .. package.path
-    
-    ErrorHandler.logError("Module Path", "Updated package.path: " .. package.path)
+-- Basic logging function before ErrorHandler is available
+local function earlyLog(context, message)
+    print("[" .. context .. "] " .. message)
 end
 
--- Enhanced safe require with detailed logging and validation
-local function safeRequire(module, required)
-    ErrorHandler.logError("Require", "Attempting to load module: " .. tostring(module))
-    
-    -- Validate module name
-    if type(module) ~= "string" then
-        ErrorHandler.logError("Require", "Invalid module name: " .. tostring(module))
-        return false, "Invalid module name"
-    end
-    
-    -- Check if module file exists
-    local moduleExists = false
-    for path in package.path:gmatch("[^;]+") do
-        local fullPath = path:gsub("?", module)
-        if fs.exists(fullPath) then
-            moduleExists = true
-            ErrorHandler.logError("Require", "Module file found: " .. fullPath)
-            break
-        end
-    end
-    
-    if not moduleExists then
-        ErrorHandler.logError("Require", "No module file found for: " .. module)
-        return false, "Module file not found"
-    end
-    
-    local status, result = ErrorHandler.protectedCall("require:" .. module, function()
-        local loaded = require(module)
-        
-        -- Additional validation of loaded module
-        if loaded == nil then
-            error("Module loaded as nil: " .. module)
-        end
-        
-        if type(loaded) ~= "table" then
-            error("Module did not return a table: " .. module .. ", type: " .. type(loaded))
-        end
-        
-        ErrorHandler.logError("Require", "Module loaded successfully: " .. tostring(module))
-        return loaded
-    end)
-    
-    if not status then
-        ErrorHandler.logError("Require", "Failed to load module: " .. tostring(module) .. ", Error: " .. tostring(result))
-        return false, result
-    end
-    
-    return true, result
-end
-
--- Modify theme loading to be more explicit
-local function loadThemeModule()
-    ErrorHandler.logError("Theme", "Explicit theme module loading initiated")
-    
-    local status, theme = safeRequire("Theme")
-    
-    if not status then
-        ErrorHandler.logError("Theme", "Theme module load failed: " .. tostring(theme))
-        
-        -- Fallback mechanism
-        theme = {
-            version = "fallback",
-            getColor = function(name) return colors.black end,
-            drawTitleBar = function() end
-        }
-    end
-    
-    return theme
-end
-
--- Call this before requiring modules
-setupModulePath()
-
--- Set up the module path
+-- Set up basic paths first
 if not fs.exists("scios") then
     fs.makeDir("scios")
+    earlyLog("Startup", "Created scios directory")
 end
 
--- Initialize error handling
-local ErrorHandler = safeRequire("ErrorHandler", true)
+-- Improve module loading path
+local function setupModulePath()
+    -- Use absolute paths with shell.dir()
+    local basePath = shell.dir()
+    package.path = fs.combine(basePath, "scios/?") .. ";" ..
+                  fs.combine(basePath, "scios/?.lua") .. ";" ..
+                  fs.combine(basePath, "?") .. ";" ..
+                  fs.combine(basePath, "?.lua")
+    
+    earlyLog("Module Path", "Updated package.path: " .. package.path)
+end
+
+-- Initialize paths before loading any modules
+setupModulePath()
+
+-- Load ErrorHandler first with detailed error checking
+earlyLog("Startup", "Loading ErrorHandler module...")
+local ErrorHandler
+local success, result = pcall(function()
+    local module = require("ErrorHandler")
+    if type(module) ~= "table" then
+        error("ErrorHandler module did not return a table, got: " .. type(module))
+    end
+    return module
+end)
+
+if not success then
+    error("Failed to load ErrorHandler: " .. tostring(result))
+end
+
+ErrorHandler = result
 if not ErrorHandler then
-    error("Failed to load ErrorHandler module")
+    error("ErrorHandler loaded as nil")
 end
 
--- Initialize theme system
-local theme = loadThemeModule()
+if type(ErrorHandler.logError) ~= "function" then
+    error("ErrorHandler.logError is not a function")
+end
+
+earlyLog("Startup", "ErrorHandler module loaded successfully")
+ErrorHandler.logError("Startup", "ErrorHandler module loaded successfully")
+
+-- Enhanced safe require with error handling
+local function safeRequire(module)
+    local success, loaded = ErrorHandler.protectedCall("require:" .. module, function()
+        local mod = require(module)
+        if not mod then
+            error("Module loaded as nil: " .. module)
+        end
+        return mod
+    end)
+    return success, loaded
+end
+
+-- Ensure theme is loaded and accessible
+local function initializeTheme()
+    ErrorHandler.logError("Theme", "Initializing theme module")
+    
+    local success, themeModule = safeRequire("Theme")
+    
+    if not success or type(themeModule) ~= "table" then
+        ErrorHandler.logError("Theme", "Failed to load theme module: " .. tostring(themeModule))
+        -- Fallback mechanism
+        themeModule = {
+            version = "fallback",
+            getColor = function(name) return colors.black end,
+            drawTitleBar = function() end,
+            init = function() return true end,
+            isInitialized = function() return true end
+        }
+    else
+        ErrorHandler.logError("Theme", "Theme module loaded successfully")
+        -- Initialize the theme immediately after loading
+        if type(themeModule.init) ~= "function" then
+            ErrorHandler.logError("Theme", "Theme module missing init function")
+            return false
+        end
+        
+        local initSuccess, initResult = ErrorHandler.protectedCall("Theme:init", function()
+            return themeModule.init()
+        end)
+        
+        if not initSuccess then
+            ErrorHandler.logError("Theme", "Theme initialization failed: " .. tostring(initResult))
+            return false
+        end
+        
+        if not initResult then
+            ErrorHandler.logError("Theme", "Theme initialization returned false")
+            return false
+        end
+        
+        ErrorHandler.logError("Theme", "Theme initialized successfully")
+    end
+    
+    -- Assign to global variable
+    _G.theme = themeModule
+    ErrorHandler.logError("Theme", "Theme module assigned globally")
+    
+    -- Verify initialization
+    if type(_G.theme.isInitialized) == "function" and _G.theme.isInitialized() then
+        ErrorHandler.logError("Theme", "Theme verified as initialized")
+        return true
+    else
+        ErrorHandler.logError("Theme", "Theme verification failed")
+        return false
+    end
+end
+
+-- Initialize theme module
+initializeTheme()
+
+-- Verify theme is accessible
+if not _G.theme then
+    ErrorHandler.logError("Theme", "Theme is nil after initialization")
+else
+    ErrorHandler.logError("Theme", "Theme is accessible globally")
+end
+
+-- Safe theme access function
+function _G.safeTheme()
+    if not _G.theme then
+        ErrorHandler.logError("Theme", "Theme module not found, attempting reinitialization")
+        initializeTheme()
+        if not _G.theme then
+            ErrorHandler.logError("Theme", "Theme reinitialization failed, using fallback")
+            return {
+                version = "fallback",
+                getColor = function(name) 
+                    ErrorHandler.logError("Theme", "Using fallback color for: " .. tostring(name))
+                    return colors.black 
+                end,
+                drawTitleBar = function() end,
+                init = function() return true end,
+                isInitialized = function() return true end
+            }
+        end
+    end
+    
+    -- If theme exists but not initialized, try to initialize it
+    if type(_G.theme.isInitialized) == "function" and not _G.theme.isInitialized() then
+        ErrorHandler.logError("Theme", "Theme not initialized, attempting initialization")
+        if type(_G.theme.init) == "function" then
+            local success = _G.theme.init()
+            if not success then
+                ErrorHandler.logError("Theme", "Theme initialization failed")
+            else
+                ErrorHandler.logError("Theme", "Theme initialized successfully")
+            end
+        else
+            ErrorHandler.logError("Theme", "Theme missing init function")
+        end
+    end
+    
+    return _G.theme
+end
 
 -- Track key states
 local altHeld = false
@@ -134,7 +198,7 @@ local function handleResolution()
                         if currentScale > 0.5 then
                             term.current().setTextScale(currentScale - 0.5)
                         end
-                        local initSuccess = theme.init() -- Refresh theme after resize
+                        local initSuccess = _G.safeTheme().init() -- Refresh theme after resize
                         if not initSuccess then
                             ErrorHandler.logError("Resolution Handler", "Failed to reinitialize theme after resize")
                         end
@@ -145,7 +209,7 @@ local function handleResolution()
                         if currentScale < 5 then
                             term.current().setTextScale(currentScale + 0.5)
                         end
-                        local initSuccess = theme.init() -- Refresh theme after resize
+                        local initSuccess = _G.safeTheme().init() -- Refresh theme after resize
                         if not initSuccess then
                             ErrorHandler.logError("Resolution Handler", "Failed to reinitialize theme after resize")
                         end
@@ -161,7 +225,7 @@ end
 -- Display startup message with protected calls
 ErrorHandler.protectedCall("draw_startup", function()
     sleep(1)  -- Add delay before drawing title bar
-    theme.drawTitleBar("SCI Sentinel OS v" .. version)
+    _G.safeTheme().drawTitleBar("SCI Sentinel OS v" .. version)
     
     -- Show resize hint
     local w, h = term.getSize()
@@ -181,7 +245,7 @@ os.sleep(3) -- Show the message longer
 ErrorHandler.protectedCall("clear_hint", function()
     term.setBackgroundColor(colors.black)
     term.clear()
-    theme.drawTitleBar("SCI Sentinel OS v" .. version)
+    _G.safeTheme().drawTitleBar("SCI Sentinel OS v" .. version)
 end)
 
 -- System file protection
@@ -209,10 +273,10 @@ end
 
 -- Start SCIOS
 ErrorHandler.logError("Startup", "Starting SCIOS")
-local sci_sentinel = safeRequire("Sci_sentinel")
+local success, sci_sentinel = safeRequire("Sci_sentinel")
 
-if not sci_sentinel then
-    ErrorHandler.logError("Startup", "SCIOS failed to start")
+if not success or type(sci_sentinel) ~= "table" then
+    ErrorHandler.logError("Startup", "SCIOS failed to start: " .. tostring(sci_sentinel))
     term.setBackgroundColor(colors.black)
     term.setTextColor(colors.red)
     term.clear()
@@ -222,4 +286,14 @@ if not sci_sentinel then
 end
 
 -- Run SCIOS
+if type(sci_sentinel.run) ~= "function" then
+    ErrorHandler.logError("Startup", "SCIOS missing run function")
+    term.setBackgroundColor(colors.black)
+    term.setTextColor(colors.red)
+    term.clear()
+    term.setCursorPos(1,1)
+    print("SCIOS initialization error. Check error.log for details.")
+    return
+end
+
 sci_sentinel.run()
